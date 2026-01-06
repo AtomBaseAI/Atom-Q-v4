@@ -161,7 +161,6 @@ export async function enrollUsersAction(formData: FormData) {
 
     await db.quizUser.createMany({
       data: enrollments,
-      skipDuplicates: true,
     })
 
     revalidatePath(`/admin/quiz/${validatedFields.data.quizId}/students`)

@@ -170,7 +170,6 @@ export default function QuizUsersPage() {
         // Reset filters
         setEnrollSearchTerm("")
         setEnrollCampusFilter("all")
-        setEnrollTagFilter("all")
         fetchEnrolledUsers()
       } else {
         const error = await response.json()
@@ -342,7 +341,6 @@ export default function QuizUsersPage() {
               // Reset filters when opening dialog
               setEnrollSearchTerm("")
               setEnrollCampusFilter("all")
-              setEnrollTagFilter("all")
               setIsEnrollDialogOpen(true)
             }}
           >

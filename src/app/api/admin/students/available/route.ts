@@ -28,11 +28,11 @@ export async function GET(request: NextRequest) {
           isActive: true,
           ...(search && {
             OR: [
-              { name: { contains: search, mode: "insensitive" } },
-              { email: { contains: search, mode: "insensitive" } }
+              { name: { contains: search } },
+              { email: { contains: search } }
             ]
           }),
-          ...(campus && { campus: { contains: campus, mode: "insensitive" } })
+          ...(campus && { campus: { contains: campus } })
         },
         select: {
           id: true,

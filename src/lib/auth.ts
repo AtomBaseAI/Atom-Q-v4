@@ -40,7 +40,8 @@ async function getMaintenanceMode(): Promise<boolean> {
     
     return isMaintenance
   } catch (error) {
-    // If database fails, assume no maintenance mode for safety
+    console.error("Error checking maintenance mode:", error)
+    // If database fails or settings table doesn't exist, assume no maintenance mode for safety
     return false
   }
 }

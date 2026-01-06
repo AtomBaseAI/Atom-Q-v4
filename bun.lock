@@ -60,6 +60,7 @@
         "tailwindcss-animate": "^1.0.7",
         "tailwindcss-scrollbar": "^0.1.0",
         "xlsx": "^0.18.5",
+        "z-ai-web-dev-sdk": "^0.0.15",
         "zod": "^4.0.15",
         "zustand": "^5.0.7",
       },
@@ -1329,6 +1330,8 @@
     "yallist": ["yallist@4.0.0", "", {}, "sha512-3wdGidZyq5PB084XLES5TpOSRA3wjXAlIWMhum2kRcv/41Sn2emQ0dycQW4uZXLejwKvg6EsvbdlVL+FYEct7A=="],
 
     "yocto-queue": ["yocto-queue@0.1.0", "", {}, "sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q=="],
+
+    "z-ai-web-dev-sdk": ["z-ai-web-dev-sdk@0.0.15", "", { "bin": { "z-ai": "dist/cli.js", "z-ai-generate": "dist/cli.js" } }, "sha512-e1Lk8q7Z5BJcXlTIFv+jAMaOF4TxJv5Ex5zY1lLVh1ee6USQAHBojV6GdwCK6gJTAjXcARMFNQzcHXfX62a5Vg=="],
 
     "zod": ["zod@4.3.5", "", {}, "sha512-k7Nwx6vuWx1IJ9Bjuf4Zt1PEllcwe7cls3VNzm4CQ1/hgtFUK2bRNG3rvnpPUhFjmqJKAKtjV576KnUkHocg/g=="],
 
