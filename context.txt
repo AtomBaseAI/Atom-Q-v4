@@ -1,0 +1,10 @@
+remove default scafholding , and clone the following repo :https://github.com/AtomBaseAI/Atom-Q-Beta, and move all files to root and run npm i, and add following data  to .env : # npx auth secret
+NEXTAUTH_SECRET="Sr3FpvqFXyDEGTgwItILgXM4A24JCURO/B0UgcSAXi4="
+# DATABASE_URL="postgresql://MaX-NeO:24JSxoYHGkah@ep-still-term-893812-pooler.ap-southeast-1.aws.neon.tech/atom-q-beta?sslmode=require&channel_binding=require"
+
+#B12
+DATABASE_URL="postgresql://MaX-NeO:24JSxoYHGkah@ep-still-term-893812-pooler.ap-southeast-1.aws.neon.tech/atom-q-b12?sslmode=require&channel_binding=require", 
+
+and run bun x prisma generate and remove --turbo from run command & run the app
+
+i don't want updates / visual updates while doing above tasks , do it and give me the final update

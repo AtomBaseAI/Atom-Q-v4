@@ -1,0 +1,211 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id             String          @id @default(cuid())
+  email          String          @unique
+  name           String?
+  password       String
+  role           UserRole        @default(USER)
+  avatar         String?
+  phone          String?
+  campus         String?
+  isActive       Boolean         @default(true)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  quizAttempts   QuizAttempt[]
+  quizUsers      QuizUser[]
+  createdQuizzes Quiz[]          @relation("QuizCreator")
+  questionGroups QuestionGroup[]
+  reportedQuestions ReportedQuestion[]
+
+  @@map("users")
+}
+
+model QuestionGroup {
+  id          String     @id @default(cuid())
+  name        String
+  description String?
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  questions   Question[]
+  creatorId   String
+  creator     User       @relation(fields: [creatorId], references: [id])
+
+  @@map("question_groups")
+}
+
+model Question {
+  id            String          @id @default(cuid())
+  title         String
+  content       String
+  type          QuestionType
+  options       String
+  correctAnswer String
+  explanation   String?
+  difficulty    DifficultyLevel @default(MEDIUM)
+  isActive      Boolean         @default(true)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  quizQuestions QuizQuestion[]
+  groupId       String
+  group         QuestionGroup?  @relation(fields: [groupId], references: [id])
+  reportedQuestions ReportedQuestion[]
+
+  @@map("questions")
+}
+
+model Quiz {
+  id                 String          @id @default(cuid())
+  title              String
+  description        String?
+  timeLimit          Int?
+  difficulty         DifficultyLevel @default(MEDIUM)
+  status             QuizStatus      @default(ACTIVE)
+  negativeMarking    Boolean         @default(false)
+  negativePoints     Float?
+  randomOrder        Boolean         @default(false)
+  maxAttempts        Int?
+  showAnswers        Boolean         @default(false)
+  startTime          DateTime?
+  endTime            DateTime?
+  creatorId          String
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  quizAttempts       QuizAttempt[]
+  quizQuestions      QuizQuestion[]
+  quizUsers          QuizUser[]
+  creator            User            @relation("QuizCreator", fields: [creatorId], references: [id])
+  checkAnswerEnabled Boolean         @default(false)
+
+  @@map("quizzes")
+}
+
+model QuizQuestion {
+  id         String   @id @default(cuid())
+  quizId     String
+  questionId String
+  order      Int
+  points     Float    @default(1.0)
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  quiz       Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  @@unique([quizId, questionId])
+  @@map("quiz_questions")
+}
+
+model QuizUser {
+  id        String   @id @default(cuid())
+  quizId    String
+  userId    String
+  createdAt DateTime @default(now())
+  quiz      Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([quizId, userId])
+  @@map("quiz_users")
+}
+
+model QuizAttempt {
+  id          String        @id @default(cuid())
+  userId      String
+  quizId      String
+  status      AttemptStatus @default(NOT_STARTED)
+  score       Float?
+  totalPoints Float?
+  timeTaken   Int?
+  startedAt   DateTime?
+  submittedAt DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  answers     QuizAnswer[]
+  quiz        Quiz          @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("quiz_attempts")
+}
+
+model QuizAnswer {
+  id           String      @id @default(cuid())
+  attemptId    String
+  questionId   String
+  userAnswer   String
+  isCorrect    Boolean?
+  pointsEarned Float?
+  timeSpent    Int?
+  createdAt    DateTime    @default(now())
+  attempt      QuizAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+
+  @@unique([attemptId, questionId])
+  @@map("quiz_answers")
+}
+
+model ReportedQuestion {
+  id           String           @id @default(cuid())
+  questionId   String
+  userId       String
+  suggestion   String
+  status       ReportStatus     @default(PENDING)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  question     Question         @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("reported_questions")
+}
+
+model Settings {
+  id                String   @id @default(cuid())
+  siteTitle         String   @default("Atom Q")
+  siteDescription   String   @default("Take quizzes and test your knowledge")
+  maintenanceMode   Boolean  @default(false)
+  allowRegistration Boolean  @default(true)
+  enableGithubAuth  Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("settings")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum QuestionType {
+  MULTIPLE_CHOICE
+  TRUE_FALSE
+  FILL_IN_BLANK
+  MULTI_SELECT
+}
+
+enum DifficultyLevel {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum QuizStatus {
+  DRAFT
+  ACTIVE
+  INACTIVE
+}
+
+enum AttemptStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  SUBMITTED
+}
+
+enum ReportStatus {
+  PENDING
+  RESOLVED
+  DISMISSED
+}
