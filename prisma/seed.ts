@@ -14,8 +14,61 @@ async function main() {
   await prisma.questionGroup.deleteMany()
   await prisma.quiz.deleteMany() 
   await prisma.user.deleteMany()
+  await prisma.department.deleteMany()
+  await prisma.campus.deleteMany()
 
   console.log('Cleaned existing data...')
+
+  // Create sample campuses
+  const campus1 = await prisma.campus.create({
+    data: {
+      name: 'Massachusetts Institute of Technology',
+      shortName: 'MIT',
+      location: 'Cambridge, Massachusetts, USA',
+      departments: {
+        create: [
+          { name: 'Computer Science' },
+          { name: 'Electrical Engineering' },
+          { name: 'Mathematics' },
+          { name: 'Physics' }
+        ]
+      }
+    }
+  })
+
+  const campus2 = await prisma.campus.create({
+    data: {
+      name: 'Stanford University',
+      shortName: 'Stanford',
+      location: 'Stanford, California, USA',
+      departments: {
+        create: [
+          { name: 'Computer Science' },
+          { name: 'Business' },
+          { name: 'Medicine' },
+          { name: 'Law' }
+        ]
+      }
+    }
+  })
+
+  const campus3 = await prisma.campus.create({
+    data: {
+      name: 'Harvard University',
+      shortName: 'Harvard',
+      location: 'Cambridge, Massachusetts, USA',
+      departments: {
+        create: [
+          { name: 'Computer Science' },
+          { name: 'Business School' },
+          { name: 'Medical School' },
+          { name: 'Law School' }
+        ]
+      }
+    }
+  })
+
+  console.log('Created sample campuses:', campus1.name, campus2.name, campus3.name)
 
   // Create admin user
   const adminPassword = await bcrypt.hash('admin@atomcode.dev', 10)
@@ -25,10 +78,45 @@ async function main() {
       name: 'Atom Admin',
       password: adminPassword,
       role: UserRole.ADMIN,
+      campusId: campus1.id,
     },
   })
 
   console.log('Created admin user:', admin.email)
+
+  // Create sample users
+  const userPassword = await bcrypt.hash('user123', 10)
+  const users = await Promise.all([
+    prisma.user.create({
+      data: {
+        email: 'student@mit.edu',
+        name: 'MIT Student',
+        password: userPassword,
+        role: UserRole.USER,
+        campusId: campus1.id,
+      },
+    }),
+    prisma.user.create({
+      data: {
+        email: 'student@stanford.edu',
+        name: 'Stanford Student',
+        password: userPassword,
+        role: UserRole.USER,
+        campusId: campus2.id,
+      },
+    }),
+    prisma.user.create({
+      data: {
+        email: 'student@harvard.edu',
+        name: 'Harvard Student',
+        password: userPassword,
+        role: UserRole.USER,
+        campusId: campus3.id,
+      },
+    }),
+  ])
+
+  console.log('Created sample users:', users.length, 'students')
 
   // Create default settings
   const settings = await prisma.settings.create({
@@ -45,6 +133,8 @@ async function main() {
 
   console.log('✅ Demo data seeded successfully!')
   console.log('🔑 Admin: admin@atomcode.dev / admin@atomcode.dev')
+  console.log('👥 Sample Users: student@mit.edu, student@stanford.edu, student@harvard.edu / user123')
+  console.log('🏫 Campuses: MIT, Stanford, Harvard')
 }
 
 main()

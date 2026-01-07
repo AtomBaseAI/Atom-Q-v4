@@ -14,6 +14,7 @@ import {
   HelpCircle,
   ChevronLeft,
   ChevronRight,
+  Building2,
 } from "lucide-react";
 import { useSidebar } from "@/components/ui/sidebar";
 
@@ -27,6 +28,11 @@ const adminNavItems = [
     title: "Users",
     href: "/admin/users",
     icon: Users,
+  },
+  {
+    title: "Campus",
+    href: "/admin/campus",
+    icon: Building2,
   },
   {
     title: "Quiz",

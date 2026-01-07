@@ -36,7 +36,7 @@ const buttonVariants = cva(
 )
 
 export interface LoadingButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
+  extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'disabled'>,
     VariantProps<typeof buttonVariants> {
   isLoading?: boolean
   loadingText?: string
@@ -50,15 +50,30 @@ const LoadingButton = React.forwardRef<HTMLButtonElement, LoadingButtonProps>(
     loadingText, 
     children, 
     disabled,
-    ...props 
+    className,
+    variant,
+    size,
+    asChild,
+    type,
+    onClick,
+    ...rest 
   }, ref) => {
     const isDisabled = disabled || isLoading
+
+    // Filter out any unwanted props before passing to Button
+    const { loading, ...filteredRest } = rest as any
 
     return (
       <Button
         ref={ref}
         disabled={isDisabled}
-        {...props}
+        className={className}
+        variant={variant}
+        size={size}
+        asChild={asChild}
+        type={type}
+        onClick={onClick}
+        {...filteredRest}
       >
         {isLoading ? (
           <>

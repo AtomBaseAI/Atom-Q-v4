@@ -7,6 +7,31 @@ datasource db {
   url      = "file:./dev.db"
 }
 
+model Campus {
+  id           String   @id @default(cuid())
+  name         String
+  shortName    String
+  logo         String?
+  location     String
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  departments  Department[]
+  users        User[]
+  quizzes      Quiz[]
+
+  @@map("campuses")
+}
+
+model Department {
+  id       String @id @default(cuid())
+  name     String
+  campusId String
+  campus   Campus @relation(fields: [campusId], references: [id], onDelete: Cascade)
+
+  @@map("departments")
+}
+
 model User {
   id             String          @id @default(cuid())
   email          String          @unique
@@ -15,7 +40,8 @@ model User {
   role           UserRole        @default(USER)
   avatar         String?
   phone          String?
-  campus         String?
+  campusId       String?
+  campus         Campus?         @relation(fields: [campusId], references: [id])
   isActive       Boolean         @default(true)
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
@@ -77,6 +103,8 @@ model Quiz {
   startTime          DateTime?
   endTime            DateTime?
   creatorId          String
+  campusId           String?
+  campus             Campus?         @relation(fields: [campusId], references: [id])
   createdAt          DateTime        @default(now())
   updatedAt          DateTime        @updatedAt
   quizAttempts       QuizAttempt[]
