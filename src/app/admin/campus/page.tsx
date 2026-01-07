@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
+import { useSession } from "next-auth/react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -106,6 +107,7 @@ interface EditFormData {
 
 export default function CampusPage() {
   const router = useRouter()
+  const { data: session, status } = useSession()
   const [campuses, setCampuses] = useState<Campus[]>([])
   const [loading, setLoading] = useState(true)
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
@@ -115,6 +117,16 @@ export default function CampusPage() {
   const [campusToDelete, setCampusToDelete] = useState<Campus | null>(null)
   const [submitLoading, setSubmitLoading] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState<string | null>(null)
+
+  // Check if user is authenticated and is admin
+  useEffect(() => {
+    if (status === "loading") return
+    
+    if (!session || session.user.role !== 'ADMIN') {
+      router.push('/')
+      return
+    }
+  }, [session, status, router])
 
   // Separate form states for create and edit
   const [createFormData, setCreateFormData] = useState<CreateFormData>({
@@ -299,15 +311,27 @@ export default function CampusPage() {
   ]
 
   useEffect(() => {
+    if (status === "loading") return
+    
+    if (!session || session.user.role !== 'ADMIN') {
+      router.push('/')
+      return
+    }
+    
     fetchCampuses()
-  }, [])
+  }, [session, status, router])
 
   const fetchCampuses = async () => {
+    if (!session) return
+    
     try {
       const response = await fetch("/api/admin/campus")
       if (response.ok) {
         const data = await response.json()
         setCampuses(data)
+      } else if (response.status === 401) {
+        toasts.error("Session expired. Please log in again.")
+        router.push('/')
       }
     } catch (error) {
       toasts.networkError()
@@ -350,9 +374,19 @@ export default function CampusPage() {
         resetCreateForm()
         fetchCampuses()
       } else {
-        toasts.error(responseData.error || responseData.message || "Campus creation failed")
+        // Handle specific unauthorized error with better message
+        if (response.status === 401) {
+          toasts.error("You are not authorized to perform this action. Please log in again.")
+          // Optionally redirect to login page after a delay
+          setTimeout(() => {
+            window.location.href = '/'
+          }, 2000)
+        } else {
+          toasts.error(responseData.error || responseData.message || "Campus creation failed")
+        }
       }
     } catch (error) {
+      console.error("Campus creation error:", error)
       toasts.actionFailed("Campus creation")
     } finally {
       setSubmitLoading(false)
@@ -501,7 +535,7 @@ export default function CampusPage() {
     }
   }
 
-  if (loading) {
+  if (loading || status === "loading") {
     return <div className="flex items-center justify-center h-[80vh] "><HexagonLoader size={80} /></div>
   }
 

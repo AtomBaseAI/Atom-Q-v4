@@ -15,6 +15,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Building2,
+  FileCheck,
 } from "lucide-react";
 import { useSidebar } from "@/components/ui/sidebar";
 
@@ -38,6 +39,11 @@ const adminNavItems = [
     title: "Quiz",
     href: "/admin/quiz",
     icon: BookOpen,
+  },
+  {
+    title: "Assessments",
+    href: "/admin/assessments",
+    icon: FileCheck,
   },
   {
     title: "Questions",

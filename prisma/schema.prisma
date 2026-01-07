@@ -19,6 +19,7 @@ model Campus {
   departments  Department[]
   users        User[]
   quizzes      Quiz[]
+  assessments  Assessment[]
 
   @@map("campuses")
 }
@@ -28,28 +29,34 @@ model Department {
   name     String
   campusId String
   campus   Campus @relation(fields: [campusId], references: [id], onDelete: Cascade)
+  users    User[]
 
   @@map("departments")
 }
 
 model User {
-  id             String          @id @default(cuid())
-  email          String          @unique
-  name           String?
-  password       String
-  role           UserRole        @default(USER)
-  avatar         String?
-  phone          String?
-  campusId       String?
-  campus         Campus?         @relation(fields: [campusId], references: [id])
-  isActive       Boolean         @default(true)
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  quizAttempts   QuizAttempt[]
-  quizUsers      QuizUser[]
-  createdQuizzes Quiz[]          @relation("QuizCreator")
-  questionGroups QuestionGroup[]
-  reportedQuestions ReportedQuestion[]
+  id                   String             @id @default(cuid())
+  email                String             @unique
+  name                 String?
+  password             String
+  role                 UserRole           @default(USER)
+  avatar               String?
+  phone                String?
+  campusId             String?
+  campus               Campus?            @relation(fields: [campusId], references: [id])
+  departmentId         String?
+  department           Department?        @relation(fields: [departmentId], references: [id])
+  isActive             Boolean            @default(true)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  quizAttempts         QuizAttempt[]
+  quizUsers            QuizUser[]
+  assessmentAttempts   AssessmentAttempt[]
+  assessmentUsers      AssessmentUser[]
+  createdQuizzes       Quiz[]             @relation("QuizCreator")
+  createdAssessments   Assessment[]       @relation("AssessmentCreator")
+  questionGroups       QuestionGroup[]
+  reportedQuestions    ReportedQuestion[]
 
   @@map("users")
 }
@@ -80,10 +87,11 @@ model Question {
   isActive      Boolean         @default(true)
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
-  quizQuestions QuizQuestion[]
-  groupId       String
-  group         QuestionGroup?  @relation(fields: [groupId], references: [id])
-  reportedQuestions ReportedQuestion[]
+  quizQuestions       QuizQuestion[]
+  assessmentQuestions AssessmentQuestion[]
+  groupId             String
+  group               QuestionGroup?  @relation(fields: [groupId], references: [id])
+  reportedQuestions   ReportedQuestion[]
 
   @@map("questions")
 }
@@ -114,6 +122,31 @@ model Quiz {
   checkAnswerEnabled Boolean         @default(false)
 
   @@map("quizzes")
+}
+
+model Assessment {
+  id                 String          @id @default(cuid())
+  title              String
+  description        String?
+  timeLimit          Int?
+  difficulty         DifficultyLevel @default(MEDIUM)
+  status             QuizStatus      @default(ACTIVE)
+  negativeMarking    Boolean         @default(false)
+  negativePoints     Float?
+  randomOrder        Boolean         @default(false)
+  startTime          DateTime?
+  endTime            DateTime?
+  creatorId          String
+  campusId           String?
+  campus             Campus?         @relation(fields: [campusId], references: [id])
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  assessmentAttempts AssessmentAttempt[]
+  assessmentQuestions AssessmentQuestion[]
+  assessmentUsers    AssessmentUser[]
+  creator            User            @relation("AssessmentCreator", fields: [creatorId], references: [id])
+
+  @@map("assessments")
 }
 
 model QuizQuestion {
@@ -173,6 +206,65 @@ model QuizAnswer {
 
   @@unique([attemptId, questionId])
   @@map("quiz_answers")
+}
+
+model AssessmentQuestion {
+  id            String      @id @default(cuid())
+  assessmentId  String
+  questionId    String
+  order         Int
+  points        Float       @default(1.0)
+  question      Question    @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  assessment    Assessment  @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+
+  @@unique([assessmentId, questionId])
+  @@map("assessment_questions")
+}
+
+model AssessmentUser {
+  id            String      @id @default(cuid())
+  assessmentId  String
+  userId        String
+  createdAt     DateTime    @default(now())
+  assessment    Assessment  @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([assessmentId, userId])
+  @@map("assessment_users")
+}
+
+model AssessmentAttempt {
+  id            String           @id @default(cuid())
+  userId        String
+  assessmentId  String
+  status        AttemptStatus    @default(NOT_STARTED)
+  score         Float?
+  totalPoints   Float?
+  timeTaken     Int?
+  startedAt     DateTime?
+  submittedAt   DateTime?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  answers       AssessmentAnswer[]
+  assessment    Assessment       @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("assessment_attempts")
+}
+
+model AssessmentAnswer {
+  id             String            @id @default(cuid())
+  attemptId      String
+  questionId     String
+  userAnswer     String
+  isCorrect      Boolean?
+  pointsEarned   Float?
+  timeSpent      Int?
+  createdAt      DateTime          @default(now())
+  attempt        AssessmentAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+
+  @@unique([attemptId, questionId])
+  @@map("assessment_answers")
 }
 
 model ReportedQuestion {

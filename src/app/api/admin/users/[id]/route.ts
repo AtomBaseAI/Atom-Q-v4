@@ -20,15 +20,28 @@ export async function PUT(
     }
 
     const { id } = await params
-    const { name, email, password, phone, campus, role, isActive } = await request.json()
+    const { name, email, password, phone, campus, department, role, isActive } = await request.json()
 
     const updateData: any = {
       name,
       email,
       phone: phone || null,
-      campus: campus || null,
       role,
       isActive
+    }
+
+    // Handle campus assignment
+    if (campus && campus !== "general") {
+      updateData.campusId = campus
+    } else {
+      updateData.campusId = null
+    }
+
+    // Handle department assignment
+    if (department && department !== "general") {
+      updateData.departmentId = department
+    } else {
+      updateData.departmentId = null
     }
 
     // Only hash and update password if provided
@@ -47,11 +60,27 @@ export async function PUT(
         isActive: true,
         phone: true,
         createdAt: true,        
-        campus: true,
+        campus: {
+          select: {
+            name: true
+          }
+        },
+        department: {
+          select: {
+            name: true
+          }
+        },
       }
     })
 
-    return NextResponse.json(user)
+    // Transform the user data
+    const transformedUser = {
+      ...user,
+      campus: user.campus?.name || null,
+      department: user.department?.name || null
+    }
+
+    return NextResponse.json(transformedUser)
   } catch (error) {
     console.error("Error updating user:", error)
     return NextResponse.json(

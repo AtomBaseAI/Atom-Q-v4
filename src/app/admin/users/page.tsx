@@ -1,6 +1,8 @@
 "use client"
 
 import { useState, useEffect, useRef, useMemo } from "react"
+import { useRouter } from "next/navigation"
+import { useSession } from "next-auth/react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -74,7 +76,15 @@ interface User {
   isActive: boolean
   phone?: string
   campus?: string
+  department?: string
   createdAt: string
+}
+
+interface Campus {
+  id: string
+  name: string
+  shortName: string
+  departments: { id: string; name: string }[]
 }
 
 interface FormData {
@@ -84,11 +94,15 @@ interface FormData {
   role: UserRole
   phone: string
   campus: string
+  department: string
   isActive: boolean
 }
 
 export default function UsersPage() {
+  const router = useRouter()
+  const { data: session, status } = useSession()
   const [users, setUsers] = useState<User[]>([])
+  const [campuses, setCampuses] = useState<Campus[]>([])
   const [loading, setLoading] = useState(true)
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
@@ -104,9 +118,20 @@ export default function UsersPage() {
     role: UserRole.USER,
     phone: "",
     campus: "",
+    department: "",
     isActive: true,
   })
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Check if user is authenticated and is admin
+  useEffect(() => {
+    if (status === "loading") return
+    
+    if (!session || session.user.role !== 'ADMIN') {
+      router.push('/')
+      return
+    }
+  }, [session, status, router])
 
   // Get unique campuses for filters
   const uniqueCampuses = useMemo(() => {
@@ -171,6 +196,11 @@ export default function UsersPage() {
       cell: ({ row }) => row.getValue("campus") || "-",
     },
     {
+      accessorKey: "department",
+      header: "Department",
+      cell: ({ row }) => row.getValue("department") || "-",
+    },
+    {
       accessorKey: "isActive",
       header: "Status",
       cell: ({ row }) => {
@@ -233,15 +263,43 @@ export default function UsersPage() {
   ]
 
   useEffect(() => {
+    if (status === "loading") return
+    
+    if (!session || session.user.role !== 'ADMIN') {
+      router.push('/')
+      return
+    }
+    
+    fetchCampuses()
     fetchUsers()
-  }, [])
+  }, [session, status, router])
+
+  const fetchCampuses = async () => {
+    try {
+      const response = await fetch("/api/admin/campus")
+      if (response.ok) {
+        const data = await response.json()
+        setCampuses(data)
+      } else if (response.status === 401) {
+        toasts.error("Session expired. Please log in again.")
+        router.push('/')
+      }
+    } catch (error) {
+      toasts.networkError()
+    }
+  }
 
   const fetchUsers = async () => {
+    if (!session) return
+    
     try {
       const response = await fetch("/api/admin/users")
       if (response.ok) {
         const data = await response.json()
         setUsers(data)
+      } else if (response.status === 401) {
+        toasts.error("Session expired. Please log in again.")
+        router.push('/')
       }
     } catch (error) {
       toasts.networkError()
@@ -317,6 +375,7 @@ export default function UsersPage() {
       role: user.role,
       phone: user.phone || "",
       campus: user.campus || "",
+      department: user.department || "",
       isActive: user.isActive,
     })
     setIsEditDialogOpen(true)
@@ -335,6 +394,7 @@ export default function UsersPage() {
       role: UserRole.USER,
       phone: "",
       campus: "",
+      department: "",
       isActive: true,
     })
   }
@@ -346,6 +406,7 @@ export default function UsersPage() {
       role: user.role,
       phone: user.phone || "",
       campus: user.campus || "",
+      department: user.department || "",
       isActive: user.isActive,
       createdAt: user.createdAt,
     }))
@@ -399,7 +460,7 @@ export default function UsersPage() {
     }
   }
 
-  if (loading) {
+  if (loading || status === "loading") {
     return <div className="flex items-center justify-center h-[80vh] "><HexagonLoader size={80} /></div>
   }
 
@@ -513,12 +574,43 @@ export default function UsersPage() {
               </div>
               <div className="grid gap-3">
                 <Label htmlFor="add-campus">Campus</Label>
-                <Input
-                  id="add-campus"
-                  value={formData.campus}
-                  onChange={(e) => setFormData({ ...formData, campus: e.target.value })}
-                  placeholder="Enter campus name"
-                />
+                <Select value={formData.campus} onValueChange={(value) => {
+                  setFormData({ ...formData, campus: value, department: "" })
+                }}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select campus" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="general">General</SelectItem>
+                    {campuses.map((campus) => (
+                      <SelectItem key={campus.id} value={campus.id}>
+                        {campus.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-3">
+                <Label htmlFor="add-department">Department</Label>
+                <Select 
+                  value={formData.department} 
+                  onValueChange={(value) => setFormData({ ...formData, department: value })}
+                  disabled={formData.campus === "" || formData.campus === "general"}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select department" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="general">General</SelectItem>
+                    {formData.campus && formData.campus !== "general" && 
+                      campuses.find(c => c.id === formData.campus)?.departments.map((dept) => (
+                        <SelectItem key={dept.id} value={dept.id}>
+                          {dept.name}
+                        </SelectItem>
+                      ))
+                    }
+                  </SelectContent>
+                </Select>
               </div>
               <div className="grid gap-3">
                 <Label htmlFor="add-role">Role</Label>
@@ -608,12 +700,43 @@ export default function UsersPage() {
               </div>
               <div className="grid gap-3">
                 <Label htmlFor="edit-campus">Campus</Label>
-                <Input
-                  id="edit-campus"
-                  value={formData.campus}
-                  onChange={(e) => setFormData({ ...formData, campus: e.target.value })}
-                  placeholder="Enter campus name"
-                />
+                <Select value={formData.campus} onValueChange={(value) => {
+                  setFormData({ ...formData, campus: value, department: "" })
+                }}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select campus" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="general">General</SelectItem>
+                    {campuses.map((campus) => (
+                      <SelectItem key={campus.id} value={campus.id}>
+                        {campus.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-3">
+                <Label htmlFor="edit-department">Department</Label>
+                <Select 
+                  value={formData.department} 
+                  onValueChange={(value) => setFormData({ ...formData, department: value })}
+                  disabled={formData.campus === "" || formData.campus === "general"}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select department" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="general">General</SelectItem>
+                    {formData.campus && formData.campus !== "general" && 
+                      campuses.find(c => c.id === formData.campus)?.departments.map((dept) => (
+                        <SelectItem key={dept.id} value={dept.id}>
+                          {dept.name}
+                        </SelectItem>
+                      ))
+                    }
+                  </SelectContent>
+                </Select>
               </div>
               <div className="grid gap-3">
                 <Label htmlFor="edit-role">Role</Label>

@@ -24,7 +24,16 @@ export async function GET(request: NextRequest) {
         role: true,
         isActive: true,
         phone: true,
-        campus: true,
+        campus: {
+          select: {
+            name: true
+          }
+        },
+        department: {
+          select: {
+            name: true
+          }
+        },
         createdAt: true,
       },
       orderBy: {
@@ -32,7 +41,14 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    return NextResponse.json(users)
+    // Transform the data to match frontend expectations
+    const transformedUsers = users.map(user => ({
+      ...user,
+      campus: user.campus?.name || null,
+      department: user.department?.name || null
+    }))
+
+    return NextResponse.json(transformedUsers)
   } catch (error) {
     console.error("Error fetching users:", error)
     return NextResponse.json(
@@ -106,15 +122,25 @@ export async function POST(request: NextRequest) {
               role: true,
               isActive: true,
               phone: true,
-              campus: true,
+              campus: {
+                select: {
+                  name: true
+                }
+              },
               createdAt: true,
             }
           })
 
+          // Transform the user data
+          const transformedUser = {
+            ...user,
+            campus: user.campus?.name || null
+          }
+
           results.push({ 
             email: item.email, 
             status: 'success', 
-            user,
+            user: transformedUser,
             message: 'User created successfully' 
           })
         } catch (error) {
@@ -139,7 +165,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Handle single user creation
-    const { name, email, password, phone, campus, role, isActive } = userData
+    const { name, email, password, phone, campus, department, role, isActive } = userData
 
     // Check if user already exists
     const existingUser = await db.user.findUnique({
@@ -156,17 +182,29 @@ export async function POST(request: NextRequest) {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 12)
 
+    // Prepare user data
+    const userDataToCreate: any = {
+      name,
+      email,
+      password: hashedPassword,
+      phone: phone || null,
+      role: role || UserRole.USER,
+      isActive: isActive !== false,
+    }
+
+    // Handle campus assignment
+    if (campus && campus !== "general") {
+      userDataToCreate.campusId = campus
+    }
+
+    // Handle department assignment
+    if (department && department !== "general") {
+      userDataToCreate.departmentId = department
+    }
+
     // Create user
     const user = await db.user.create({
-      data: {
-        name,
-        email,
-        password: hashedPassword,
-        phone: phone || null,
-        campus: campus || null,
-        role: role || UserRole.USER,
-        isActive: isActive !== false,
-      },
+      data: userDataToCreate,
       select: {
         id: true,
         email: true,
@@ -174,12 +212,28 @@ export async function POST(request: NextRequest) {
         role: true,
         isActive: true,
         phone: true,
-        campus: true,
+        campus: {
+          select: {
+            name: true
+          }
+        },
+        department: {
+          select: {
+            name: true
+          }
+        },
         createdAt: true,
       }
     })
 
-    return NextResponse.json(user, { status: 201 })
+    // Transform the user data
+    const transformedUser = {
+      ...user,
+      campus: user.campus?.name || null,
+      department: user.department?.name || null
+    }
+
+    return NextResponse.json(transformedUser, { status: 201 })
   } catch (error) {
     console.error("Error creating user:", error)
     return NextResponse.json(
