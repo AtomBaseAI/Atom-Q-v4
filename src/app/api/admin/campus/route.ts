@@ -11,6 +11,7 @@ const createCampusSchema = z.object({
   logo: z.string().optional(),
   location: z.string().min(1, "Location is required"),
   departments: z.array(z.object({ name: z.string().min(1) })).optional(),
+  batches: z.array(z.object({ name: z.string().min(1) })).optional(),
 })
 
 export async function GET() {
@@ -29,6 +30,7 @@ export async function GET() {
         _count: {
           select: {
             departments: true,
+            batches: true,
             users: {
               where: {
                 role: "USER"
@@ -38,6 +40,12 @@ export async function GET() {
           }
         },
         departments: {
+          select: {
+            id: true,
+            name: true
+          }
+        },
+        batches: {
           select: {
             id: true,
             name: true
@@ -126,14 +134,23 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Create campus with departments
+    // Only add batches if there are valid batches
+    if (validatedData.batches && validatedData.batches.length > 0) {
+      campusData.batches = {
+        create: validatedData.batches
+      }
+    }
+
+    // Create campus with departments and batches
     const campus = await db.campus.create({
       data: campusData,
       include: {
         departments: true,
+        batches: true,
         _count: {
           select: {
             departments: true,
+            batches: true,
             users: {
               where: {
                 role: "USER"

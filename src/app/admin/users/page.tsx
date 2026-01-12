@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo } from "react"
 import { useRouter } from "next/navigation"
-import { useSession } from "next-auth/react"
+import { useAdminAuth } from "@/hooks/use-admin-auth"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -52,7 +52,7 @@ import {
   X
 } from "lucide-react"
 import { toasts } from "@/lib/toasts"
-import { UserRole } from "@prisma/client"
+import { UserRole, StudentSection } from "@prisma/client"
 import Papa from "papaparse"
 import { DataTable } from "@/components/ui/data-table"
 import { ColumnDef } from "@tanstack/react-table"
@@ -75,8 +75,10 @@ interface User {
   role: UserRole
   isActive: boolean
   phone?: string
+  section?: string
   campus?: string
   department?: string
+  batch?: string
   createdAt: string
 }
 
@@ -95,14 +97,17 @@ interface FormData {
   phone: string
   campus: string
   department: string
+  batch: string
+  section: StudentSection
   isActive: boolean
 }
 
 export default function UsersPage() {
   const router = useRouter()
-  const { data: session, status } = useSession()
+  const { session, status, isLoading, isAuthenticated, isAdmin } = useAdminAuth()
   const [users, setUsers] = useState<User[]>([])
   const [campuses, setCampuses] = useState<Campus[]>([])
+  const [batches, setBatches] = useState<{ id: string; name: string }[]>([])
   const [loading, setLoading] = useState(true)
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
@@ -119,19 +124,11 @@ export default function UsersPage() {
     phone: "",
     campus: "",
     department: "",
+    batch: "",
+    section: StudentSection.A,
     isActive: true,
   })
   const fileInputRef = useRef<HTMLInputElement>(null)
-
-  // Check if user is authenticated and is admin
-  useEffect(() => {
-    if (status === "loading") return
-    
-    if (!session || session.user.role !== 'ADMIN') {
-      router.push('/')
-      return
-    }
-  }, [session, status, router])
 
   // Get unique campuses for filters
   const uniqueCampuses = useMemo(() => {
@@ -201,6 +198,19 @@ export default function UsersPage() {
       cell: ({ row }) => row.getValue("department") || "-",
     },
     {
+      accessorKey: "batch",
+      header: "Batch",
+      cell: ({ row }) => row.getValue("batch") || "-",
+    },
+    {
+      accessorKey: "section",
+      header: "Section",
+      cell: ({ row }) => {
+        const section = row.getValue("section") as string
+        return section ? `Section ${section}` : "-"
+      },
+    },
+    {
       accessorKey: "isActive",
       header: "Status",
       cell: ({ row }) => {
@@ -263,18 +273,35 @@ export default function UsersPage() {
   ]
 
   useEffect(() => {
-    if (status === "loading") return
-    
-    if (!session || session.user.role !== 'ADMIN') {
-      router.push('/')
-      return
-    }
+    if (status === "loading" || !isAuthenticated || !isAdmin) return
     
     fetchCampuses()
     fetchUsers()
-  }, [session, status, router])
+  }, [session, status, isAuthenticated, isAdmin, router])
+
+  const fetchBatches = async (campusId: string) => {
+    if (!campusId || campusId === "general") {
+      setBatches([])
+      return
+    }
+    
+    try {
+      const response = await fetch(`/api/admin/campus/${campusId}`)
+      if (response.ok) {
+        const campus = await response.json()
+        setBatches(campus.batches || [])
+      }
+    } catch (error) {
+      console.error("Error fetching batches:", error)
+      setBatches([])
+    }
+  }
 
   const fetchCampuses = async () => {
+    if (!isAuthenticated || !isAdmin) {
+      return
+    }
+    
     try {
       const response = await fetch("/api/admin/campus")
       if (response.ok) {
@@ -283,6 +310,8 @@ export default function UsersPage() {
       } else if (response.status === 401) {
         toasts.error("Session expired. Please log in again.")
         router.push('/')
+      } else {
+        toasts.error("Failed to fetch campuses")
       }
     } catch (error) {
       toasts.networkError()
@@ -290,7 +319,9 @@ export default function UsersPage() {
   }
 
   const fetchUsers = async () => {
-    if (!session) return
+    if (!isAuthenticated || !isAdmin) {
+      return
+    }
     
     try {
       const response = await fetch("/api/admin/users")
@@ -300,6 +331,8 @@ export default function UsersPage() {
       } else if (response.status === 401) {
         toasts.error("Session expired. Please log in again.")
         router.push('/')
+      } else {
+        toasts.error("Failed to fetch users")
       }
     } catch (error) {
       toasts.networkError()
@@ -395,8 +428,11 @@ export default function UsersPage() {
       phone: "",
       campus: "",
       department: "",
+      batch: "",
+      section: StudentSection.A,
       isActive: true,
     })
+    setBatches([])
   }
 
   const handleExportUsers = () => {
@@ -460,7 +496,7 @@ export default function UsersPage() {
     }
   }
 
-  if (loading || status === "loading") {
+  if (loading || isLoading) {
     return <div className="flex items-center justify-center h-[80vh] "><HexagonLoader size={80} /></div>
   }
 
@@ -575,7 +611,8 @@ export default function UsersPage() {
               <div className="grid gap-3">
                 <Label htmlFor="add-campus">Campus</Label>
                 <Select value={formData.campus} onValueChange={(value) => {
-                  setFormData({ ...formData, campus: value, department: "" })
+                  setFormData({ ...formData, campus: value, department: "", batch: "" })
+                  fetchBatches(value)
                 }}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select campus" />
@@ -609,6 +646,45 @@ export default function UsersPage() {
                         </SelectItem>
                       ))
                     }
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-3">
+                <Label htmlFor="add-batch">Batch</Label>
+                <Select 
+                  value={formData.batch} 
+                  onValueChange={(value) => setFormData({ ...formData, batch: value })}
+                  disabled={formData.campus === "" || formData.campus === "general"}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select batch" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="general">General</SelectItem>
+                    {batches.map((batch) => (
+                      <SelectItem key={batch.id} value={batch.id}>
+                        {batch.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-3">
+                <Label htmlFor="add-section">Section</Label>
+                <Select 
+                  value={formData.section} 
+                  onValueChange={(value: StudentSection) => setFormData({ ...formData, section: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={StudentSection.A}>Section A</SelectItem>
+                    <SelectItem value={StudentSection.B}>Section B</SelectItem>
+                    <SelectItem value={StudentSection.C}>Section C</SelectItem>
+                    <SelectItem value={StudentSection.D}>Section D</SelectItem>
+                    <SelectItem value={StudentSection.E}>Section E</SelectItem>
+                    <SelectItem value={StudentSection.F}>Section F</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

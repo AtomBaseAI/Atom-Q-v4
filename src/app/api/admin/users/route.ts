@@ -24,12 +24,18 @@ export async function GET(request: NextRequest) {
         role: true,
         isActive: true,
         phone: true,
+        section: true,
         campus: {
           select: {
             name: true
           }
         },
         department: {
+          select: {
+            name: true
+          }
+        },
+        batch: {
           select: {
             name: true
           }
@@ -45,7 +51,8 @@ export async function GET(request: NextRequest) {
     const transformedUsers = users.map(user => ({
       ...user,
       campus: user.campus?.name || null,
-      department: user.department?.name || null
+      department: user.department?.name || null,
+      batch: user.batch?.name || null
     }))
 
     return NextResponse.json(transformedUsers)
@@ -165,7 +172,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Handle single user creation
-    const { name, email, password, phone, campus, department, role, isActive } = userData
+    const { name, email, password, phone, campus, department, batch, section, role, isActive } = userData
 
     // Check if user already exists
     const existingUser = await db.user.findUnique({
@@ -188,6 +195,7 @@ export async function POST(request: NextRequest) {
       email,
       password: hashedPassword,
       phone: phone || null,
+      section: section || 'A',
       role: role || UserRole.USER,
       isActive: isActive !== false,
     }
@@ -202,6 +210,11 @@ export async function POST(request: NextRequest) {
       userDataToCreate.departmentId = department
     }
 
+    // Handle batch assignment
+    if (batch && batch !== "general") {
+      userDataToCreate.batchId = batch
+    }
+
     // Create user
     const user = await db.user.create({
       data: userDataToCreate,
@@ -212,12 +225,18 @@ export async function POST(request: NextRequest) {
         role: true,
         isActive: true,
         phone: true,
+        section: true,
         campus: {
           select: {
             name: true
           }
         },
         department: {
+          select: {
+            name: true
+          }
+        },
+        batch: {
           select: {
             name: true
           }
@@ -230,7 +249,8 @@ export async function POST(request: NextRequest) {
     const transformedUser = {
       ...user,
       campus: user.campus?.name || null,
-      department: user.department?.name || null
+      department: user.department?.name || null,
+      batch: user.batch?.name || null
     }
 
     return NextResponse.json(transformedUser, { status: 201 })

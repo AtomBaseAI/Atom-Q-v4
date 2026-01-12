@@ -16,12 +16,26 @@ model Campus {
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+  batches      Batch[]
   departments  Department[]
   users        User[]
   quizzes      Quiz[]
   assessments  Assessment[]
 
   @@map("campuses")
+}
+
+model Batch {
+  id        String   @id @default(cuid())
+  name      String   // e.g., "2014-2018"
+  campusId  String
+  campus    Campus   @relation(fields: [campusId], references: [id], onDelete: Cascade)
+  users     User[]
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("batches")
 }
 
 model Department {
@@ -42,10 +56,13 @@ model User {
   role                 UserRole           @default(USER)
   avatar               String?
   phone                String?
+  section              StudentSection     @default(A)
   campusId             String?
   campus               Campus?            @relation(fields: [campusId], references: [id])
   departmentId         String?
   department           Department?        @relation(fields: [departmentId], references: [id])
+  batchId              String?
+  batch                Batch?             @relation(fields: [batchId], references: [id])
   isActive             Boolean            @default(true)
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
@@ -328,4 +345,13 @@ enum ReportStatus {
   PENDING
   RESOLVED
   DISMISSED
+}
+
+enum StudentSection {
+  A
+  B
+  C
+  D
+  E
+  F
 }

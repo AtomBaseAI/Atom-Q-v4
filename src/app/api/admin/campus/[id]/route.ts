@@ -8,6 +8,7 @@ const updateCampusSchema = z.object({
   logo: z.string().optional(),
   location: z.string().min(1, "Location is required"),
   departments: z.array(z.object({ name: z.string().min(1) })).optional(),
+  batches: z.array(z.object({ name: z.string().min(1) })).optional(),
 })
 
 export async function GET(
@@ -24,9 +25,16 @@ export async function GET(
             name: true
           }
         },
+        batches: {
+          select: {
+            id: true,
+            name: true
+          }
+        },
         _count: {
           select: {
             departments: true,
+            batches: true,
             users: {
               where: {
                 role: "USER"
@@ -106,7 +114,7 @@ export async function PUT(
       )
     }
 
-    // Update campus and departments
+    // Update campus and departments/batches
     const campus = await db.campus.update({
       where: { id: params.id },
       data: {
@@ -121,6 +129,13 @@ export async function PUT(
             deleteMany: {},
             create: validatedData.departments
           }
+        }),
+        // Update batches - same approach as departments
+        ...(validatedData.batches && {
+          batches: {
+            deleteMany: {},
+            create: validatedData.batches
+          }
         })
       },
       include: {
@@ -130,9 +145,16 @@ export async function PUT(
             name: true
           }
         },
+        batches: {
+          select: {
+            id: true,
+            name: true
+          }
+        },
         _count: {
           select: {
             departments: true,
+            batches: true,
             users: {
               where: {
                 role: "USER"

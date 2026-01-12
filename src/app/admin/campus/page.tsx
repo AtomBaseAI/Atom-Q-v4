@@ -85,8 +85,10 @@ interface Campus {
     students: number
     quizzes: number
     assessments: number
+    batches: number
   }
   departments: { id: string; name: string }[]
+  batches: { id: string; name: string }[]
 }
 
 interface CreateFormData {
@@ -95,6 +97,7 @@ interface CreateFormData {
   logo: string
   location: string
   departments: { name: string }[]
+  batches: { name: string }[]
 }
 
 interface EditFormData {
@@ -103,6 +106,7 @@ interface EditFormData {
   logo: string
   location: string
   departments: { name: string }[]
+  batches: { name: string }[]
 }
 
 export default function CampusPage() {
@@ -135,6 +139,7 @@ export default function CampusPage() {
     logo: "",
     location: "",
     departments: [{ name: "" }],
+    batches: [{ name: "" }],
   })
 
   const [editFormData, setEditFormData] = useState<EditFormData>({
@@ -143,6 +148,7 @@ export default function CampusPage() {
     logo: "",
     location: "",
     departments: [{ name: "" }],
+    batches: [{ name: "" }],
   })
 
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -201,6 +207,14 @@ export default function CampusPage() {
       cell: ({ row }) => {
         const campus = row.original
         return campus._count?.departments || 0
+      },
+    },
+    {
+      accessorKey: "_count.batches",
+      header: "Batches",
+      cell: ({ row }) => {
+        const campus = row.original
+        return campus._count?.batches || 0
       },
     },
     {
@@ -460,6 +474,7 @@ export default function CampusPage() {
       logo: campus.logo || "",
       location: campus.location,
       departments: campus.departments.length > 0 ? campus.departments : [{ name: "" }],
+      batches: campus.batches.length > 0 ? campus.batches : [{ name: "" }],
     })
     setIsEditDialogOpen(true)
   }
@@ -476,6 +491,7 @@ export default function CampusPage() {
       logo: "",
       location: "",
       departments: [{ name: "" }],
+      batches: [{ name: "" }],
     })
   }
 
@@ -486,6 +502,7 @@ export default function CampusPage() {
       logo: "",
       location: "",
       departments: [{ name: "" }],
+      batches: [{ name: "" }],
     })
   }
 
@@ -499,6 +516,20 @@ export default function CampusPage() {
       setCreateFormData(prev => ({
         ...prev,
         departments: [...prev.departments, { name: "" }]
+      }))
+    }
+  }
+
+  const addBatch = (isEdit: boolean = false) => {
+    if (isEdit) {
+      setEditFormData(prev => ({
+        ...prev,
+        batches: [...prev.batches, { name: "" }]
+      }))
+    } else {
+      setCreateFormData(prev => ({
+        ...prev,
+        batches: [...prev.batches, { name: "" }]
       }))
     }
   }
@@ -517,6 +548,20 @@ export default function CampusPage() {
     }
   }
 
+  const removeBatch = (index: number, isEdit: boolean = false) => {
+    if (isEdit) {
+      setEditFormData(prev => ({
+        ...prev,
+        batches: prev.batches.filter((_, i) => i !== index)
+      }))
+    } else {
+      setCreateFormData(prev => ({
+        ...prev,
+        batches: prev.batches.filter((_, i) => i !== index)
+      }))
+    }
+  }
+
   const updateDepartment = (index: number, value: string, isEdit: boolean = false) => {
     if (isEdit) {
       setEditFormData(prev => ({
@@ -530,6 +575,24 @@ export default function CampusPage() {
         ...prev,
         departments: prev.departments.map((dept, i) => 
           i === index ? { name: value } : dept
+        )
+      }))
+    }
+  }
+
+  const updateBatch = (index: number, value: string, isEdit: boolean = false) => {
+    if (isEdit) {
+      setEditFormData(prev => ({
+        ...prev,
+        batches: prev.batches.map((batch, i) => 
+          i === index ? { name: value } : batch
+        )
+      }))
+    } else {
+      setCreateFormData(prev => ({
+        ...prev,
+        batches: prev.batches.map((batch, i) => 
+          i === index ? { name: value } : batch
         )
       }))
     }
@@ -672,6 +735,43 @@ export default function CampusPage() {
               </div>
             </div>
 
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Batches</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => addBatch(false)}
+                >
+                  <Plus className="w-4 h-4 mr-1" />
+                  Add Batch
+                </Button>
+              </div>
+              <div className="space-y-2">
+                {createFormData.batches.map((batch, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <Input
+                      value={batch.name}
+                      onChange={(e) => updateBatch(index, e.target.value, false)}
+                      placeholder="Batch name (e.g., 2014-2018)"
+                      className="flex-1"
+                    />
+                    {createFormData.batches.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={() => removeBatch(index, false)}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
             <SheetFooter>
               <Button
                 type="button"
@@ -770,6 +870,43 @@ export default function CampusPage() {
                         variant="outline"
                         size="icon"
                         onClick={() => removeDepartment(index, true)}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Batches</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => addBatch(true)}
+                >
+                  <Plus className="w-4 h-4 mr-1" />
+                  Add Batch
+                </Button>
+              </div>
+              <div className="space-y-2">
+                {editFormData.batches.map((batch, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <Input
+                      value={batch.name}
+                      onChange={(e) => updateBatch(index, e.target.value, true)}
+                      placeholder="Batch name (e.g., 2014-2018)"
+                      className="flex-1"
+                    />
+                    {editFormData.batches.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={() => removeBatch(index, true)}
                       >
                         <X className="w-4 h-4" />
                       </Button>
