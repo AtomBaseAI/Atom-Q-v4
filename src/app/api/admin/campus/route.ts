@@ -42,13 +42,31 @@ export async function GET() {
         departments: {
           select: {
             id: true,
-            name: true
+            name: true,
+            _count: {
+              select: {
+                users: {
+                  where: {
+                    role: "USER"
+                  }
+                }
+              }
+            }
           }
         },
         batches: {
           select: {
             id: true,
-            name: true
+            name: true,
+            _count: {
+              select: {
+                users: {
+                  where: {
+                    role: "USER"
+                  }
+                }
+              }
+            }
           }
         }
       },

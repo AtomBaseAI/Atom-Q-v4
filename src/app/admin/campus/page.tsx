@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import React, { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
 import { Button } from "@/components/ui/button"
@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
@@ -31,6 +32,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Label } from "@/components/ui/label"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import {
@@ -54,12 +56,20 @@ import {
   Building2,
   MapPin,
   X,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react"
 import { toasts } from "@/lib/toasts"
-import { DataTable } from "@/components/ui/data-table"
-import { ColumnDef } from "@tanstack/react-table"
 import HexagonLoader from "@/components/Loader/Loading"
 import { LoadingButton } from "@/components/ui/laodaing-button"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 import Image from "next/image"
 
 // Helper function to format dates in dd/mm/yyyy format
@@ -87,8 +97,8 @@ interface Campus {
     assessments: number
     batches: number
   }
-  departments: { id: string; name: string }[]
-  batches: { id: string; name: string }[]
+  departments: { id: string; name: string; _count: { users: number } }[]
+  batches: { id: string; name: string; _count: { users: number } }[]
 }
 
 interface CreateFormData {
@@ -113,7 +123,10 @@ export default function CampusPage() {
   const router = useRouter()
   const { data: session, status } = useSession()
   const [campuses, setCampuses] = useState<Campus[]>([])
+  const [filteredCampuses, setFilteredCampuses] = useState<Campus[]>([])
   const [loading, setLoading] = useState(true)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [statusFilter, setStatusFilter] = useState<string>("all")
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
@@ -122,6 +135,19 @@ export default function CampusPage() {
   const [deleteConfirmation, setDeleteConfirmation] = useState("")
   const [submitLoading, setSubmitLoading] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState<string | null>(null)
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
+  const [columnVisibility, setColumnVisibility] = useState({
+    logo: true,
+    shortName: true,
+    departments: true,
+    batches: true,
+    students: true,
+    quizzes: true,
+    assessments: true,
+    location: true,
+    status: true,
+    createdAt: true,
+  })
 
   // Check if user is authenticated and is admin
   useEffect(() => {
@@ -154,196 +180,61 @@ export default function CampusPage() {
 
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const columns: ColumnDef<Campus>[] = [
-    {
-      accessorKey: "logo",
-      header: "Logo",
-      cell: ({ row }) => {
-        const campus = row.original
-        return (
-          <div className="w-10 h-10 relative">
-            {campus.logo ? (
-              <Image
-                src={campus.logo}
-                alt={campus.name}
-                fill
-                className="object-cover rounded-md"
-              />
-            ) : (
-              <div className="w-10 h-10 bg-muted rounded-md flex items-center justify-center">
-                <Building2 className="w-5 h-5 text-muted-foreground" />
-              </div>
-            )}
-          </div>
-        )
-      },
-    },
-    {
-      accessorKey: "name",
-      header: ({ column }) => {
-        return (
-          <Button
-            variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          >
-            Name
-            <ArrowUpDown className="ml-2 h-4 w-4" />
-          </Button>
-        )
-      },
-      cell: ({ row }) => (
-        <div className="font-medium">{row.getValue("name")}</div>
-      ),
-    },
-    {
-      accessorKey: "shortName",
-      header: "Short Name",
-      cell: ({ row }) => (
-        <Badge variant="secondary">{row.getValue("shortName")}</Badge>
-      ),
-    },
-    {
-      accessorKey: "_count.departments",
-      header: "Departments",
-      cell: ({ row }) => {
-        const campus = row.original
-        return campus._count?.departments || 0
-      },
-    },
-    {
-      accessorKey: "_count.batches",
-      header: "Batches",
-      cell: ({ row }) => {
-        const campus = row.original
-        return campus._count?.batches || 0
-      },
-    },
-    {
-      accessorKey: "_count.students",
-      header: "Students",
-      cell: ({ row }) => {
-        const campus = row.original
-        return campus._count?.students || 0
-      },
-    },
-    {
-      accessorKey: "_count.quizzes",
-      header: "Quizzes",
-      cell: ({ row }) => {
-        const campus = row.original
-        return campus._count?.quizzes || 0
-      },
-    },
-    {
-      accessorKey: "_count.assessments",
-      header: "Assessments",
-      cell: ({ row }) => {
-        const campus = row.original
-        return campus._count?.assessments || 0
-      },
-    },
-    {
-      accessorKey: "location",
-      header: "Location",
-      cell: ({ row }) => {
-        const campus = row.original
-        return (
-          <div className="flex items-center gap-1">
-            <MapPin className="w-4 h-4 text-muted-foreground" />
-            <span className="text-sm">{campus.location}</span>
-          </div>
-        )
-      },
-    },
-    {
-      accessorKey: "isActive",
-      header: "Status",
-      cell: ({ row }) => {
-        const campus = row.original
-        return (
-          <Badge variant={campus.isActive ? "default" : "secondary"}>
-            {campus.isActive ? "Active" : "Inactive"}
-          </Badge>
-        )
-      },
-    },
-    {
-      accessorKey: "createdAt",
-      header: ({ column }) => {
-        return (
-          <Button
-            variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          >
-            Created At
-            <ArrowUpDown className="ml-2 h-4 w-4" />
-          </Button>
-        )
-      },
-      cell: ({ row }) => {
-        const date = new Date(row.getValue("createdAt"))
-        return formatDateDDMMYYYY(date.toISOString())
-      },
-    },
-    {
-      id: "actions",
-      enableHiding: false,
-      cell: ({ row }) => {
-        const campus = row.original
-        return (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-8 w-8 p-0">
-                <span className="sr-only">Open menu</span>
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => router.push(`/admin/campus/${campus.id}/departments`)}>
-                <Building2 className="mr-2 h-4 w-4" />
-                Manage Departments
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => router.push(`/admin/campus/${campus.id}/users`)}>
-                <Users className="mr-2 h-4 w-4" />
-                Users
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => openEditDialog(campus)}>
-                <Edit className="mr-2 h-4 w-4" />
-                Edit
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => openDeleteDialog(campus)}
-                className="text-red-600"
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )
-      },
-    },
-  ]
+  const toggleRow = (campusId: string) => {
+    setExpandedRows((prev) => {
+      const newSet = new Set(prev)
+      if (newSet.has(campusId)) {
+        newSet.delete(campusId)
+      } else {
+        newSet.add(campusId)
+      }
+      return newSet
+    })
+  }
 
   useEffect(() => {
     if (status === "loading") return
-    
+
     if (!session || session.user.role !== 'ADMIN') {
       router.push('/')
       return
     }
-    
+
     fetchCampuses()
   }, [session, status, router])
 
+  useEffect(() => {
+    let filtered = campuses
+
+    // Apply status filter
+    if (statusFilter !== "all") {
+      filtered = filtered.filter(campus =>
+        statusFilter === "true" ? campus.isActive : !campus.isActive
+      )
+    }
+
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase()
+      filtered = filtered.filter(campus =>
+        campus.name.toLowerCase().includes(query) ||
+        campus.shortName.toLowerCase().includes(query) ||
+        campus.location.toLowerCase().includes(query)
+      )
+    }
+
+    setFilteredCampuses(filtered)
+  }, [campuses, searchQuery, statusFilter])
+
   const fetchCampuses = async () => {
     if (!session) return
-    
+
     try {
       const response = await fetch("/api/admin/campus")
       if (response.ok) {
         const data = await response.json()
         setCampuses(data)
+        setFilteredCampuses(data)
       } else if (response.status === 401) {
         toasts.error("Session expired. Please log in again.")
         router.push('/')
@@ -626,23 +517,393 @@ export default function CampusPage() {
       </div>
 
       <Card>
-        <CardContent>
-          <DataTable
-            columns={columns}
-            data={campuses}
-            searchKey="name"
-            searchPlaceholder="Search campuses..."
-            filters={[
-              {
-                key: "isActive",
-                label: "Status",
-                options: [
-                  { value: "true", label: "Active" },
-                  { value: "false", label: "Inactive" },
-                ],
-              },
-            ]}
-          />
+        <CardContent className="p-0">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 flex-1">
+              <Input
+                placeholder="Search campuses..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="max-w-sm"
+              />
+              <div className="flex items-center gap-2">
+                <Select
+                  value={statusFilter}
+                  onValueChange={(value) => setStatusFilter(value)}
+                >
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="true">Active</SelectItem>
+                    <SelectItem value="false">Inactive</SelectItem>
+                  </SelectContent>
+                </Select>
+                {statusFilter !== "all" && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setStatusFilter("all")}
+                    className="h-8 w-8 p-0"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline">
+                  Columns <ChevronDown className="ml-2 h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuCheckboxItem
+                  checked={columnVisibility.logo}
+                  onCheckedChange={(checked) =>
+                    setColumnVisibility({ ...columnVisibility, logo: checked as boolean })
+                  }
+                >
+                  Logo
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={columnVisibility.shortName}
+                  onCheckedChange={(checked) =>
+                    setColumnVisibility({ ...columnVisibility, shortName: checked as boolean })
+                  }
+                >
+                  Short Name
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={columnVisibility.departments}
+                  onCheckedChange={(checked) =>
+                    setColumnVisibility({ ...columnVisibility, departments: checked as boolean })
+                  }
+                >
+                  Departments
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={columnVisibility.batches}
+                  onCheckedChange={(checked) =>
+                    setColumnVisibility({ ...columnVisibility, batches: checked as boolean })
+                  }
+                >
+                  Batches
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={columnVisibility.students}
+                  onCheckedChange={(checked) =>
+                    setColumnVisibility({ ...columnVisibility, students: checked as boolean })
+                  }
+                >
+                  Students
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={columnVisibility.quizzes}
+                  onCheckedChange={(checked) =>
+                    setColumnVisibility({ ...columnVisibility, quizzes: checked as boolean })
+                  }
+                >
+                  Quizzes
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={columnVisibility.assessments}
+                  onCheckedChange={(checked) =>
+                    setColumnVisibility({ ...columnVisibility, assessments: checked as boolean })
+                  }
+                >
+                  Assessments
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={columnVisibility.location}
+                  onCheckedChange={(checked) =>
+                    setColumnVisibility({ ...columnVisibility, location: checked as boolean })
+                  }
+                >
+                  Location
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={columnVisibility.status}
+                  onCheckedChange={(checked) =>
+                    setColumnVisibility({ ...columnVisibility, status: checked as boolean })
+                  }
+                >
+                  Status
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={columnVisibility.createdAt}
+                  onCheckedChange={(checked) =>
+                    setColumnVisibility({ ...columnVisibility, createdAt: checked as boolean })
+                  }
+                >
+                  Created At
+                </DropdownMenuCheckboxItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[50px]"></TableHead>
+                  {columnVisibility.logo && <TableHead>Logo</TableHead>}
+                  <TableHead>Name</TableHead>
+                  {columnVisibility.shortName && <TableHead>Short Name</TableHead>}
+                  {columnVisibility.departments && <TableHead>Departments</TableHead>}
+                  {columnVisibility.batches && <TableHead>Batches</TableHead>}
+                  {columnVisibility.students && <TableHead>Students</TableHead>}
+                  {columnVisibility.quizzes && <TableHead>Quizzes</TableHead>}
+                  {columnVisibility.assessments && <TableHead>Assessments</TableHead>}
+                  {columnVisibility.location && <TableHead>Location</TableHead>}
+                  {columnVisibility.status && <TableHead>Status</TableHead>}
+                  {columnVisibility.createdAt && <TableHead>Created At</TableHead>}
+                  <TableHead className="w-[50px]"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredCampuses.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={2 +
+                        (columnVisibility.logo ? 1 : 0) +
+                        (columnVisibility.shortName ? 1 : 0) +
+                        (columnVisibility.departments ? 1 : 0) +
+                        (columnVisibility.batches ? 1 : 0) +
+                        (columnVisibility.students ? 1 : 0) +
+                        (columnVisibility.quizzes ? 1 : 0) +
+                        (columnVisibility.assessments ? 1 : 0) +
+                        (columnVisibility.location ? 1 : 0) +
+                        (columnVisibility.status ? 1 : 0) +
+                        (columnVisibility.createdAt ? 1 : 0)
+                      }
+                      className="h-24 text-center"
+                    >
+                      {searchQuery || statusFilter !== "all" ? "No campuses found matching your search." : "No campuses found."}
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredCampuses.map((campus) => (
+                    <React.Fragment key={campus.id}>
+                      <TableRow className="cursor-pointer hover:bg-muted/50">
+                        <TableCell onClick={(e) => { e.stopPropagation(); toggleRow(campus.id) }}>
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                            {expandedRows.has(campus.id) ? (
+                              <ChevronDown className="h-4 w-4" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </TableCell>
+                        {columnVisibility.logo && (
+                          <TableCell>
+                            <div className="w-10 h-10 relative">
+                              {campus.logo ? (
+                                <Image
+                                  src={campus.logo}
+                                  alt={campus.name}
+                                  fill
+                                  className="object-cover rounded-md"
+                                />
+                              ) : (
+                                <div className="w-10 h-10 bg-muted rounded-md flex items-center justify-center">
+                                  <Building2 className="w-5 h-5 text-muted-foreground" />
+                                </div>
+                              )}
+                            </div>
+                          </TableCell>
+                        )}
+                        <TableCell className="font-medium">{campus.name}</TableCell>
+                        {columnVisibility.shortName && (
+                          <TableCell><Badge variant="secondary">{campus.shortName}</Badge></TableCell>
+                        )}
+                        {columnVisibility.departments && (
+                          <TableCell>{campus._count?.departments || 0}</TableCell>
+                        )}
+                        {columnVisibility.batches && (
+                          <TableCell>{campus._count?.batches || 0}</TableCell>
+                        )}
+                        {columnVisibility.students && (
+                          <TableCell>{campus._count?.students || 0}</TableCell>
+                        )}
+                        {columnVisibility.quizzes && (
+                          <TableCell>{campus._count?.quizzes || 0}</TableCell>
+                        )}
+                        {columnVisibility.assessments && (
+                          <TableCell>{campus._count?.assessments || 0}</TableCell>
+                        )}
+                        {columnVisibility.location && (
+                          <TableCell>
+                            <div className="flex items-center gap-1">
+                              <MapPin className="w-4 h-4 text-muted-foreground" />
+                              <span className="text-sm">{campus.location}</span>
+                            </div>
+                          </TableCell>
+                        )}
+                        {columnVisibility.status && (
+                          <TableCell>
+                            <Badge variant={campus.isActive ? "default" : "secondary"}>
+                              {campus.isActive ? "Active" : "Inactive"}
+                            </Badge>
+                          </TableCell>
+                        )}
+                        {columnVisibility.createdAt && (
+                          <TableCell>{formatDateDDMMYYYY(campus.createdAt)}</TableCell>
+                        )}
+                        <TableCell>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" className="h-8 w-8 p-0" onClick={(e) => e.stopPropagation()}>
+                                <span className="sr-only">Open menu</span>
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => router.push(`/admin/campus/${campus.id}/departments`)}>
+                                <Building2 className="mr-2 h-4 w-4" />
+                                Manage Departments
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => router.push(`/admin/campus/${campus.id}/users`)}>
+                                <Users className="mr-2 h-4 w-4" />
+                                Users
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => openEditDialog(campus)}>
+                                <Edit className="mr-2 h-4 w-4" />
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => openDeleteDialog(campus)}
+                                className="text-red-600"
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+
+                      {expandedRows.has(campus.id) && (
+                        <>
+                          {/* Departments Row */}
+                          <TableRow className="bg-muted/20">
+                            <TableCell></TableCell>
+                            <TableCell
+                              colSpan={1 +
+                                (columnVisibility.logo ? 1 : 0) +
+                                (columnVisibility.shortName ? 1 : 0) +
+                                (columnVisibility.departments ? 1 : 0) +
+                                (columnVisibility.batches ? 1 : 0) +
+                                (columnVisibility.students ? 1 : 0) +
+                                (columnVisibility.quizzes ? 1 : 0) +
+                                (columnVisibility.assessments ? 1 : 0) +
+                                (columnVisibility.location ? 1 : 0) +
+                                (columnVisibility.status ? 1 : 0) +
+                                (columnVisibility.createdAt ? 1 : 0)
+                              }
+                            >
+                              <div className="space-y-2 py-2">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <Building2 className="w-4 h-4 text-muted-foreground" />
+                                    <span className="font-medium">Departments</span>
+                                  </div>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => router.push(`/admin/campus/${campus.id}/departments`)}
+                                  >
+                                    <Plus className="w-4 h-4 mr-1" />
+                                    Add Department
+                                  </Button>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 ml-6">
+                                  {campus.departments.map((dept) => (
+                                    <div
+                                      key={dept.id}
+                                      className="flex items-center justify-between p-2 bg-background rounded border"
+                                    >
+                                      <span className="text-sm">{dept.name}</span>
+                                      <Badge variant="outline" className="text-xs">
+                                        <Users className="w-3 h-3 mr-1" />
+                                        {dept._count?.users || 0} students
+                                      </Badge>
+                                    </div>
+                                  ))}
+                                  {campus.departments.length === 0 && (
+                                    <div className="text-sm text-muted-foreground col-span-full ml-6">
+                                      No departments found
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell></TableCell>
+                          </TableRow>
+
+                          {/* Batches Row */}
+                          <TableRow className="bg-muted/20">
+                            <TableCell></TableCell>
+                            <TableCell
+                              colSpan={1 +
+                                (columnVisibility.logo ? 1 : 0) +
+                                (columnVisibility.shortName ? 1 : 0) +
+                                (columnVisibility.departments ? 1 : 0) +
+                                (columnVisibility.batches ? 1 : 0) +
+                                (columnVisibility.students ? 1 : 0) +
+                                (columnVisibility.quizzes ? 1 : 0) +
+                                (columnVisibility.assessments ? 1 : 0) +
+                                (columnVisibility.location ? 1 : 0) +
+                                (columnVisibility.status ? 1 : 0) +
+                                (columnVisibility.createdAt ? 1 : 0)
+                              }
+                            >
+                              <div className="space-y-2 py-2">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <BookOpen className="w-4 h-4 text-muted-foreground" />
+                                    <span className="font-medium">Batches</span>
+                                  </div>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => router.push(`/admin/campus/${campus.id}/batches`)}
+                                  >
+                                    <Plus className="w-4 h-4 mr-1" />
+                                    Add Batch
+                                  </Button>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 ml-6">
+                                  {campus.batches.map((batch) => (
+                                    <div
+                                      key={batch.id}
+                                      className="flex items-center justify-between p-2 bg-background rounded border"
+                                    >
+                                      <span className="text-sm">{batch.name}</span>
+                                      <Badge variant="outline" className="text-xs">
+                                        <Users className="w-3 h-3 mr-1" />
+                                        {batch._count?.users || 0} students
+                                      </Badge>
+                                    </div>
+                                  ))}
+                                  {campus.batches.length === 0 && (
+                                    <div className="text-sm text-muted-foreground col-span-full ml-6">
+                                      No batches found
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell></TableCell>
+                          </TableRow>
+                        </>
+                      )}
+                    </React.Fragment>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
 
