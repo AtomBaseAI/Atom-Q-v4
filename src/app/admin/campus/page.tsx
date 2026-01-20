@@ -119,6 +119,7 @@ export default function CampusPage() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [selectedCampus, setSelectedCampus] = useState<Campus | null>(null)
   const [campusToDelete, setCampusToDelete] = useState<Campus | null>(null)
+  const [deleteConfirmation, setDeleteConfirmation] = useState("")
   const [submitLoading, setSubmitLoading] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState<string | null>(null)
 
@@ -443,6 +444,11 @@ export default function CampusPage() {
   }
 
   const handleDeleteCampus = async (campusId: string) => {
+    if (deleteConfirmation !== "CONFIRM DELETE") {
+      toasts.error('Please type "CONFIRM DELETE" to confirm deletion')
+      return
+    }
+
     try {
       setDeleteLoading(campusId)
       const response = await fetch(`/api/admin/campus/${campusId}`, {
@@ -455,6 +461,7 @@ export default function CampusPage() {
         setCampuses(campuses.filter(campus => campus.id !== campusId))
         setIsDeleteDialogOpen(false)
         setCampusToDelete(null)
+        setDeleteConfirmation("")
       } else {
         toasts.actionFailed("Campus deletion")
       }
@@ -481,6 +488,7 @@ export default function CampusPage() {
 
   const openDeleteDialog = (campus: Campus) => {
     setCampusToDelete(campus)
+    setDeleteConfirmation("")
     setIsDeleteDialogOpen(true)
   }
 
@@ -618,12 +626,6 @@ export default function CampusPage() {
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>All Campuses</CardTitle>
-          <CardDescription>
-            Manage all campuses and their departments in the system
-          </CardDescription>
-        </CardHeader>
         <CardContent>
           <DataTable
             columns={columns}
@@ -939,14 +941,33 @@ export default function CampusPage() {
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
               This action cannot be undone. This will permanently delete the campus "{campusToDelete?.name}" and all associated data.
+              <div className="mt-4 space-y-2">
+                <Label htmlFor="delete-confirmation">
+                  <span className="font-semibold text-destructive">CONFIRM DELETE</span> to proceed:
+                </Label>
+                <Input
+                  id="delete-confirmation"
+                  value={deleteConfirmation}
+                  onChange={(e) => setDeleteConfirmation(e.target.value)}
+                  placeholder="CONFIRM DELETE"
+                  autoComplete="off"
+                  className="uppercase"
+                />
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel onClick={() => {
+              setIsDeleteDialogOpen(false)
+              setCampusToDelete(null)
+              setDeleteConfirmation("")
+            }}>
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={() => campusToDelete && handleDeleteCampus(campusToDelete.id)}
               className="bg-red-600 hover:bg-red-700"
-              disabled={deleteLoading !== null}
+              disabled={deleteLoading !== null || deleteConfirmation !== "CONFIRM DELETE"}
             >
               {deleteLoading === campusToDelete?.id ? (
                 <>

@@ -130,6 +130,7 @@ export default function AssessmentsPage() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [selectedAssessment, setSelectedAssessment] = useState<Assessment | null>(null)
   const [assessmentToDelete, setAssessmentToDelete] = useState<Assessment | null>(null)
+  const [deleteConfirmation, setDeleteConfirmation] = useState("")
   const [submitLoading, setSubmitLoading] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState<string | null>(null)
 
@@ -434,6 +435,11 @@ export default function AssessmentsPage() {
   }
 
   const handleDeleteAssessment = async (assessmentId: string) => {
+    if (deleteConfirmation !== "CONFIRM DELETE") {
+      toasts.error('Please type "CONFIRM DELETE" to confirm deletion')
+      return
+    }
+
     try {
       setDeleteLoading(assessmentId)
       const response = await fetch(`/api/admin/assessments/${assessmentId}`, {
@@ -446,6 +452,7 @@ export default function AssessmentsPage() {
         setAssessments(assessments.filter(assessment => assessment.id !== assessmentId))
         setIsDeleteDialogOpen(false)
         setAssessmentToDelete(null)
+        setDeleteConfirmation("")
       } else {
         toasts.actionFailed("Assessment deletion")
       }
@@ -489,6 +496,7 @@ export default function AssessmentsPage() {
 
   const openDeleteDialog = (assessment: Assessment) => {
     setAssessmentToDelete(assessment)
+    setDeleteConfirmation("")
     setIsDeleteDialogOpen(true)
   }
 
@@ -554,7 +562,7 @@ export default function AssessmentsPage() {
   }
 
   if (status === "loading" || loading) {
-    return <HexagonLoader />
+    return <div className="flex items-center justify-center h-[80vh] "><HexagonLoader size={80} /></div>
   }
 
   return (
@@ -579,12 +587,6 @@ export default function AssessmentsPage() {
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Assessment List</CardTitle>
-          <CardDescription>
-            View and manage all assessments in the system
-          </CardDescription>
-        </CardHeader>
         <CardContent>
           <DataTable
             columns={columns}
@@ -916,14 +918,34 @@ export default function AssessmentsPage() {
             <AlertDialogTitle>Delete Assessment</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete "{assessmentToDelete?.title}"? This action cannot be undone and will also delete all associated questions, enrollments, and submissions.
+              <div className="mt-4 space-y-2">
+                <Label htmlFor="delete-confirmation">
+                  <span className="font-semibold text-destructive">CONFIRM DELETE</span> to proceed:
+                </Label>
+                <Input
+                  id="delete-confirmation"
+                  value={deleteConfirmation}
+                  onChange={(e) => setDeleteConfirmation(e.target.value)}
+                  placeholder="CONFIRM DELETE"
+                  autoComplete="off"
+                  className="uppercase"
+                />
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel onClick={() => {
+              setIsDeleteDialogOpen(false)
+              setAssessmentToDelete(null)
+              setDeleteConfirmation("")
+            }}>
+              Cancel
+            </AlertDialogCancel>
             <LoadingButton
               onClick={() => assessmentToDelete && handleDeleteAssessment(assessmentToDelete.id)}
               loading={deleteLoading === assessmentToDelete?.id}
               variant="destructive"
+              disabled={deleteConfirmation !== "CONFIRM DELETE"}
             >
               Delete
             </LoadingButton>

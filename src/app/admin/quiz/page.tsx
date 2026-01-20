@@ -131,6 +131,7 @@ export default function QuizzesPage() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [selectedQuiz, setSelectedQuiz] = useState<Quiz | null>(null)
   const [quizToDelete, setQuizToDelete] = useState<Quiz | null>(null)
+  const [deleteConfirmation, setDeleteConfirmation] = useState("")
   const [submitLoading, setSubmitLoading] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState<string | null>(null)
 
@@ -438,6 +439,11 @@ export default function QuizzesPage() {
   }
 
   const handleDeleteQuiz = async (quizId: string) => {
+    if (deleteConfirmation !== "CONFIRM DELETE") {
+      toasts.error('Please type "CONFIRM DELETE" to confirm deletion')
+      return
+    }
+
     try {
       setDeleteLoading(quizId)
       const response = await fetch(`/api/admin/quiz/${quizId}`, {
@@ -450,6 +456,7 @@ export default function QuizzesPage() {
         setQuizzes(quizzes.filter(quiz => quiz.id !== quizId))
         setIsDeleteDialogOpen(false)
         setQuizToDelete(null)
+        setDeleteConfirmation("")
       } else {
         toasts.actionFailed("Quiz deletion")
       }
@@ -494,6 +501,7 @@ export default function QuizzesPage() {
 
   const openDeleteDialog = (quiz: Quiz) => {
     setQuizToDelete(quiz)
+    setDeleteConfirmation("")
     setIsDeleteDialogOpen(true)
   }
 
@@ -632,12 +640,6 @@ export default function QuizzesPage() {
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>All Quizzes</CardTitle>
-          <CardDescription>
-            Manage all quiz assessments in the system
-          </CardDescription>
-        </CardHeader>
         <CardContent>
           <DataTable
             columns={columns}
@@ -1026,19 +1028,33 @@ export default function QuizzesPage() {
             <AlertDialogTitle>Confirm Deletion</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete "{quizToDelete?.title}"? This action cannot be undone and will remove all associated questions and results.
+              <div className="mt-4 space-y-2">
+                <Label htmlFor="delete-confirmation">
+                  <span className="font-semibold text-destructive">CONFIRM DELETE</span> to proceed:
+                </Label>
+                <Input
+                  id="delete-confirmation"
+                  value={deleteConfirmation}
+                  onChange={(e) => setDeleteConfirmation(e.target.value)}
+                  placeholder="CONFIRM DELETE"
+                  autoComplete="off"
+                  className="uppercase"
+                />
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => {
               setIsDeleteDialogOpen(false)
               setQuizToDelete(null)
+              setDeleteConfirmation("")
             }}>
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={() => quizToDelete && handleDeleteQuiz(quizToDelete.id)}
               className="bg-red-600 hover:bg-red-700"
-              disabled={deleteLoading === quizToDelete?.id}
+              disabled={deleteLoading === quizToDelete?.id || deleteConfirmation !== "CONFIRM DELETE"}
             >
               {deleteLoading === quizToDelete?.id ? (
                 <>

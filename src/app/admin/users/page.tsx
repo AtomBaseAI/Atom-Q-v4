@@ -114,6 +114,7 @@ export default function UsersPage() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [userToDelete, setUserToDelete] = useState<User | null>(null)
+  const [deleteConfirmation, setDeleteConfirmation] = useState("")
   const [submitLoading, setSubmitLoading] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState<string | null>(null)
   const [formData, setFormData] = useState<FormData>({
@@ -173,6 +174,9 @@ export default function UsersPage() {
     {
       accessorKey: "role",
       header: "Role",
+      filterFn: (row, id, value) => {
+        return value === "all" || row.getValue("role") === value
+      },
       cell: ({ row }) => {
         const role = row.getValue("role") as UserRole
         return (
@@ -190,6 +194,9 @@ export default function UsersPage() {
     {
       accessorKey: "campus",
       header: "Campus",
+      filterFn: (row, id, value) => {
+        return value === "all" || row.getValue("campus") === value
+      },
       cell: ({ row }) => row.getValue("campus") || "-",
     },
     {
@@ -213,6 +220,11 @@ export default function UsersPage() {
     {
       accessorKey: "isActive",
       header: "Status",
+      filterFn: (row, id, value) => {
+        if (value === "all") return true
+        const isActive = row.getValue("isActive") as boolean
+        return isActive === (value === "true")
+      },
       cell: ({ row }) => {
         const isActive = row.getValue("isActive") as boolean
         return (
@@ -377,6 +389,11 @@ export default function UsersPage() {
   }
 
   const handleDeleteUser = async (userId: string) => {
+    if (deleteConfirmation !== "CONFIRM DELETE") {
+      toasts.error('Please type "CONFIRM DELETE" to confirm deletion')
+      return
+    }
+
     try {
       setDeleteLoading(userId)
       const response = await fetch(`/api/admin/users/${userId}`, {
@@ -389,6 +406,7 @@ export default function UsersPage() {
         setUsers(users.filter(user => user.id !== userId))
         setIsDeleteDialogOpen(false)
         setUserToDelete(null)
+        setDeleteConfirmation("")
       } else {
         toasts.actionFailed("User deletion")
       }
@@ -416,6 +434,7 @@ export default function UsersPage() {
 
   const openDeleteDialog = (user: User) => {
     setUserToDelete(user)
+    setDeleteConfirmation("")
     setIsDeleteDialogOpen(true)
   }
 
@@ -533,12 +552,6 @@ export default function UsersPage() {
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>All Users</CardTitle>
-          <CardDescription>
-            A list of all users in the system
-          </CardDescription>
-        </CardHeader>
         <CardContent>
         
           <DataTable
@@ -547,6 +560,24 @@ export default function UsersPage() {
             searchKey="name"
             searchPlaceholder="Search users..."
             filters={[
+              {
+                key: "role",
+                label: "Role",
+                options: [
+                  { value: "all", label: "All Roles" },
+                  { value: "ADMIN", label: "ADMIN" },
+                  { value: "USER", label: "USER" },
+                ],
+              },
+              {
+                key: "isActive",
+                label: "Status",
+                options: [
+                  { value: "all", label: "All Status" },
+                  { value: "true", label: "Active" },
+                  { value: "false", label: "Inactive" },
+                ],
+              },
               {
                 key: "campus",
                 label: "Campus",
@@ -860,19 +891,33 @@ export default function UsersPage() {
             <AlertDialogTitle>Confirm Deletion</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete "{userToDelete?.name}"? This action cannot be undone.
+              <div className="mt-4 space-y-2">
+                <Label htmlFor="delete-confirmation">
+                  <span className="font-semibold text-destructive">CONFIRM DELETE</span> to proceed:
+                </Label>
+                <Input
+                  id="delete-confirmation"
+                  value={deleteConfirmation}
+                  onChange={(e) => setDeleteConfirmation(e.target.value)}
+                  placeholder="CONFIRM DELETE"
+                  autoComplete="off"
+                  className="uppercase"
+                />
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => {
               setIsDeleteDialogOpen(false)
               setUserToDelete(null)
+              setDeleteConfirmation("")
             }}>
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={() => userToDelete && handleDeleteUser(userToDelete.id)}
               className="bg-red-600 hover:bg-red-700"
-              disabled={deleteLoading === userToDelete?.id}
+              disabled={deleteLoading === userToDelete?.id || deleteConfirmation !== "CONFIRM DELETE"}
             >
               {deleteLoading === userToDelete?.id ? (
                 <>

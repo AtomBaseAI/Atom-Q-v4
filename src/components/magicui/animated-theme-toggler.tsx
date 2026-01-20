@@ -1,7 +1,7 @@
 "use client";
 
-import { Moon, SunDim } from "lucide-react";
-import { useState, useRef } from "react";
+import { Moon, SunDim, Maximize, Minimize } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
 import { flushSync } from "react-dom";
 import { cn } from "@/lib/utils";
 
@@ -11,7 +11,22 @@ type props = {
 
 export const AnimatedThemeToggler = ({ className }: props) => {
   const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const buttonRef = useRef<HTMLButtonElement | null>(null);
+  const fullscreenRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    // Check fullscreen state
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
+  }, []);
+
   const changeTheme = async () => {
     if (!buttonRef.current) return;
 
@@ -45,9 +60,29 @@ export const AnimatedThemeToggler = ({ className }: props) => {
       },
     );
   };
+
+  const toggleFullscreen = async () => {
+    if (!fullscreenRef.current) return;
+
+    try {
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen();
+      } else {
+        await document.exitFullscreen();
+      }
+    } catch (error) {
+      console.error('Fullscreen toggle failed:', error);
+    }
+  };
+
   return (
-    <button ref={buttonRef} onClick={changeTheme} className={cn(className)}>
-      {isDarkMode ? <SunDim /> : <Moon />}
-    </button>
+    <div className={cn("flex items-center gap-2", className)}>
+      <button ref={buttonRef} onClick={changeTheme} className={cn(className)}>
+        {isDarkMode ? <SunDim /> : <Moon />}
+      </button>
+      <button ref={fullscreenRef} onClick={toggleFullscreen} className={cn(className)}>
+        {isFullscreen ? <Minimize /> : <Maximize />}
+      </button>
+    </div>
   );
 };
