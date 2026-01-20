@@ -1,0 +1,3 @@
+NEXTAUTH_SECRET=jrMJlRlwj8V4MefB3+A92zIJB7n7TX9pc9iI/gjKLtI=
+NEXTAUTH_URL=http://localhost:3000
+NODE_ENV=development
