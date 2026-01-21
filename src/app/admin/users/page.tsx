@@ -49,7 +49,9 @@ import {
   Trash2,
   ArrowUpDown,
   Loader2,
-  X
+  X,
+  CheckCircle2 as CheckCircle,
+  BookOpen,
 } from "lucide-react"
 import { toasts } from "@/lib/toasts"
 import { UserRole, StudentSection } from "@prisma/client"
@@ -117,6 +119,24 @@ export default function UsersPage() {
   const [deleteConfirmation, setDeleteConfirmation] = useState("")
   const [submitLoading, setSubmitLoading] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState<string | null>(null)
+
+  // Student deletion tracking state
+  const [deleteInfo, setDeleteInfo] = useState<{
+    user: { id: string; name: string; email: string }
+    enrollments: {
+      quizzes: number
+      assessments: number
+      total: number
+    }
+  } | null>(null)
+  const [deletionStatus, setDeletionStatus] = useState<{
+    enrollments: 'pending' | 'deleting' | 'deleted'
+    user: 'pending' | 'deleting'
+  }>({
+    enrollments: 'pending',
+    user: 'pending'
+  })
+
   const [formData, setFormData] = useState<FormData>({
     name: "",
     email: "",
@@ -388,13 +408,52 @@ export default function UsersPage() {
     }
   }
 
+  const handleDeleteEnrollments = async () => {
+    if (!userToDelete) return
+
+    try {
+      setDeletionStatus(prev => ({ ...prev, enrollments: 'deleting' }))
+      const response = await fetch(`/api/admin/users/${userToDelete.id}/enrollments`, {
+        method: 'DELETE'
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        toasts.success(`${data.deleted.total} enrollment(s) deleted successfully`)
+        setDeletionStatus(prev => ({ ...prev, enrollments: 'deleted' }))
+
+        // Refresh delete info
+        const refreshResponse = await fetch(`/api/admin/users/${userToDelete.id}/delete-info`)
+        if (refreshResponse.ok) {
+          const refreshData = await refreshResponse.json()
+          setDeleteInfo(refreshData)
+        }
+      } else {
+        toasts.actionFailed("Enrollment deletion")
+        setDeletionStatus(prev => ({ ...prev, enrollments: 'pending' }))
+      }
+    } catch (error) {
+      console.error("Error deleting enrollments:", error)
+      toasts.actionFailed("Enrollment deletion")
+      setDeletionStatus(prev => ({ ...prev, enrollments: 'pending' }))
+    }
+  }
+
   const handleDeleteUser = async (userId: string) => {
-    if (deleteConfirmation !== "CONFIRM DELETE") {
+    if (!userToDelete || deleteConfirmation !== "CONFIRM DELETE") {
       toasts.error('Please type "CONFIRM DELETE" to confirm deletion')
       return
     }
 
+    // Check if enrollments need to be deleted first
+    const hasEnrollments = deleteInfo?.enrollments.total > 0
+    if (hasEnrollments && deletionStatus.enrollments !== 'deleted') {
+      toasts.error('Please delete all enrollments first')
+      return
+    }
+
     try {
+      setDeletionStatus(prev => ({ ...prev, user: 'deleting' }))
       setDeleteLoading(userId)
       const response = await fetch(`/api/admin/users/${userId}`, {
         method: "DELETE",
@@ -406,12 +465,24 @@ export default function UsersPage() {
         setUsers(users.filter(user => user.id !== userId))
         setIsDeleteDialogOpen(false)
         setUserToDelete(null)
+        setDeleteInfo(null)
         setDeleteConfirmation("")
+        setDeletionStatus({ enrollments: 'pending', user: 'pending' })
       } else {
-        toasts.actionFailed("User deletion")
+        const error = await response.json()
+        
+        if (error.error === "CANNOT_DELETE_USER_WITH_ENROLLMENTS") {
+          toasts.error("User has enrollments that must be deleted first")
+          setDeletionStatus(prev => ({ ...prev, user: 'pending' }))
+        } else {
+          toasts.error(error.message || "User deletion failed")
+          setDeletionStatus(prev => ({ ...prev, user: 'pending' }))
+        }
       }
     } catch (error) {
+      console.error("Error deleting user:", error)
       toasts.actionFailed("User deletion")
+      setDeletionStatus(prev => ({ ...prev, user: 'pending' }))
     } finally {
       setDeleteLoading(null)
     }
@@ -432,10 +503,24 @@ export default function UsersPage() {
     setIsEditDialogOpen(true)
   }
 
-  const openDeleteDialog = (user: User) => {
+  const openDeleteDialog = async (user: User) => {
     setUserToDelete(user)
     setDeleteConfirmation("")
+    setDeletionStatus({ enrollments: 'pending', user: 'pending' })
+    setDeleteInfo(null)
     setIsDeleteDialogOpen(true)
+
+    // Fetch enrollment info
+    try {
+      const response = await fetch(`/api/admin/users/${user.id}/delete-info`)
+      if (response.ok) {
+        const data = await response.json()
+        setDeleteInfo(data)
+      }
+    } catch (error) {
+      console.error("Error fetching enrollment info:", error)
+      toasts.error("Failed to fetch user enrollment info")
+    }
   }
 
   const resetForm = () => {
@@ -886,38 +971,110 @@ export default function UsersPage() {
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <AlertDialogContent>
+        <AlertDialogContent className="max-w-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle>Confirm Deletion</AlertDialogTitle>
+            <AlertDialogTitle>Delete Student: {userToDelete?.name}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{userToDelete?.name}"? This action cannot be undone.
+              <p>{userToDelete?.email}</p>
+              <p className="text-muted-foreground text-sm">
+                {userToDelete?.name} ({userToDelete?.email})
+              </p>
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="mt-4 space-y-2">
-            <Label htmlFor="delete-confirmation">
-              <span className="font-semibold text-destructive">CONFIRM DELETE</span> to proceed:
-            </Label>
-            <Input
-              id="delete-confirmation"
-              value={deleteConfirmation}
-              onChange={(e) => setDeleteConfirmation(e.target.value)}
-              placeholder="CONFIRM DELETE"
-              autoComplete="off"
-              className="uppercase"
-            />
+
+          <div className="mt-4 space-y-4">
+            {deleteInfo ? (
+              <div className="space-y-3">
+                {/* Enrollments Section */}
+                {deleteInfo.enrollments.total > 0 && (
+                  <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/30">
+                    <div>
+                      <p className="font-medium">Enrollments</p>
+                      <div className="text-sm text-muted-foreground space-y-1">
+                        {deleteInfo.enrollments.quizzes > 0 && (
+                          <p>• {deleteInfo.enrollments.quizzes} quiz attempt{deleteInfo.enrollments.quizzes !== 1 ? 's' : ''}</p>
+                        )}
+                        {deleteInfo.enrollments.assessments > 0 && (
+                          <p>• {deleteInfo.enrollments.assessments} assessment attempt{deleteInfo.enrollments.assessments !== 1 ? 's' : ''}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {deletionStatus.enrollments === 'deleted' && (
+                        <CheckCircle className="w-5 h-5 text-green-600" />
+                      )}
+                      <Button
+                        onClick={handleDeleteEnrollments}
+                        disabled={deletionStatus.enrollments === 'deleted' || deletionStatus.enrollments === 'deleting'}
+                        variant={deletionStatus.enrollments === 'deleted' ? 'outline' : 'destructive'}
+                        className="min-w-[180px]"
+                      >
+                        {deletionStatus.enrollments === 'deleting' ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Deleting...
+                          </>
+                        ) : deletionStatus.enrollments === 'deleted' ? (
+                          'Deleted'
+                        ) : (
+                          `Delete ${deleteInfo.enrollments.total} Enrollment(s)`
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Empty State - No Enrollments */}
+                {deleteInfo.enrollments.total === 0 && (
+                  <div className="p-4 border rounded-lg bg-green-50 border-green-200">
+                    <p className="text-green-800 text-sm font-medium">
+                      ✓ No enrollments found. This student can be safely deleted.
+                    </p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center justify-center p-8">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            )}
           </div>
+
+          {/* Confirmation Input - Only show if there's no enrollments */}
+          {deleteInfo?.enrollments.total === 0 && (
+            <div className="mt-4 pt-4 border-t space-y-2">
+              <Label htmlFor="delete-confirmation">
+                <span className="font-semibold text-destructive">CONFIRM DELETE</span> to proceed:
+              </Label>
+              <Input
+                id="delete-confirmation"
+                value={deleteConfirmation}
+                onChange={(e) => setDeleteConfirmation(e.target.value)}
+                placeholder="CONFIRM DELETE"
+                autoComplete="off"
+                className="uppercase"
+              />
+            </div>
+          )}
+
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => {
               setIsDeleteDialogOpen(false)
               setUserToDelete(null)
+              setDeleteInfo(null)
               setDeleteConfirmation("")
+              setDeletionStatus({ enrollments: 'pending', user: 'pending' })
             }}>
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={() => userToDelete && handleDeleteUser(userToDelete.id)}
               className="bg-red-600 hover:bg-red-700"
-              disabled={deleteLoading === userToDelete?.id || deleteConfirmation !== "CONFIRM DELETE"}
+              disabled={
+                deleteLoading === userToDelete?.id ||
+                deleteConfirmation !== "CONFIRM DELETE" ||
+                (deleteInfo?.enrollments.total === 0 ? false : deletionStatus.enrollments !== 'deleted')
+              }
             >
               {deleteLoading === userToDelete?.id ? (
                 <>
@@ -925,7 +1082,7 @@ export default function UsersPage() {
                   Deleting...
                 </>
               ) : (
-                "Delete User"
+                "Delete Student"
               )}
             </AlertDialogAction>
           </AlertDialogFooter>

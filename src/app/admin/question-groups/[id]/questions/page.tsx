@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -12,16 +12,16 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Switch } from "@/components/ui/switch"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
-import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
-import { Plus, Edit, Trash2, ArrowLeft, Loader2, ChevronLeft, Download, Upload, FileDown, FileUp } from "lucide-react"
+import { Plus, ArrowLeft, Loader2, ChevronLeft, FileDown, FileUp, Trash2 } from "lucide-react"
 import { format } from "date-fns"
 import { QuestionType, DifficultyLevel } from "@prisma/client"
 import Papa from "papaparse"
 import HexagonLoader from "@/components/Loader/Loading"
 import { LoadingButton } from "@/components/ui/laodaing-button"
 import { toast } from "sonner"
+import { DataTable } from "@/components/ui/data-table"
+import { ColumnDef } from "@tanstack/react-table"
+import { ArrowUpDown } from "lucide-react"
 
 interface Question {
   id: string
@@ -50,6 +50,14 @@ interface QuestionGroup {
   questions: Question[]
 }
 
+const formatDateDDMMYYYY = (dateString: string) => {
+  const date = new Date(dateString)
+  const day = String(date.getDate()).padStart(2, '0')
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const year = date.getFullYear()
+  return `${day}/${month}/${year}`
+}
+
 export default function QuestionGroupPage() {
   const params = useParams()
   const router = useRouter()
@@ -66,7 +74,7 @@ export default function QuestionGroupPage() {
     title: "",
     content: "",
     type: QuestionType.MULTIPLE_CHOICE as QuestionType,
-    options: ["", "", ""], // Initialize with 3 empty options
+    options: ["", "", ""],
     correctAnswer: "",
     correctAnswers: [] as string[],
     explanation: "",
@@ -74,12 +82,141 @@ export default function QuestionGroupPage() {
     isActive: true
   })
 
-  // CSV Import/Export states
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isImportSheetOpen, setIsImportSheetOpen] = useState(false)
   const [importFile, setImportFile] = useState<File | null>(null)
   const [isDragOver, setIsDragOver] = useState(false)
   const [isImporting, setIsImporting] = useState(false)
+
+  const columns: ColumnDef<Question>[] = [
+    {
+      accessorKey: "title",
+      header: ({ column }) => {
+        return (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          >
+            Title
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          </Button>
+        )
+      },
+      cell: ({ row }) => {
+        const title = row.getValue("title") as string
+        const maxLength = 50
+        return (
+          <div className="font-medium max-w-xs truncate" title={title}>
+            {title.length > maxLength ? title.slice(0, maxLength) + "..." : title}
+          </div>
+        )
+      },
+    },
+    {
+      accessorKey: "type",
+      header: "Type",
+      cell: ({ row }) => {
+        const type = row.getValue("type") as QuestionType
+        const typeLabels: Record<QuestionType, string> = {
+          [QuestionType.MULTIPLE_CHOICE]: "Multiple Choice",
+          [QuestionType.TRUE_FALSE]: "True/False",
+          [QuestionType.FILL_IN_BLANK]: "Fill in Blank",
+          [QuestionType.MULTI_SELECT]: "Multi Select",
+        }
+        return <Badge variant="outline">{typeLabels[type]}</Badge>
+      },
+    },
+    {
+      accessorKey: "difficulty",
+      header: "Difficulty",
+      cell: ({ row }) => {
+        const difficulty = row.getValue("difficulty") as DifficultyLevel
+        const difficultyColors: Record<DifficultyLevel, string> = {
+          [DifficultyLevel.EASY]: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100",
+          [DifficultyLevel.MEDIUM]: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100",
+          [DifficultyLevel.HARD]: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100",
+        }
+        return (
+          <Badge className={difficultyColors[difficulty]}>
+            {difficulty.toLowerCase()}
+          </Badge>
+        )
+      },
+    },
+    {
+      accessorKey: "correctAnswer",
+      header: "Correct Answer",
+      cell: ({ row }) => {
+        const correctAnswer = row.getValue("correctAnswer") as string
+        const maxLength = 50
+        return (
+          <div className="max-w-xs truncate" title={correctAnswer}>
+            {correctAnswer.length > maxLength ? correctAnswer.slice(0, maxLength) + "..." : correctAnswer}
+          </div>
+        )
+      },
+    },
+    {
+      accessorKey: "isActive",
+      header: "Status",
+      cell: ({ row }) => {
+        const isActive = row.getValue("isActive") as boolean
+        return (
+          <Badge variant={isActive ? "default" : "secondary"}>
+            {isActive ? "Active" : "Inactive"}
+          </Badge>
+        )
+      },
+    },
+    {
+      accessorKey: "createdAt",
+      header: ({ column }) => {
+        return (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          >
+            Created At
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          </Button>
+        )
+      },
+      cell: ({ row }) => {
+        const date = new Date(row.getValue("createdAt"))
+        return formatDateDDMMYYYY(date.toISOString())
+      },
+    },
+    {
+      id: "actions",
+      enableHiding: false,
+      cell: ({ row }) => {
+        const question = row.original
+        return (
+          <div className="flex items-center space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleEdit(question)}
+            >
+              Edit
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleDelete(question.id)}
+              disabled={deleteLoading === question.id}
+            >
+              {deleteLoading === question.id ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
+        )
+      },
+    },
+  ]
 
   useEffect(() => {
     fetchQuestionGroup()
@@ -115,49 +252,45 @@ export default function QuestionGroupPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    // Validate form data
     if (!formData.title.trim()) {
-      alert("Title is required")
+      toast.error("Title is required")
       return
     }
 
-    // Check if content has actual text content (not just HTML tags)
     const tempDiv = document.createElement('div')
     tempDiv.innerHTML = formData.content
     const textContent = tempDiv.textContent || tempDiv.innerText || ""
 
     if (!textContent.trim()) {
-      alert("Content is required")
+      toast.error("Content is required")
       return
     }
 
     if (formData.type !== QuestionType.FILL_IN_BLANK) {
       if (formData.options.length === 0) {
-        alert("At least one option is required")
+        toast.error("At least one option is required")
         return
       }
 
-      // Check for empty options
       if (formData.options.some(option => !option.trim())) {
-        alert("All options must have values")
+        toast.error("All options must have values")
         return
       }
 
-      // Validate correct answers
       if (formData.type === QuestionType.MULTI_SELECT) {
         if (formData.correctAnswers.length === 0) {
-          alert("At least one correct answer must be selected for multi-select questions")
+          toast.error("At least one correct answer must be selected for multi-select questions")
           return
         }
       } else {
         if (!formData.correctAnswer.trim()) {
-          alert("A correct answer must be selected")
+          toast.error("A correct answer must be selected")
           return
         }
       }
     } else {
       if (!formData.correctAnswer.trim()) {
-        alert("Correct answer is required for fill-in-the-blank questions")
+        toast.error("Correct answer is required for fill-in-the-blank questions")
         return
       }
     }
@@ -165,12 +298,11 @@ export default function QuestionGroupPage() {
     setSubmitLoading(true)
 
     try {
-      // Prepare the data for the API
       const apiData = {
         title: formData.title,
         content: formData.content,
         type: formData.type,
-        options: formData.options, // API handles both array and string
+        options: formData.options,
         correctAnswer: formData.correctAnswer,
         explanation: formData.explanation,
         difficulty: formData.difficulty,
@@ -195,14 +327,14 @@ export default function QuestionGroupPage() {
         await fetchQuestions()
         setIsDialogOpen(false)
         resetForm()
+        toast.success(editingQuestion ? "Question updated successfully" : "Question created successfully")
       } else {
         const errorData = await response.json()
-        console.error("Error saving question:", errorData.message)
-        alert(`Error: ${errorData.message}`)
+        toast.error(`Error: ${errorData.message}`)
       }
     } catch (error) {
       console.error("Error saving question:", error)
-      alert("Error saving question. Please try again.")
+      toast.error("Error saving question. Please try again.")
     } finally {
       setSubmitLoading(false)
     }
@@ -230,6 +362,10 @@ export default function QuestionGroupPage() {
   }
 
   const handleDelete = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this question?")) {
+      return
+    }
+
     try {
       setDeleteLoading(id)
       const response = await fetch(`/api/admin/question-groups/${groupId}/questions/${id}`, {
@@ -238,13 +374,14 @@ export default function QuestionGroupPage() {
 
       if (response.ok) {
         await fetchQuestions()
+        toast.success("Question deleted successfully")
       } else {
         const errorData = await response.json()
-        alert(`Error: ${errorData.message}`)
+        toast.error(`Error: ${errorData.message}`)
       }
     } catch (error) {
       console.error("Error deleting question:", error)
-      alert("Error deleting question. Please try again.")
+      toast.error("Error deleting question. Please try again.")
     } finally {
       setDeleteLoading(null)
     }
@@ -256,7 +393,7 @@ export default function QuestionGroupPage() {
       title: "",
       content: "",
       type: QuestionType.MULTIPLE_CHOICE as QuestionType,
-      options: ["", "", ""], // Initialize with 3 empty options
+      options: ["", "", ""],
       correctAnswer: "",
       correctAnswers: [],
       explanation: "",
@@ -306,7 +443,6 @@ export default function QuestionGroupPage() {
         correctAnswer: newCorrectAnswers.join('|')
       })
     } else {
-      // For single choice questions, only one answer can be selected
       setFormData({
         ...formData,
         correctAnswer: isChecked ? option : "",
@@ -315,18 +451,15 @@ export default function QuestionGroupPage() {
     }
   }
 
-  // CSV Export function
   const handleExportQuestions = () => {
     const csvContent = [
       ["Title", "Content", "Type", "Options", "Correct Answer", "Explanation", "Difficulty", "Active"],
       ...questions.map(question => {
-        // Parse options from database (stored as JSON string) and convert to pipe-separated format
         let optionsString = ""
         try {
           const parsedOptions = JSON.parse(question.options || "[]")
           optionsString = parsedOptions.join("|")
         } catch (e) {
-          console.warn("Failed to parse options for question:", question.title, e)
           optionsString = question.options?.toString() || ""
         }
 
@@ -342,7 +475,6 @@ export default function QuestionGroupPage() {
         ]
       })
     ].map(row =>
-      // Properly escape CSV values that contain commas or quotes
       row.map(cell => {
         if (cell === null || cell === undefined) return ""
         const str = cell.toString()
@@ -363,7 +495,6 @@ export default function QuestionGroupPage() {
     toast.success("Questions exported to CSV")
   }
 
-  // CSV Import functions
   const handleImportQuestions = () => {
     setIsImportSheetOpen(true)
   }
@@ -420,7 +551,6 @@ export default function QuestionGroupPage() {
       skipEmptyLines: true,
       complete: async (results) => {
         try {
-          // Filter out empty rows and validate required fields
           const validQuestions = results.data.filter((row: any) => {
             const hasTitle = row.Title && row.Title.trim() !== ""
             const hasContent = row.Content && row.Content.trim() !== ""
@@ -433,13 +563,12 @@ export default function QuestionGroupPage() {
 
           if (validQuestions.length === 0) {
             toast.error("No valid questions found in CSV file. Please ensure all required fields are filled.")
+            setIsImporting(false)
             return
           }
 
-          // Create questions in the current question group
           const importPromises = validQuestions.map(async (question: any, index: number) => {
             try {
-              // Parse options from CSV (pipe-separated format)
               const options = question.Options.split('|').map((opt: string) => opt.trim()).filter((opt: string) => opt)
               
               const apiData = {
@@ -485,18 +614,14 @@ export default function QuestionGroupPage() {
           if (failedImports.length > 0) {
             const errorMessages = failedImports.map(f => f.error).join(", ")
             console.error("Failed imports:", errorMessages)
-            toast.error(`Failed to import ${failedImports.length} question(s):\n${errorMessages}`)
+            toast.error(`Failed to import ${failedImports.length} question(s). Check console for details.`)
           }
 
-          // Close the import sheet and reset state
           setIsImportSheetOpen(false)
           setImportFile(null)
-          if (fileInputRef.current) {
-            fileInputRef.current.value = ""
-          }
         } catch (error) {
-          console.error("CSV parsing error:", error)
-          toast.error(`Failed to parse CSV file: ${error instanceof Error ? error.message : "Unknown error"}`)
+          console.error("Import error:", error)
+          toast.error("Failed to import questions. Please try again.")
         } finally {
           setIsImporting(false)
         }
@@ -510,7 +635,7 @@ export default function QuestionGroupPage() {
   }
 
   if (loading) {
-    return <div className="flex items-center justify-center h-[80vh] "><HexagonLoader size={80} /></div>
+    return <div className="flex items-center justify-center h-[80vh]"><HexagonLoader size={80} /></div>
   }
 
   if (!questionGroup) {
@@ -518,229 +643,32 @@ export default function QuestionGroupPage() {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex justify-center items-center">
-        <div className="w-1/2 flex flex-row justify-start items-center">
-          <div className="flex items-center space-x-4">
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <div className="flex items-center space-x-3">
             <h1 className="text-3xl font-bold tracking-tight">{questionGroup.name}</h1>
             <Badge variant={questionGroup.isActive ? "default" : "secondary"}>
               {questionGroup.isActive ? "Active" : "Inactive"}
             </Badge>
-            <span className="text-sm text-muted-foreground">
-              Created {format(new Date(questionGroup.createdAt), "MMM d, yyyy")}
-            </span>
           </div>
+          <p className="text-muted-foreground mt-1">
+            Created {format(new Date(questionGroup.createdAt), "MMM d, yyyy")} • {questions.length} questions
+          </p>
         </div>
-        <div className="w-1/2 flex flex-row justify-end items-center g-2">
-          <Button variant="outline" onClick={handleExportQuestions} className="mr-1">
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleExportQuestions}>
             <FileDown className="mr-2 h-4 w-4" />
-            Export CSV
+            Export
           </Button>
-          <Button variant="outline" onClick={handleImportQuestions} className="mr-1">
+          <Button variant="outline" onClick={handleImportQuestions}>
             <FileUp className="mr-2 h-4 w-4" />
-            Import CSV
+            Import
           </Button>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button onClick={resetForm} className="mr-1">
-                <Plus className="mr-2 h-4 w-4" />
-                New Question
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="min-w-[100vw] min-h-[99vh] w-full p-0 m-0 rounded-none">
-              <form onSubmit={handleSubmit} className="flex flex-col h-full w-full">
-                <div className="flex flex-col h-full w-full">
-                  <DialogHeader className="px-6 pt-6 pb-4 border-b">
-                    <DialogTitle>
-                      {editingQuestion ? "Edit Question" : "Create Question"}
-                    </DialogTitle>
-                  </DialogHeader>
-                  <div className="flex flex-row flex-1 overflow-y-hidden px-6 py-4 space-y-6 gap-4">
-                    <div className="flex flex-col flex-1 w-1/2 h-full p-4 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="title" className="text-sm font-medium">
-                          Title
-                        </Label>
-                        <Input
-                          id="title"
-                          value={formData.title}
-                          onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                          placeholder="Enter question title"
-                          required
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="type" className="text-sm font-medium">
-                          Type
-                        </Label>
-                        <Select
-                          value={formData.type}
-                          onValueChange={(value) => {
-                            const newType = value as QuestionType
-                            // Ensure minimum options for multi-select
-                            let newOptions = [...formData.options]
-                            if (newType === QuestionType.MULTI_SELECT && newOptions.length < 3) {
-                              while (newOptions.length < 3) {
-                                newOptions.push("")
-                              }
-                            } else if (newType === QuestionType.TRUE_FALSE) {
-                              // For true/false, set exactly 2 options
-                              newOptions = ["True", "False"]
-                            } else if (newType === QuestionType.MULTIPLE_CHOICE && newOptions.length < 2) {
-                              // For multiple choice, ensure at least 2 options
-                              while (newOptions.length < 2) {
-                                newOptions.push("")
-                              }
-                            }
-
-                            setFormData({
-                              ...formData,
-                              type: newType,
-                              options: newOptions,
-                              correctAnswer: "",
-                              correctAnswers: []
-                            })
-                          }}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select question type" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value={QuestionType.MULTIPLE_CHOICE}>Multiple Choice</SelectItem>
-                            <SelectItem value={QuestionType.MULTI_SELECT}>Multi-Select</SelectItem>
-                            <SelectItem value={QuestionType.TRUE_FALSE}>True/False</SelectItem>
-                            <SelectItem value={QuestionType.FILL_IN_BLANK}>Fill in the Blank</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      {formData.type !== QuestionType.FILL_IN_BLANK && (
-                        <div className="space-y-4">
-                          <div className="flex justify-between items-center">
-                            <Label className="text-sm font-medium">Options</Label>
-                            <Button type="button" variant="outline" size="sm" onClick={addOption}>
-                              <Plus className="h-4 w-4 mr-1" />
-                              Add Option
-                            </Button>
-                          </div>
-                          {formData.type === QuestionType.MULTI_SELECT && (
-                            <p className="text-sm text-muted-foreground">
-                              Multi-select questions require at least 3 options.
-                            </p>
-                          )}
-                          <div className="space-y-2">
-                            {formData.options.map((option, index) => (
-                              <div key={index} className="flex items-center space-x-2">
-                                <Input
-                                  value={option}
-                                  onChange={(e) => updateOption(index, e.target.value)}
-                                  placeholder={`Option ${index + 1}`}
-                                  required
-                                />
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => removeOption(index)}
-                                  disabled={formData.options.length <= (formData.type === QuestionType.MULTI_SELECT ? 3 :
-                                    formData.type === QuestionType.TRUE_FALSE ? 2 : 1)}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      {formData.type !== QuestionType.FILL_IN_BLANK && (
-                        <div className="space-y-4">
-                          <Label className="text-sm font-medium">
-                            {formData.type === QuestionType.MULTI_SELECT ? "Correct Answers" : "Correct Answer"}
-                          </Label>
-                          <div className="space-y-2">
-                            {formData.options.map((option, index) => (
-                              <div key={index} className="flex items-center space-x-2">
-                                <Checkbox
-                                  id={`correct-${index}`}
-                                  checked={formData.correctAnswers.includes(option)}
-                                  onCheckedChange={(checked) => handleCorrectAnswerChange(option, checked as boolean)}
-                                />
-                                <label htmlFor={`correct-${index}`} className="text-sm">
-                                  {option || `Option ${index + 1}`}
-                                </label>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {formData.type === QuestionType.FILL_IN_BLANK && (
-                        <div className="space-y-2">
-                          <Label htmlFor="correctAnswer" className="text-sm font-medium">
-                            Correct Answer
-                          </Label>
-                          <Input
-                            id="correctAnswer"
-                            value={formData.correctAnswer}
-                            onChange={(e) => setFormData({ ...formData, correctAnswer: e.target.value })}
-                            placeholder="Enter correct answer"
-                            required
-                          />
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex flex-col flex-1 w-1/2 h-full p-4 gap-6">
-                      <div className="space-y-2">
-                        <Label htmlFor="content" className="text-sm font-medium">
-                          Content
-                        </Label>
-                        <RichTextEditor
-                          value={formData.content}
-                          onChange={(value) => setFormData({ ...formData, content: value })}
-                          placeholder="Enter question content..."
-                          className="min-h-[150px]"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="explanation" className="text-sm font-medium">
-                          Explanation
-                        </Label>
-                        <RichTextEditor
-                          value={formData.explanation}
-                          onChange={(value) => setFormData({ ...formData, explanation: value })}
-                          placeholder="Enter explanation (optional)..."
-                          className="min-h-[100px]"
-                        />
-                      </div>
-                    </div>
-
-                  </div>
-                  <div className="px-6 py-4 border-t flex flex-row">
-                    <div className="w-1/2 flex justify-start items-center">
-                      <div className="flex items-center justify-center pt-4">
-                        <Label htmlFor="isActive" className="text-sm font-medium mr-2">
-                          Active
-                        </Label>
-                        <Switch
-                          id="isActive"
-                          checked={formData.isActive}
-                          onCheckedChange={(checked) => setFormData({ ...formData, isActive: checked })}
-                        />
-                      </div>
-                    </div>
-                    <div className="w-1/2 flex justify-end items-center">
-                      <LoadingButton 
-                        type="submit" 
-                        isLoading={submitLoading}
-                        loadingText={editingQuestion ? "Updating..." : "Creating..."}
-                      >
-                        {editingQuestion ? "Update" : "Create"}
-                      </LoadingButton>
-                    </div>
-                  </div>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
+          <Button onClick={() => { resetForm(); setIsDialogOpen(true) }}>
+            <Plus className="mr-2 h-4 w-4" />
+            New Question
+          </Button>
           <Button variant="outline" onClick={() => router.back()}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
@@ -748,131 +676,263 @@ export default function QuestionGroupPage() {
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Questions</CardTitle>
-          <CardDescription>
-            Questions in this group ({questions.length})
-          </CardDescription>
-        </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Title</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Difficulty</TableHead>
-                <TableHead>Correct Answer</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {questions.map((question) => (
-                <TableRow key={question.id}>
-                  <TableCell className="font-medium">{question.title}</TableCell>
-                  <TableCell>
-                    <Badge variant={
-                      question.type === QuestionType.MULTIPLE_CHOICE ? "default" :
-                        question.type === QuestionType.MULTI_SELECT ? "secondary" :
-                          question.type === QuestionType.TRUE_FALSE ? "outline" : "destructive"
-                    }>
-                      {question.type.replace("_", " ")}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={question.difficulty === DifficultyLevel.EASY ? "default" : question.difficulty === DifficultyLevel.MEDIUM ? "secondary" : "destructive"}>
-                      {question.difficulty}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="max-w-xs truncate">
-                    {question.correctAnswer}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={question.isActive ? "default" : "secondary"}>
-                      {question.isActive ? "Active" : "Inactive"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleEdit(question)}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={deleteLoading === question.id}
-                          >
-                            {deleteLoading === question.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <Trash2 className="h-4 w-4" />
-                            )}
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Delete Question</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Are you sure you want to delete "{question.title}"? This action cannot be undone.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={() => handleDelete(question.id)}
-                              className="bg-destructive hover:bg-destructive/90"
-                              disabled={deleteLoading === question.id}
-                            >
-                              {deleteLoading === question.id ? (
-                                <>
-                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                  Deleting...
-                                </>
-                              ) : (
-                                "Delete"
-                              )}
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-          {questions.length === 0 && (
-            <div className="text-center py-8 text-muted-foreground">
-              No questions found in this group. Create your first question to get started.
-            </div>
-          )}
+          <DataTable
+            columns={columns}
+            data={questions}
+            searchKey="title"
+            searchPlaceholder="Search questions..."
+            filters={[
+              {
+                key: "type",
+                label: "Type",
+                options: [
+                  { value: "all", label: "All Types" },
+                  { value: "MULTIPLE_CHOICE", label: "Multiple Choice" },
+                  { value: "TRUE_FALSE", label: "True/False" },
+                  { value: "FILL_IN_BLANK", label: "Fill in Blank" },
+                  { value: "MULTI_SELECT", label: "Multi Select" },
+                ],
+              },
+              {
+                key: "difficulty",
+                label: "Difficulty",
+                options: [
+                  { value: "all", label: "All Levels" },
+                  { value: "EASY", label: "Easy" },
+                  { value: "MEDIUM", label: "Medium" },
+                  { value: "HARD", label: "Hard" },
+                ],
+              },
+              {
+                key: "isActive",
+                label: "Status",
+                options: [
+                  { value: "all", label: "All Status" },
+                  { value: "true", label: "Active" },
+                  { value: "false", label: "Inactive" },
+                ],
+              },
+            ]}
+          />
         </CardContent>
       </Card>
 
-      {/* CSV Import Sheet */}
-      <Sheet open={isImportSheetOpen} onOpenChange={setIsImportSheetOpen}>
-        <SheetContent className="w-[400px] sm:w-[540px]">
-          <SheetHeader>
-            <SheetTitle>Import Questions</SheetTitle>
-            <SheetDescription>
-              Import questions from a CSV file into this question group
-            </SheetDescription>
-          </SheetHeader>
-          <div className="space-y-4 py-4">
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {editingQuestion ? "Edit Question" : "Create Question"}
+            </DialogTitle>
+            <DialogDescription>
+              {editingQuestion ? "Update the question details below" : "Create a new question for this group"}
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSubmit}>
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="title">Title</Label>
+                <Input
+                  id="title"
+                  value={formData.title}
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  placeholder="Enter question title"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="type">Type</Label>
+                  <Select
+                    value={formData.type}
+                    onValueChange={(value) => {
+                      const newType = value as QuestionType
+                      let newOptions = [...formData.options]
+                      if (newType === QuestionType.MULTI_SELECT && newOptions.length < 3) {
+                        while (newOptions.length < 3) {
+                          newOptions.push("")
+                        }
+                      } else if (newType === QuestionType.TRUE_FALSE) {
+                        newOptions = ["True", "False"]
+                      } else if (newType === QuestionType.MULTIPLE_CHOICE && newOptions.length < 2) {
+                        while (newOptions.length < 2) {
+                          newOptions.push("")
+                        }
+                      }
+
+                      setFormData({
+                        ...formData,
+                        type: newType,
+                        options: newOptions,
+                        correctAnswer: "",
+                        correctAnswers: []
+                      })
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select question type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={QuestionType.MULTIPLE_CHOICE}>Multiple Choice</SelectItem>
+                      <SelectItem value={QuestionType.MULTI_SELECT}>Multi-Select</SelectItem>
+                      <SelectItem value={QuestionType.TRUE_FALSE}>True/False</SelectItem>
+                      <SelectItem value={QuestionType.FILL_IN_BLANK}>Fill in Blank</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="difficulty">Difficulty</Label>
+                  <Select
+                    value={formData.difficulty}
+                    onValueChange={(value) => setFormData({ ...formData, difficulty: value as DifficultyLevel })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select difficulty" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={DifficultyLevel.EASY}>Easy</SelectItem>
+                      <SelectItem value={DifficultyLevel.MEDIUM}>Medium</SelectItem>
+                      <SelectItem value={DifficultyLevel.HARD}>Hard</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {formData.type !== QuestionType.FILL_IN_BLANK && (
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <Label>Options</Label>
+                    <Button type="button" variant="outline" size="sm" onClick={addOption}>
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add Option
+                    </Button>
+                  </div>
+                  {formData.type === QuestionType.MULTI_SELECT && (
+                    <p className="text-sm text-muted-foreground">
+                      Multi-select questions require at least 3 options.
+                    </p>
+                  )}
+                  <div className="space-y-2">
+                    {formData.options.map((option, index) => (
+                      <div key={index} className="flex items-center space-x-2">
+                        <Input
+                          value={option}
+                          onChange={(e) => updateOption(index, e.target.value)}
+                          placeholder={`Option ${index + 1}`}
+                          required
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => removeOption(index)}
+                          disabled={formData.options.length <= (formData.type === QuestionType.MULTI_SELECT ? 3 :
+                            formData.type === QuestionType.TRUE_FALSE ? 2 : 1)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {formData.type !== QuestionType.FILL_IN_BLANK && (
+                <div className="space-y-2">
+                  <Label>
+                    {formData.type === QuestionType.MULTI_SELECT ? "Correct Answers" : "Correct Answer"}
+                  </Label>
+                  <div className="space-y-2">
+                    {formData.options.map((option, index) => (
+                      <div key={index} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`correct-${index}`}
+                          checked={formData.correctAnswers.includes(option)}
+                          onCheckedChange={(checked) => handleCorrectAnswerChange(option, checked as boolean)}
+                        />
+                        <label htmlFor={`correct-${index}`} className="text-sm">
+                          {option || `Option ${index + 1}`}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {formData.type === QuestionType.FILL_IN_BLANK && (
+                <div className="space-y-2">
+                  <Label htmlFor="correctAnswer">Correct Answer</Label>
+                  <Input
+                    id="correctAnswer"
+                    value={formData.correctAnswer}
+                    onChange={(e) => setFormData({ ...formData, correctAnswer: e.target.value })}
+                    placeholder="Enter correct answer"
+                    required
+                  />
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label htmlFor="content">Content</Label>
+                <RichTextEditor
+                  value={formData.content}
+                  onChange={(value) => setFormData({ ...formData, content: value })}
+                  placeholder="Enter question content..."
+                  className="min-h-[150px]"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="explanation">Explanation (Optional)</Label>
+                <RichTextEditor
+                  value={formData.explanation}
+                  onChange={(value) => setFormData({ ...formData, explanation: value })}
+                  placeholder="Enter explanation..."
+                  className="min-h-[100px]"
+                />
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="isActive"
+                  checked={formData.isActive}
+                  onCheckedChange={(checked) => setFormData({ ...formData, isActive: checked })}
+                />
+                <Label htmlFor="isActive">Active</Label>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <LoadingButton 
+                type="submit" 
+                loading={submitLoading}
+                loadingText={editingQuestion ? "Updating..." : "Creating..."}
+              >
+                {editingQuestion ? "Update" : "Create"}
+              </LoadingButton>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isImportSheetOpen} onOpenChange={setIsImportSheetOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Import Questions</DialogTitle>
+            <DialogDescription>
+              Upload a CSV file to import questions into this group
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
             <div
-              className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
-                isDragOver ? "border-primary bg-primary/5" : "border-gray-300"
+              className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+                isDragOver ? "border-primary bg-primary/5" : "border-muted-foreground/25"
               }`}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
-              onClick={() => fileInputRef.current?.click()}
             >
               <input
                 ref={fileInputRef}
@@ -883,59 +943,52 @@ export default function QuestionGroupPage() {
               />
               {importFile ? (
                 <div className="space-y-2">
-                  <p className="text-lg font-medium">{importFile.name}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {(importFile.size / 1024).toFixed(1)} KB
-                  </p>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleRemoveFile()
-                    }}
-                  >
-                    Remove File
+                  <p className="font-medium">{importFile.name}</p>
+                  <Button type="button" variant="outline" size="sm" onClick={handleRemoveFile}>
+                    Remove
                   </Button>
                 </div>
               ) : (
                 <div className="space-y-2">
-                  <p className="text-lg font-medium">Drop your CSV file here</p>
-                  <p className="text-sm text-muted-foreground">or click to browse</p>
-                  <p className="text-xs text-muted-foreground">
-                    Supported format: CSV with headers (Title, Content, Type, Options, Correct Answer, Explanation, Difficulty, Active)
+                  <p className="text-sm text-muted-foreground">
+                    Drag and drop a CSV file here, or click to browse
                   </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    Select File
+                  </Button>
                 </div>
               )}
             </div>
-            <div className="text-sm text-muted-foreground">
-              <p className="font-medium mb-2">CSV Format Requirements:</p>
-              <ul className="list-disc list-inside space-y-1 text-xs">
-                <li><strong>Title:</strong> Question title</li>
-                <li><strong>Content:</strong> Question content (HTML supported)</li>
-                <li><strong>Type:</strong> MULTIPLE_CHOICE, MULTI_SELECT, TRUE_FALSE, or FILL_IN_BLANK</li>
-                <li><strong>Options:</strong> Pipe-separated options (e.g., "Option 1|Option 2|Option 3")</li>
-                <li><strong>Correct Answer:</strong> The correct answer(s)</li>
-                <li><strong>Explanation:</strong> Answer explanation (optional)</li>
-                <li><strong>Difficulty:</strong> EASY, MEDIUM, or HARD (default: MEDIUM)</li>
-                <li><strong>Active:</strong> true or false (default: true)</li>
-              </ul>
-            </div>
           </div>
-          <SheetFooter>
-            <LoadingButton
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsImportSheetOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
               type="button"
               onClick={handleImportWithGroup}
-              isLoading={isImporting}
-              loadingText="Importing..."
-              disabled={!importFile}
+              disabled={isImporting || !importFile}
             >
-              Import Questions
-            </LoadingButton>
-          </SheetFooter>
-        </SheetContent>
-      </Sheet>
+              {isImporting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Importing...
+                </>
+              ) : (
+                "Import"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

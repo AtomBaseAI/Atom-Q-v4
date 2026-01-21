@@ -3,49 +3,55 @@
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { RichTextDisplay } from "@/components/ui/rich-text-display"
 import { RichTextEditor } from "@/components/ui/rich-text-editor"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Checkbox } from "@/components/ui/checkbox"
-import { TriangleAlert, Bug, Edit, ArrowLeft, Loader2, Plus, Trash2 } from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { TriangleAlert, Bug, Edit, ArrowLeft, Loader2, Trash2, Plus } from "lucide-react"
 import { format } from "date-fns"
 import HexagonLoader from "@/components/Loader/Loading"
 import { LoadingButton } from "@/components/ui/laodaing-button"
-import { QuestionType, DifficultyLevel } from "@prisma/client"
+import { QuestionType, DifficultyLevel, ReportStatus } from "@prisma/client"
+import { DataTable } from "@/components/ui/data-table"
+import { ColumnDef } from "@tanstack/react-table"
+import { ArrowUpDown } from "lucide-react"
+import { toast } from "sonner"
 
 interface ReportedQuestion {
   id: string
   suggestion: string
-  status: string
+  status: ReportStatus
   createdAt: string
   question: {
     id: string
     title: string
     content: string
-    type: string
+    type: QuestionType
     options: string
     correctAnswer: string
     explanation: string | null
-    difficulty: string
+    difficulty: DifficultyLevel
     isActive: boolean
-    group: {
-      id: string
-      name: string
-    }
   }
   user: {
     id: string
     name: string | null
     email: string
   }
+}
+
+const formatDateDDMMYYYY = (dateString: string) => {
+  const date = new Date(dateString)
+  const day = String(date.getDate()).padStart(2, '0')
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const year = date.getFullYear()
+  return `${day}/${month}/${year}`
 }
 
 export default function ReportedQuestionsPage() {
@@ -56,19 +62,152 @@ export default function ReportedQuestionsPage() {
   const [updating, setUpdating] = useState<string | null>(null)
   const [selectedReport, setSelectedReport] = useState<ReportedQuestion | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [editingQuestion, setEditingQuestion] = useState<any>(null)
   const [submitLoading, setSubmitLoading] = useState(false)
   const [formData, setFormData] = useState({
     title: "",
     content: "",
     type: QuestionType.MULTIPLE_CHOICE as QuestionType,
-    options: ["", "", ""], // Initialize with 3 empty options
+    options: ["", "", ""],
     correctAnswer: "",
     correctAnswers: [] as string[],
     explanation: "",
     difficulty: DifficultyLevel.MEDIUM as DifficultyLevel,
     isActive: true
   })
+
+  const columns: ColumnDef<ReportedQuestion>[] = [
+    {
+      accessorKey: "questionTitle",
+      header: ({ column }) => {
+        return (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          >
+            Question
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          </Button>
+        )
+      },
+      cell: ({ row }) => {
+        const title = row.original.question.title
+        const maxLength = 50
+        return (
+          <div className="font-medium max-w-xs truncate" title={title}>
+            {title.length > maxLength ? title.slice(0, maxLength) + "..." : title}
+          </div>
+        )
+      },
+    },
+    {
+      accessorKey: "questionType",
+      header: "Type",
+      cell: ({ row }) => {
+        const type = row.original.question.type
+        const typeLabels: Record<QuestionType, string> = {
+          [QuestionType.MULTIPLE_CHOICE]: "Multiple Choice",
+          [QuestionType.TRUE_FALSE]: "True/False",
+          [QuestionType.FILL_IN_BLANK]: "Fill in Blank",
+          [QuestionType.MULTI_SELECT]: "Multi Select",
+        }
+        return <Badge variant="outline">{typeLabels[type]}</Badge>
+      },
+    },
+    {
+      accessorKey: "questionDifficulty",
+      header: "Difficulty",
+      cell: ({ row }) => {
+        const difficulty = row.original.question.difficulty
+        const difficultyColors: Record<DifficultyLevel, string> = {
+          [DifficultyLevel.EASY]: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100",
+          [DifficultyLevel.MEDIUM]: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100",
+          [DifficultyLevel.HARD]: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100",
+        }
+        return (
+          <Badge className={difficultyColors[difficulty]}>
+            {difficulty.toLowerCase()}
+          </Badge>
+        )
+      },
+    },
+    {
+      accessorKey: "userName",
+      header: "Reported By",
+      cell: ({ row }) => {
+        const report = row.original
+        return (
+          <div>
+            <p className="font-medium">{report.user.name || "Unknown"}</p>
+            <p className="text-sm text-muted-foreground">{report.user.email}</p>
+          </div>
+        )
+      },
+    },
+    {
+      accessorKey: "status",
+      header: "Status",
+      cell: ({ row }) => {
+        const status = row.original.status
+        const statusColors: Record<ReportStatus, string> = {
+          [ReportStatus.PENDING]: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100",
+          [ReportStatus.RESOLVED]: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100",
+          [ReportStatus.DISMISSED]: "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-100",
+        }
+        return (
+          <Badge className={statusColors[status]}>
+            {status.toLowerCase()}
+          </Badge>
+        )
+      },
+    },
+    {
+      accessorKey: "createdAt",
+      header: ({ column }) => {
+        return (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          >
+            Reported At
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          </Button>
+        )
+      },
+      cell: ({ row }) => {
+        const date = new Date(row.getValue("createdAt"))
+        return formatDateDDMMYYYY(date.toISOString())
+      },
+    },
+    {
+      id: "actions",
+      enableHiding: false,
+      cell: ({ row }) => {
+        const report = row.original
+        return (
+          <div className="flex items-center space-x-2">
+            <Dialog open={selectedReport?.id === report.id} onOpenChange={(open) => setSelectedReport(open ? report : null)}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Bug className="h-4 w-4" />
+                </Button>
+              </DialogTrigger>
+            </Dialog>
+            {report.status === ReportStatus.PENDING && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleEditQuestion(report)}
+              >
+                <Edit className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        )
+      },
+    },
+  ]
 
   useEffect(() => {
     fetchReportedQuestions()
@@ -88,7 +227,7 @@ export default function ReportedQuestionsPage() {
     }
   }
 
-  const handleMarkAsUpdated = async (reportId: string) => {
+  const handleMarkAsResolved = async (reportId: string) => {
     try {
       setUpdating(reportId)
       const response = await fetch(`/api/admin/question-groups/${params.id}/reported-questions`, {
@@ -105,13 +244,44 @@ export default function ReportedQuestionsPage() {
       if (response.ok) {
         await fetchReportedQuestions()
         setSelectedReport(null)
+        toast.success("Report marked as resolved")
       } else {
         const errorData = await response.json()
-        alert(`Error: ${errorData.error}`)
+        toast.error(`Error: ${errorData.error}`)
       }
     } catch (error) {
       console.error("Error updating report status:", error)
-      alert("Error updating report status. Please try again.")
+      toast.error("Error updating report status. Please try again.")
+    } finally {
+      setUpdating(null)
+    }
+  }
+
+  const handleMarkAsDismissed = async (reportId: string) => {
+    try {
+      setUpdating(reportId)
+      const response = await fetch(`/api/admin/question-groups/${params.id}/reported-questions`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          reportId,
+          status: "DISMISSED"
+        }),
+      })
+
+      if (response.ok) {
+        await fetchReportedQuestions()
+        setSelectedReport(null)
+        toast.success("Report dismissed")
+      } else {
+        const errorData = await response.json()
+        toast.error(`Error: ${errorData.error}`)
+      }
+    } catch (error) {
+      console.error("Error updating report status:", error)
+      toast.error("Error updating report status. Please try again.")
     } finally {
       setUpdating(null)
     }
@@ -127,63 +297,59 @@ export default function ReportedQuestionsPage() {
     setFormData({
       title: report.question.title,
       content: report.question.content,
-      type: report.question.type as QuestionType,
+      type: report.question.type,
       options: parsedOptions,
       correctAnswer: report.question.correctAnswer,
       correctAnswers,
       explanation: report.question.explanation || "",
-      difficulty: report.question.difficulty as DifficultyLevel,
+      difficulty: report.question.difficulty,
       isActive: report.question.isActive
     })
-    setIsDialogOpen(true)
+    setIsEditDialogOpen(true)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    // Validate form data
     if (!formData.title.trim()) {
-      alert("Title is required")
+      toast.error("Title is required")
       return
     }
 
-    // Check if content has actual text content (not just HTML tags)
     const tempDiv = document.createElement('div')
     tempDiv.innerHTML = formData.content
     const textContent = tempDiv.textContent || tempDiv.innerText || ""
 
     if (!textContent.trim()) {
-      alert("Content is required")
+      toast.error("Content is required")
       return
     }
 
     if (formData.type !== QuestionType.FILL_IN_BLANK) {
       if (formData.options.length === 0) {
-        alert("At least one option is required")
+        toast.error("At least one option is required")
         return
       }
 
-      // Check for empty options
       if (formData.options.some(option => !option.trim())) {
-        alert("All options must have values")
+        toast.error("All options must have values")
         return
       }
 
-      // Validate correct answers
       if (formData.type === QuestionType.MULTI_SELECT) {
         if (formData.correctAnswers.length === 0) {
-          alert("At least one correct answer must be selected for multi-select questions")
+          toast.error("At least one correct answer must be selected for multi-select questions")
           return
         }
       } else {
         if (!formData.correctAnswer.trim()) {
-          alert("A correct answer must be selected")
+          toast.error("A correct answer must be selected")
           return
         }
       }
     } else {
       if (!formData.correctAnswer.trim()) {
-        alert("Correct answer is required for fill-in-the-blank questions")
+        toast.error("Correct answer is required for fill-in-the-blank questions")
         return
       }
     }
@@ -191,12 +357,11 @@ export default function ReportedQuestionsPage() {
     setSubmitLoading(true)
 
     try {
-      // Prepare the data for the API
       const apiData = {
         title: formData.title,
         content: formData.content,
         type: formData.type,
-        options: formData.options, // API handles both array and string
+        options: formData.options,
         correctAnswer: formData.correctAnswer,
         explanation: formData.explanation,
         difficulty: formData.difficulty,
@@ -215,16 +380,16 @@ export default function ReportedQuestionsPage() {
 
       if (response.ok) {
         await fetchReportedQuestions()
-        setIsDialogOpen(false)
+        setIsEditDialogOpen(false)
         resetForm()
+        toast.success("Question updated successfully")
       } else {
         const errorData = await response.json()
-        console.error("Error saving question:", errorData.message)
-        alert(`Error: ${errorData.message}`)
+        toast.error(`Error: ${errorData.message}`)
       }
     } catch (error) {
       console.error("Error saving question:", error)
-      alert("Error saving question. Please try again.")
+      toast.error("Error saving question. Please try again.")
     } finally {
       setSubmitLoading(false)
     }
@@ -236,9 +401,9 @@ export default function ReportedQuestionsPage() {
       title: "",
       content: "",
       type: QuestionType.MULTIPLE_CHOICE as QuestionType,
-      options: ["", "", ""], // Initialize with 3 empty options
+      options: ["", "", ""],
       correctAnswer: "",
-      correctAnswers: [] as string[],
+      correctAnswers: [],
       explanation: "",
       difficulty: DifficultyLevel.MEDIUM as DifficultyLevel,
       isActive: true
@@ -286,7 +451,6 @@ export default function ReportedQuestionsPage() {
         correctAnswer: newCorrectAnswers.join('|')
       })
     } else {
-      // For single choice questions, only one answer can be selected
       setFormData({
         ...formData,
         correctAnswer: isChecked ? option : "",
@@ -295,31 +459,18 @@ export default function ReportedQuestionsPage() {
     }
   }
 
-  const getQuestionTypeDisplay = (type: string) => {
+  const getQuestionTypeDisplay = (type: QuestionType) => {
     switch (type) {
-      case "MULTIPLE_CHOICE":
+      case QuestionType.MULTIPLE_CHOICE:
         return "Multiple Choice"
-      case "TRUE_FALSE":
+      case QuestionType.TRUE_FALSE:
         return "True/False"
-      case "FILL_IN_BLANK":
-        return "Fill in the Blank"
-      case "MULTI_SELECT":
+      case QuestionType.FILL_IN_BLANK:
+        return "Fill in Blank"
+      case QuestionType.MULTI_SELECT:
         return "Multi-Select"
       default:
         return type
-    }
-  }
-
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty) {
-      case "EASY":
-        return "bg-green-100 text-green-800"
-      case "MEDIUM":
-        return "bg-yellow-100 text-yellow-800"
-      case "HARD":
-        return "bg-red-100 text-red-800"
-      default:
-        return "bg-gray-100 text-gray-800"
     }
   }
 
@@ -328,411 +479,335 @@ export default function ReportedQuestionsPage() {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center space-x-4">
-        <Button
-          variant="outline"
-          onClick={() => router.back()}
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back
-        </Button>
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Reported Questions</h1>
           <p className="text-muted-foreground">
             Review and manage reported questions for this question group
           </p>
         </div>
+        <Button variant="outline" onClick={() => router.back()}>
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Reported Questions</CardTitle>
-          <CardDescription>
-            Questions that users have reported issues with
-          </CardDescription>
-        </CardHeader>
         <CardContent>
-          {reportedQuestions.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              No reported questions found for this question group.
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Question</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Difficulty</TableHead>
-                  <TableHead>Reported By</TableHead>
-                  <TableHead>Reported At</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {reportedQuestions.map((report) => (
-                  <TableRow key={report.id}>
-                    <TableCell className="font-medium">
-                      <div className="max-w-xs">
-                        {/* <RichTextDisplay content={report.question.content} /> */}
-                        <p className="">{report.question.title}</p>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">
-                        {getQuestionTypeDisplay(report.question.type)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={getDifficultyColor(report.question.difficulty)}>
-                        {report.question.difficulty}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div>
-                        <p className="font-medium">{report.user.name || "Unknown"}</p>
-                        <p className="text-sm text-muted-foreground">{report.user.email}</p>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {format(new Date(report.createdAt), "MMM d, yyyy HH:mm")}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center space-x-2">
-                        <Dialog open={selectedReport?.id === report.id} onOpenChange={(open) => setSelectedReport(open ? report : null)}>
-                          <DialogTrigger asChild>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                            >
-                              <Bug className="h-4 w-4" />
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-                            <DialogHeader>
-                              <DialogTitle>Report Details</DialogTitle>
-                              <DialogDescription>
-                                Review the reported question and user feedback
-                              </DialogDescription>
-                            </DialogHeader>
-                            <div className="space-y-6">
-                              {/* User Information */}
-                              <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                  <h4 className="font-semibold text-sm text-muted-foreground mb-1">Reported By</h4>
-                                  <p className="font-medium">{selectedReport?.user.name || "Unknown"}</p>
-                                  <p className="text-sm text-muted-foreground">{selectedReport?.user.email}</p>
-                                </div>
-                                <div>
-                                  <h4 className="font-semibold text-sm text-muted-foreground mb-1">Reported At</h4>
-                                  <p className="font-medium">
-                                    {selectedReport ? format(new Date(selectedReport.createdAt), "MMM d, yyyy HH:mm") : ""}
-                                  </p>
-                                </div>
-                              </div>
-
-                              {/* Question Information */}
-                              <div>
-                                <h4 className="font-semibold text-sm text-muted-foreground mb-2">Question</h4>
-                                <div className="bg-muted/50 p-4 rounded-lg">
-                                  <div className="mb-3">
-                                    <RichTextDisplay content={selectedReport?.question.content || ""} />
-                                  </div>
-                                  <div className="grid grid-cols-3 gap-4 text-sm">
-                                    <div>
-                                      <span className="font-medium">Type:</span>
-                                      <span className="ml-2">{selectedReport ? getQuestionTypeDisplay(selectedReport.question.type) : ""}</span>
-                                    </div>
-                                    <div>
-                                      <span className="font-medium">Difficulty:</span>
-                                      <span className="ml-2">
-                                        {selectedReport && (
-                                          <Badge className={getDifficultyColor(selectedReport.question.difficulty)}>
-                                            {selectedReport.question.difficulty}
-                                          </Badge>
-                                        )}
-                                      </span>
-                                    </div>
-                                    <div>
-                                      <span className="font-medium">Group:</span>
-                                      <span className="ml-2">{selectedReport?.question.group.name}</span>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Question Details */}
-                              <div>
-                                <h4 className="font-semibold text-sm text-muted-foreground mb-2">Question Details</h4>
-                                <div className="space-y-3">
-                                  <div>
-                                    <span className="font-medium">Options:</span>
-                                    <div className="mt-1 bg-muted/30 p-3 rounded text-sm">
-                                      {selectedReport?.question.options ? selectedReport.question.options.split(',').map((option, index) => (
-                                        <div key={index} className="py-1">
-                                          {String.fromCharCode(65 + index)}. {option.trim()}
-                                        </div>
-                                      )) : "No options"}
-                                    </div>
-                                  </div>
-                                  <div>
-                                    <span className="font-medium">Correct Answer:</span>
-                                    <div className="mt-1  border border-green-200 p-3 rounded text-sm">
-                                      {selectedReport?.question.correctAnswer || "No correct answer specified"}
-                                    </div>
-                                  </div>
-                                  {selectedReport?.question.explanation && (
-                                    <div>
-                                      <span className="font-medium">Explanation:</span>
-                                      <div className="mt-1 border border-blue-200 p-3 rounded text-sm">
-                                        <RichTextDisplay content={selectedReport.question.explanation} />
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-
-                              {/* User Suggestion */}
-                              <div>
-                                <h4 className="font-semibold text-sm text-muted-foreground mb-2">User Suggestion</h4>
-                                <div className="border border-yellow-200 p-4 rounded">
-                                  <p className="text-sm">{selectedReport?.suggestion || "No suggestion provided"}</p>
-                                </div>
-                              </div>
-                            </div>
-                            <DialogFooter>
-                              <Button
-                                variant="outline"
-                                onClick={() => setSelectedReport(null)}
-                              >
-                                Close
-                              </Button>
-                              <Button
-                                onClick={() => selectedReport && handleMarkAsUpdated(selectedReport.id)}
-                                disabled={updating === selectedReport?.id}
-                              >
-                                {updating === selectedReport?.id ? (
-                                  <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    Updating...
-                                  </>
-                                ) : (
-                                  "Mark as Updated"
-                                )}
-                              </Button>
-                            </DialogFooter>
-                          </DialogContent>
-                        </Dialog>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEditQuestion(report)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
+          <DataTable
+            columns={columns}
+            data={reportedQuestions}
+            searchKey="questionTitle"
+            searchPlaceholder="Search reported questions..."
+            filters={[
+              {
+                key: "status",
+                label: "Status",
+                options: [
+                  { value: "all", label: "All Status" },
+                  { value: "PENDING", label: "Pending" },
+                  { value: "RESOLVED", label: "Resolved" },
+                  { value: "DISMISSED", label: "Dismissed" },
+                ],
+              },
+            ]}
+          />
         </CardContent>
       </Card>
 
-      {/* Edit Question Dialog - Exact same as questions page */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="min-w-[100vw] min-h-[99vh] w-full p-0 m-0 rounded-none">
-          <form onSubmit={handleSubmit} className="flex flex-col h-full w-full">
-            <div className="flex flex-col h-full w-full">
-              <DialogHeader className="px-6 pt-6 pb-4 border-b">
-                <DialogTitle>
-                  {editingQuestion ? "Edit Question" : "Create Question"}
-                </DialogTitle>
-              </DialogHeader>
-              <div className="flex flex-row flex-1 overflow-y-hidden px-6 py-4 space-y-6 gap-4">
-                <div className="flex flex-col flex-1 w-1/2 h-full p-4 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="title" className="text-sm font-medium">
-                      Title
-                    </Label>
-                    <Input
-                      id="title"
-                      value={formData.title}
-                      onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                      placeholder="Enter question title"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="type" className="text-sm font-medium">
-                      Type
-                    </Label>
-                    <Select
-                      value={formData.type}
-                      onValueChange={(value) => {
-                        const newType = value as QuestionType
-                        // Ensure minimum options for multi-select
-                        let newOptions = [...formData.options]
-                        if (newType === QuestionType.MULTI_SELECT && newOptions.length < 3) {
-                          while (newOptions.length < 3) {
-                            newOptions.push("")
-                          }
-                        } else if (newType === QuestionType.TRUE_FALSE) {
-                          // For true/false, set exactly 2 options
-                          newOptions = ["True", "False"]
-                        } else if (newType === QuestionType.MULTIPLE_CHOICE && newOptions.length < 2) {
-                          // For multiple choice, ensure at least 2 options
-                          while (newOptions.length < 2) {
-                            newOptions.push("")
-                          }
-                        }
+      <Dialog open={selectedReport !== null} onOpenChange={(open) => setSelectedReport(open ? selectedReport : null)}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Report Details</DialogTitle>
+            <DialogDescription>
+              Review reported question and user feedback
+            </DialogDescription>
+          </DialogHeader>
+          {selectedReport && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <h4 className="font-semibold text-sm text-muted-foreground mb-1">Reported By</h4>
+                  <p className="font-medium">{selectedReport.user.name || "Unknown"}</p>
+                  <p className="text-sm text-muted-foreground">{selectedReport.user.email}</p>
+                </div>
+                <div>
+                  <h4 className="font-semibold text-sm text-muted-foreground mb-1">Reported At</h4>
+                  <p className="font-medium">
+                    {format(new Date(selectedReport.createdAt), "MMM d, yyyy HH:mm")}
+                  </p>
+                </div>
+              </div>
 
-                        setFormData({
-                          ...formData,
-                          type: newType,
-                          options: newOptions,
-                          correctAnswer: "",
-                          correctAnswers: []
-                        })
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select question type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={QuestionType.MULTIPLE_CHOICE}>Multiple Choice</SelectItem>
-                        <SelectItem value={QuestionType.MULTI_SELECT}>Multi-Select</SelectItem>
-                        <SelectItem value={QuestionType.TRUE_FALSE}>True/False</SelectItem>
-                        <SelectItem value={QuestionType.FILL_IN_BLANK}>Fill in the Blank</SelectItem>
-                      </SelectContent>
-                    </Select>
+              <div>
+                <h4 className="font-semibold text-sm text-muted-foreground mb-2">User Suggestion</h4>
+                <div className="bg-muted/50 p-4 rounded-lg">
+                  <RichTextDisplay content={selectedReport.suggestion} />
+                </div>
+              </div>
+
+              <div>
+                <h4 className="font-semibold text-sm text-muted-foreground mb-2">Question</h4>
+                <div className="bg-muted/50 p-4 rounded-lg space-y-3">
+                  <div>
+                    <h5 className="font-medium">{selectedReport.question.title}</h5>
+                    <RichTextDisplay content={selectedReport.question.content} />
                   </div>
-                  {formData.type !== QuestionType.FILL_IN_BLANK && (
-                    <div className="space-y-4">
-                      <div className="flex justify-between items-center">
-                        <Label className="text-sm font-medium">Options</Label>
-                        <Button type="button" variant="outline" size="sm" onClick={addOption}>
-                          <Plus className="h-4 w-4 mr-1" />
-                          Add Option
+                  <div className="grid grid-cols-3 gap-4 text-sm">
+                    <div>
+                      <span className="font-medium">Type:</span>
+                      <span className="ml-2">{getQuestionTypeDisplay(selectedReport.question.type)}</span>
+                    </div>
+                    <div>
+                      <span className="font-medium">Difficulty:</span>
+                      <span className="ml-2">{selectedReport.question.difficulty}</span>
+                    </div>
+                    <div>
+                      <span className="font-medium">Correct Answer:</span>
+                      <span className="ml-2">{selectedReport.question.correctAnswer}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {selectedReport.question.explanation && (
+                <div>
+                  <h4 className="font-semibold text-sm text-muted-foreground mb-2">Explanation</h4>
+                  <div className="bg-muted/50 p-4 rounded-lg">
+                    <RichTextDisplay content={selectedReport.question.explanation} />
+                  </div>
+                </div>
+              )}
+
+              {selectedReport.status === ReportStatus.PENDING && (
+                <DialogFooter>
+                  <Button
+                    variant="outline"
+                    onClick={() => handleMarkAsDismissed(selectedReport.id)}
+                    disabled={updating === selectedReport.id}
+                  >
+                    {updating === selectedReport.id ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Dismissing...
+                      </>
+                    ) : (
+                      "Dismiss"
+                    )}
+                  </Button>
+                  <Button
+                    onClick={() => handleMarkAsResolved(selectedReport.id)}
+                    disabled={updating === selectedReport.id}
+                  >
+                    {updating === selectedReport.id ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Marking Resolved...
+                      </>
+                    ) : (
+                      "Mark as Resolved"
+                    )}
+                  </Button>
+                </DialogFooter>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Question</DialogTitle>
+            <DialogDescription>
+              Update the question details to address the report
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSubmit}>
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="title">Title</Label>
+                <Input
+                  id="title"
+                  value={formData.title}
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  placeholder="Enter question title"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="type">Type</Label>
+                  <Select
+                    value={formData.type}
+                    onValueChange={(value) => {
+                      const newType = value as QuestionType
+                      let newOptions = [...formData.options]
+                      if (newType === QuestionType.MULTI_SELECT && newOptions.length < 3) {
+                        while (newOptions.length < 3) {
+                          newOptions.push("")
+                        }
+                      } else if (newType === QuestionType.TRUE_FALSE) {
+                        newOptions = ["True", "False"]
+                      } else if (newType === QuestionType.MULTIPLE_CHOICE && newOptions.length < 2) {
+                        while (newOptions.length < 2) {
+                          newOptions.push("")
+                        }
+                      }
+
+                      setFormData({
+                        ...formData,
+                        type: newType,
+                        options: newOptions,
+                        correctAnswer: "",
+                        correctAnswers: []
+                      })
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select question type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={QuestionType.MULTIPLE_CHOICE}>Multiple Choice</SelectItem>
+                      <SelectItem value={QuestionType.MULTI_SELECT}>Multi-Select</SelectItem>
+                      <SelectItem value={QuestionType.TRUE_FALSE}>True/False</SelectItem>
+                      <SelectItem value={QuestionType.FILL_IN_BLANK}>Fill in Blank</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="difficulty">Difficulty</Label>
+                  <Select
+                    value={formData.difficulty}
+                    onValueChange={(value) => setFormData({ ...formData, difficulty: value as DifficultyLevel })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select difficulty" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={DifficultyLevel.EASY}>Easy</SelectItem>
+                      <SelectItem value={DifficultyLevel.MEDIUM}>Medium</SelectItem>
+                      <SelectItem value={DifficultyLevel.HARD}>Hard</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {formData.type !== QuestionType.FILL_IN_BLANK && (
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <Label>Options</Label>
+                    <Button type="button" variant="outline" size="sm" onClick={addOption}>
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add Option
+                    </Button>
+                  </div>
+                  {formData.type === QuestionType.MULTI_SELECT && (
+                    <p className="text-sm text-muted-foreground">
+                      Multi-select questions require at least 3 options.
+                    </p>
+                  )}
+                  <div className="space-y-2">
+                    {formData.options.map((option, index) => (
+                      <div key={index} className="flex items-center space-x-2">
+                        <Input
+                          value={option}
+                          onChange={(e) => updateOption(index, e.target.value)}
+                          placeholder={`Option ${index + 1}`}
+                          required
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => removeOption(index)}
+                          disabled={formData.options.length <= (formData.type === QuestionType.MULTI_SELECT ? 3 :
+                            formData.type === QuestionType.TRUE_FALSE ? 2 : 1)}
+                        >
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
-                      {formData.type === QuestionType.MULTI_SELECT && (
-                        <p className="text-sm text-muted-foreground">
-                          Multi-select questions require at least 3 options.
-                        </p>
-                      )}
-                      <div className="space-y-2">
-                        {formData.options.map((option, index) => (
-                          <div key={index} className="flex items-center space-x-2">
-                            <Input
-                              value={option}
-                              onChange={(e) => updateOption(index, e.target.value)}
-                              placeholder={`Option ${index + 1}`}
-                              required
-                            />
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => removeOption(index)}
-                              disabled={formData.options.length <= (formData.type === QuestionType.MULTI_SELECT ? 3 :
-                                formData.type === QuestionType.TRUE_FALSE ? 2 : 1)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {formData.type !== QuestionType.FILL_IN_BLANK && (
-                    <div className="space-y-4">
-                      <Label className="text-sm font-medium">
-                        {formData.type === QuestionType.MULTI_SELECT ? "Correct Answers" : "Correct Answer"}
-                      </Label>
-                      <div className="space-y-2">
-                        {formData.options.map((option, index) => (
-                          <div key={index} className="flex items-center space-x-2">
-                            <Checkbox
-                              id={`correct-${index}`}
-                              checked={formData.correctAnswers.includes(option)}
-                              onCheckedChange={(checked) => handleCorrectAnswerChange(option, checked as boolean)}
-                            />
-                            <label htmlFor={`correct-${index}`} className="text-sm">
-                              {option || `Option ${index + 1}`}
-                            </label>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {formData.type === QuestionType.FILL_IN_BLANK && (
-                    <div className="space-y-2">
-                      <Label htmlFor="correctAnswer" className="text-sm font-medium">
-                        Correct Answer
-                      </Label>
-                      <Input
-                        id="correctAnswer"
-                        value={formData.correctAnswer}
-                        onChange={(e) => setFormData({ ...formData, correctAnswer: e.target.value })}
-                        placeholder="Enter correct answer"
-                        required
-                      />
-                    </div>
-                  )}
-                </div>
-                <div className="flex flex-col flex-1 w-1/2 h-full p-4 gap-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="content" className="text-sm font-medium">
-                      Content
-                    </Label>
-                    <RichTextEditor
-                      value={formData.content}
-                      onChange={(value) => setFormData({ ...formData, content: value })}
-                      placeholder="Enter question content..."
-                      className="min-h-[150px]"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="explanation" className="text-sm font-medium">
-                      Explanation
-                    </Label>
-                    <RichTextEditor
-                      value={formData.explanation}
-                      onChange={(value) => setFormData({ ...formData, explanation: value })}
-                      placeholder="Enter explanation (optional)..."
-                      className="min-h-[100px]"
-                    />
+                    ))}
                   </div>
                 </div>
+              )}
 
+              {formData.type !== QuestionType.FILL_IN_BLANK && (
+                <div className="space-y-2">
+                  <Label>
+                    {formData.type === QuestionType.MULTI_SELECT ? "Correct Answers" : "Correct Answer"}
+                  </Label>
+                  <div className="space-y-2">
+                    {formData.options.map((option, index) => (
+                      <div key={index} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`correct-${index}`}
+                          checked={formData.correctAnswers.includes(option)}
+                          onCheckedChange={(checked) => handleCorrectAnswerChange(option, checked as boolean)}
+                        />
+                        <label htmlFor={`correct-${index}`} className="text-sm">
+                          {option || `Option ${index + 1}`}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {formData.type === QuestionType.FILL_IN_BLANK && (
+                <div className="space-y-2">
+                  <Label htmlFor="correctAnswer">Correct Answer</Label>
+                  <Input
+                    id="correctAnswer"
+                    value={formData.correctAnswer}
+                    onChange={(e) => setFormData({ ...formData, correctAnswer: e.target.value })}
+                    placeholder="Enter correct answer"
+                    required
+                  />
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label htmlFor="content">Content</Label>
+                <RichTextEditor
+                  value={formData.content}
+                  onChange={(value) => setFormData({ ...formData, content: value })}
+                  placeholder="Enter question content..."
+                  className="min-h-[150px]"
+                />
               </div>
-              <div className="px-6 py-4 border-t flex flex-row">
-                <div className="w-1/2 flex justify-start items-center">
-                  <div className="flex items-center justify-center pt-4">
-                    <Label htmlFor="isActive" className="text-sm font-medium mr-2">
-                      Active
-                    </Label>
-                    <Switch
-                      id="isActive"
-                      checked={formData.isActive}
-                      onCheckedChange={(checked) => setFormData({ ...formData, isActive: checked })}
-                    />
-                  </div>
-                </div>
-                <div className="w-1/2 flex justify-end items-center">
-                  <LoadingButton 
-                    type="submit" 
-                    isLoading={submitLoading}
-                    loadingText={editingQuestion ? "Updating..." : "Creating..."}
-                  >
-                    {editingQuestion ? "Update" : "Create"}
-                  </LoadingButton>
-                </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="explanation">Explanation (Optional)</Label>
+                <RichTextEditor
+                  value={formData.explanation}
+                  onChange={(value) => setFormData({ ...formData, explanation: value })}
+                  placeholder="Enter explanation..."
+                  className="min-h-[100px]"
+                />
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="isActive"
+                  checked={formData.isActive}
+                  onCheckedChange={(checked) => setFormData({ ...formData, isActive: checked })}
+                />
+                <Label htmlFor="isActive">Active</Label>
               </div>
             </div>
+
+            <DialogFooter>
+              <LoadingButton 
+                type="submit" 
+                loading={submitLoading}
+                loadingText="Updating..."
+              >
+                Update
+              </LoadingButton>
+            </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>

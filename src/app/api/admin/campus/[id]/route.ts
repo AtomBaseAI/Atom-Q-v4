@@ -53,11 +53,14 @@ export async function GET(
       )
     }
 
-    // Transform the data to include assessments count
+    // Transform the data to rename users to students and include assessments count
     const transformedCampus = {
       ...campus,
       _count: {
-        ...campus._count,
+        departments: campus._count.departments,
+        batches: campus._count.batches,
+        students: campus._count.users,
+        quizzes: campus._count.quizzes,
         assessments: campus._count.quizzes
       }
     }
@@ -166,11 +169,14 @@ export async function PUT(
       }
     })
 
-    // Transform the response
+    // Transform the response to rename users to students
     const transformedCampus = {
       ...campus,
       _count: {
-        ...campus._count,
+        departments: campus._count.departments,
+        batches: campus._count.batches,
+        students: campus._count.users,
+        quizzes: campus._count.quizzes,
         assessments: campus._count.quizzes
       }
     }

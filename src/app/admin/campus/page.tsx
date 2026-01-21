@@ -58,6 +58,7 @@ import {
   X,
   ChevronDown,
   ChevronRight,
+  CheckCircle2 as CheckCircle,
 } from "lucide-react"
 import { toasts } from "@/lib/toasts"
 import HexagonLoader from "@/components/Loader/Loading"
@@ -147,6 +148,27 @@ export default function CampusPage() {
     location: true,
     status: true,
     createdAt: true,
+  })
+
+  // Deletion tracking state
+  const [deleteInfo, setDeleteInfo] = useState<{
+    campus: { id: string; name: string }
+    counts: {
+      students: number
+      departments: number
+      batches: number
+      quizzes: number
+      assessments: number
+      quizAttempts: number
+      assessmentAttempts: number
+    }
+  } | null>(null)
+  const [deletionStatus, setDeletionStatus] = useState<{
+    students: 'pending' | 'deleting' | 'deleted'
+    data: 'pending' | 'deleting' | 'deleted'
+  }>({
+    students: 'pending',
+    data: 'pending'
   })
 
   // Check if user is authenticated and is admin
@@ -335,8 +357,25 @@ export default function CampusPage() {
   }
 
   const handleDeleteCampus = async (campusId: string) => {
-    if (deleteConfirmation !== "CONFIRM DELETE") {
+    if (!campusToDelete || deleteConfirmation !== "CONFIRM DELETE") {
       toasts.error('Please type "CONFIRM DELETE" to confirm deletion')
+      return
+    }
+
+    // Check if all steps are completed
+    const hasStudents = (deleteInfo?.counts.students || 0) > 0
+    const hasData = (deleteInfo?.counts.departments || 0) > 0 ||
+                  (deleteInfo?.counts.batches || 0) > 0 ||
+                  (deleteInfo?.counts.quizzes || 0) > 0 ||
+                  (deleteInfo?.counts.assessments || 0) > 0
+
+    if (hasStudents && deletionStatus.students !== 'deleted') {
+      toasts.error('Please delete all students first')
+      return
+    }
+
+    if (hasData && deletionStatus.data !== 'deleted') {
+      toasts.error('Please delete all associated data (departments, batches, quizzes, assessments) first')
       return
     }
 
@@ -347,16 +386,19 @@ export default function CampusPage() {
       })
 
       if (response.ok) {
-        const campus = campuses.find(c => c.id === campusId)
-        toasts.success(`${campus?.name || "Campus"} deleted successfully`)
+        toasts.success(`${campusToDelete?.name || "Campus"} deleted successfully`)
         setCampuses(campuses.filter(campus => campus.id !== campusId))
         setIsDeleteDialogOpen(false)
         setCampusToDelete(null)
+        setDeleteInfo(null)
         setDeleteConfirmation("")
+        setDeletionStatus({ students: 'pending', data: 'pending' })
       } else {
-        toasts.actionFailed("Campus deletion")
+        const error = await response.json()
+        toasts.error(error.error || "Campus deletion failed")
       }
     } catch (error) {
+      console.error("Error deleting campus:", error)
       toasts.actionFailed("Campus deletion")
     } finally {
       setDeleteLoading(null)
@@ -377,10 +419,85 @@ export default function CampusPage() {
     setIsEditDialogOpen(true)
   }
 
-  const openDeleteDialog = (campus: Campus) => {
+  const openDeleteDialog = async (campus: Campus) => {
     setCampusToDelete(campus)
     setDeleteConfirmation("")
+    setDeletionStatus({ students: 'pending', data: 'pending' })
     setIsDeleteDialogOpen(true)
+
+    // Fetch detailed deletion info
+    try {
+      const response = await fetch(`/api/admin/campus/${campus.id}/delete-info`)
+      if (response.ok) {
+        const data = await response.json()
+        setDeleteInfo(data)
+      }
+    } catch (error) {
+      console.error("Error fetching delete info:", error)
+      toasts.error("Failed to fetch campus data")
+    }
+  }
+
+  const handleDeleteStudents = async () => {
+    if (!campusToDelete) return
+
+    try {
+      setDeletionStatus(prev => ({ ...prev, students: 'deleting' }))
+      const response = await fetch(`/api/admin/campus/${campusToDelete.id}/delete-students`, {
+        method: 'DELETE'
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        toasts.success(`${data.count} students deleted successfully`)
+        setDeletionStatus(prev => ({ ...prev, students: 'deleted' }))
+
+        // Refresh delete info to update counts
+        const refreshResponse = await fetch(`/api/admin/campus/${campusToDelete.id}/delete-info`)
+        if (refreshResponse.ok) {
+          const refreshData = await refreshResponse.json()
+          setDeleteInfo(refreshData)
+        }
+      } else {
+        toasts.actionFailed("Student deletion")
+        setDeletionStatus(prev => ({ ...prev, students: 'pending' }))
+      }
+    } catch (error) {
+      console.error("Error deleting students:", error)
+      toasts.actionFailed("Student deletion")
+      setDeletionStatus(prev => ({ ...prev, students: 'pending' }))
+    }
+  }
+
+  const handleDeleteCampusData = async () => {
+    if (!campusToDelete) return
+
+    try {
+      setDeletionStatus(prev => ({ ...prev, data: 'deleting' }))
+      const response = await fetch(`/api/admin/campus/${campusToDelete.id}/delete-data`, {
+        method: 'DELETE'
+      })
+
+      if (response.ok) {
+        toasts.success("Departments, batches, quizzes & assessments deleted successfully")
+        setDeletionStatus(prev => ({ ...prev, data: 'deleted' }))
+
+        // Refresh delete info to update counts
+        const refreshResponse = await fetch(`/api/admin/campus/${campusToDelete.id}/delete-info`)
+        if (refreshResponse.ok) {
+          const refreshData = await refreshResponse.json()
+          setDeleteInfo(refreshData)
+        }
+      } else {
+        const error = await response.json()
+        toasts.error(error.error || "Failed to delete campus data")
+        setDeletionStatus(prev => ({ ...prev, data: 'pending' }))
+      }
+    } catch (error) {
+      console.error("Error deleting campus data:", error)
+      toasts.actionFailed("Campus data deletion")
+      setDeletionStatus(prev => ({ ...prev, data: 'pending' }))
+    }
   }
 
   const resetCreateForm = () => {
@@ -1197,38 +1314,170 @@ export default function CampusPage() {
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <AlertDialogContent>
+        <AlertDialogContent className="max-w-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogTitle>Delete Campus: {campusToDelete?.name}</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the campus "{campusToDelete?.name}" and all associated data.
-              <div className="mt-4 space-y-2">
-                <Label htmlFor="delete-confirmation">
-                  <span className="font-semibold text-destructive">CONFIRM DELETE</span> to proceed:
-                </Label>
-                <Input
-                  id="delete-confirmation"
-                  value={deleteConfirmation}
-                  onChange={(e) => setDeleteConfirmation(e.target.value)}
-                  placeholder="CONFIRM DELETE"
-                  autoComplete="off"
-                  className="uppercase"
-                />
-              </div>
+              This action cannot be undone. Please delete all associated data before deleting the campus.
             </AlertDialogDescription>
           </AlertDialogHeader>
+
+          <div className="mt-4 space-y-4">
+            {deleteInfo ? (
+              <div className="space-y-3">
+                {/* Students Section */}
+                {deleteInfo.counts.students > 0 && (
+                  <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/30">
+                    <div className="flex items-center gap-3">
+                      <Users className="w-5 h-5 text-blue-600" />
+                      <div>
+                        <p className="font-medium">Students</p>
+                        <p className="text-sm text-muted-foreground">
+                          {deleteInfo.counts.students} student{deleteInfo.counts.students !== 1 ? 's' : ''} enrolled
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {deletionStatus.students === 'deleted' && (
+                        <CheckCircle className="w-5 h-5 text-green-600" />
+                      )}
+                      <Button
+                        onClick={handleDeleteStudents}
+                        disabled={deletionStatus.students === 'deleted' || deletionStatus.students === 'deleting'}
+                        variant={deletionStatus.students === 'deleted' ? 'outline' : 'destructive'}
+                        className="min-w-[160px]"
+                      >
+                        {deletionStatus.students === 'deleting' ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Deleting...
+                          </>
+                        ) : deletionStatus.students === 'deleted' ? (
+                          'Deleted'
+                        ) : (
+                          'Delete Students'
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Data Section - Departments, Batches, Quizzes, Assessments */}
+                {(deleteInfo.counts.departments > 0 ||
+                  deleteInfo.counts.batches > 0 ||
+                  deleteInfo.counts.quizzes > 0 ||
+                  deleteInfo.counts.assessments > 0) && (
+                  <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/30">
+                    <div>
+                      <p className="font-medium">Campus Data</p>
+                      <div className="text-sm text-muted-foreground space-y-1 mt-1">
+                        {deleteInfo.counts.departments > 0 && (
+                          <p>• {deleteInfo.counts.departments} department{deleteInfo.counts.departments !== 1 ? 's' : ''}</p>
+                        )}
+                        {deleteInfo.counts.batches > 0 && (
+                          <p>• {deleteInfo.counts.batches} batch{deleteInfo.counts.batches !== 1 ? 'es' : ''}</p>
+                        )}
+                        {deleteInfo.counts.quizzes > 0 && (
+                          <p>• {deleteInfo.counts.quizzes} quiz{deleteInfo.counts.quizzes !== 1 ? 'zes' : 'z'}</p>
+                        )}
+                        {deleteInfo.counts.assessments > 0 && (
+                          <p>• {deleteInfo.counts.assessments} assessment{deleteInfo.counts.assessments !== 1 ? 's' : ''}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {deletionStatus.data === 'deleted' && (
+                        <CheckCircle className="w-5 h-5 text-green-600" />
+                      )}
+                      <Button
+                        onClick={handleDeleteCampusData}
+                        disabled={
+                          deletionStatus.data === 'deleted' ||
+                          deletionStatus.data === 'deleting' ||
+                          deletionStatus.students !== 'deleted'
+                        }
+                        variant={deletionStatus.data === 'deleted' ? 'outline' : 'destructive'}
+                        className="min-w-[200px]"
+                      >
+                        {deletionStatus.data === 'deleting' ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Deleting...
+                          </>
+                        ) : deletionStatus.data === 'deleted' ? (
+                          'Deleted'
+                        ) : (
+                          'Delete Campus Data'
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Empty State */}
+                {deleteInfo.counts.students === 0 &&
+                 deleteInfo.counts.departments === 0 &&
+                 deleteInfo.counts.batches === 0 &&
+                 deleteInfo.counts.quizzes === 0 &&
+                 deleteInfo.counts.assessments === 0 && (
+                  <div className="p-4 border rounded-lg bg-green-50 border-green-200">
+                    <p className="text-green-800 text-sm font-medium">
+                      ✓ No associated data found. This campus can be safely deleted.
+                    </p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center justify-center p-8">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            )}
+          </div>
+
+          {/* Final Confirmation Input - Only show if there's no data to delete */}
+          {(deleteInfo?.counts.students === 0 &&
+           deleteInfo?.counts.departments === 0 &&
+           deleteInfo?.counts.batches === 0 &&
+           deleteInfo?.counts.quizzes === 0 &&
+           deleteInfo?.counts.assessments === 0) && (
+            <div className="mt-4 pt-4 border-t space-y-2">
+              <Label htmlFor="delete-confirmation">
+                <span className="font-semibold text-destructive">CONFIRM DELETE</span> to proceed:
+              </Label>
+              <Input
+                id="delete-confirmation"
+                value={deleteConfirmation}
+                onChange={(e) => setDeleteConfirmation(e.target.value)}
+                placeholder="CONFIRM DELETE"
+                autoComplete="off"
+                className="uppercase"
+              />
+            </div>
+          )}
+
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => {
               setIsDeleteDialogOpen(false)
               setCampusToDelete(null)
+              setDeleteInfo(null)
               setDeleteConfirmation("")
+              setDeletionStatus({ students: 'pending', data: 'pending' })
             }}>
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={() => campusToDelete && handleDeleteCampus(campusToDelete.id)}
               className="bg-red-600 hover:bg-red-700"
-              disabled={deleteLoading !== null || deleteConfirmation !== "CONFIRM DELETE"}
+              disabled={
+                deleteLoading !== null ||
+                deleteConfirmation !== "CONFIRM DELETE" ||
+                (deleteInfo?.counts.students === 0 &&
+                 deleteInfo?.counts.departments === 0 &&
+                 deleteInfo?.counts.batches === 0 &&
+                 deleteInfo?.counts.quizzes === 0 &&
+                 deleteInfo?.counts.assessments === 0) ? false :
+                deletionStatus.students !== 'deleted' || deletionStatus.data !== 'deleted'
+              }
             >
               {deleteLoading === campusToDelete?.id ? (
                 <>
@@ -1236,7 +1485,7 @@ export default function CampusPage() {
                   Deleting...
                 </>
               ) : (
-                "Delete"
+                "Delete Campus"
               )}
             </AlertDialogAction>
           </AlertDialogFooter>

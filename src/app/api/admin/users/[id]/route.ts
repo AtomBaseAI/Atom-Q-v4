@@ -125,6 +125,36 @@ export async function DELETE(
       )
     }
 
+    // Check for existing enrollments
+    const quizAttemptsCount = await db.quizAttempt.count({
+      where: {
+        userId: id
+      }
+    })
+
+    const assessmentAttemptsCount = await db.assessmentAttempt.count({
+      where: {
+        userId: id
+      }
+    })
+
+    const hasEnrollments = quizAttemptsCount > 0 || assessmentAttemptsCount > 0
+
+    if (hasEnrollments) {
+      return NextResponse.json(
+        {
+          message: "User has enrollments that must be deleted first",
+          error: "CANNOT_DELETE_USER_WITH_ENROLLMENTS",
+          enrollments: {
+            quizzes: quizAttemptsCount,
+            assessments: assessmentAttemptsCount,
+            total: quizAttemptsCount + assessmentAttemptsCount
+          }
+        },
+        { status: 400 }
+      )
+    }
+
     await db.user.delete({
       where: { id }
     })

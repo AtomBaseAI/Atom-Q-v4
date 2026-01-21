@@ -75,11 +75,14 @@ export async function GET() {
       }
     })
 
-    // Transform the data to include assessments count (quizzes count for now)
+    // Transform the data to include assessments count and rename users to students
     const transformedCampuses = campuses.map(campus => ({
       ...campus,
       _count: {
-        ...campus._count,
+        departments: campus._count.departments,
+        batches: campus._count.batches,
+        students: campus._count.users,
+        quizzes: campus._count.quizzes,
         assessments: campus._count.quizzes // Using quizzes count as assessments count
       }
     }))
@@ -180,11 +183,14 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    // Transform the response
+    // Transform the response to rename users to students
     const transformedCampus = {
       ...campus,
       _count: {
-        ...campus._count,
+        departments: campus._count.departments,
+        batches: campus._count.batches,
+        students: campus._count.users,
+        quizzes: campus._count.quizzes,
         assessments: campus._count.quizzes
       }
     }
