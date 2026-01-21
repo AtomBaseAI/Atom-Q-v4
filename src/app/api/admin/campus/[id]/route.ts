@@ -205,7 +205,8 @@ export async function DELETE(
           select: {
             users: true,
             quizzes: true,
-            departments: true
+            departments: true,
+            batches: true
           }
         }
       }
@@ -218,14 +219,17 @@ export async function DELETE(
       )
     }
 
-    // Check if campus has associated data
+    // Check if campus still has associated data
+    // If it does, it means the multi-step deletion process wasn't completed
     const hasUsers = existingCampus._count.users > 0
     const hasQuizzes = existingCampus._count.quizzes > 0
+    const hasDepartments = existingCampus._count.departments > 0
+    const hasBatches = existingCampus._count.batches > 0
 
-    if (hasUsers || hasQuizzes) {
+    if (hasUsers || hasQuizzes || hasDepartments || hasBatches) {
       return NextResponse.json(
-        { 
-          error: "Cannot delete campus with associated users or quizzes. Please reassign or delete them first." 
+        {
+          error: "Cannot delete campus with associated data. Please complete the multi-step deletion process first."
         },
         { status: 400 }
       )

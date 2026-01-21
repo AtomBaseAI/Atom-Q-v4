@@ -547,21 +547,21 @@ export default function QuestionGroupsPage() {
             <AlertDialogTitle>Delete Question Group</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete "{groupToDelete?.name}"? This action cannot be undone and will also delete all questions in this group.
-              <div className="mt-4 space-y-2">
-                <Label htmlFor="delete-confirmation">
-                  <span className="font-semibold text-destructive">CONFIRM DELETE</span> to proceed:
-                </Label>
-                <Input
-                  id="delete-confirmation"
-                  value={deleteConfirmation}
-                  onChange={(e) => setDeleteConfirmation(e.target.value)}
-                  placeholder="CONFIRM DELETE"
-                  autoComplete="off"
-                  className="uppercase"
-                />
-              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <div className="mt-4 space-y-2">
+            <Label htmlFor="delete-confirmation">
+              <span className="font-semibold text-destructive">CONFIRM DELETE</span> to proceed:
+            </Label>
+            <Input
+              id="delete-confirmation"
+              value={deleteConfirmation}
+              onChange={(e) => setDeleteConfirmation(e.target.value)}
+              placeholder="CONFIRM DELETE"
+              autoComplete="off"
+              className="uppercase"
+            />
+          </div>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => {
               setIsDeleteDialogOpen(false)
