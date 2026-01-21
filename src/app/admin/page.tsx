@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Users, BookOpen, TrendingUp, Clock } from "lucide-react"
 
@@ -12,6 +13,7 @@ interface DashboardStats {
 }
 
 export default function AdminDashboard() {
+  const router = useRouter()
   const [stats, setStats] = useState<DashboardStats>({
     totalUsers: 0,
     totalQuizzes: 0,
@@ -127,11 +129,33 @@ export default function AdminDashboard() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
-              <div className="p-4 border rounded-lg cursor-pointer hover:bg-accent">
+              <div
+                className="p-4 border rounded-lg cursor-pointer hover:bg-accent transition-colors"
+                onClick={() => router.push('/admin/users')}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    router.push('/admin/users')
+                  }
+                }}
+              >
                 <Users className="h-6 w-6 mb-2" />
                 <p className="text-sm font-medium">Manage Users</p>
               </div>
-              <div className="p-4 border rounded-lg cursor-pointer hover:bg-accent">
+              <div
+                className="p-4 border rounded-lg cursor-pointer hover:bg-accent transition-colors"
+                onClick={() => router.push('/admin/quiz')}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    router.push('/admin/quiz')
+                  }
+                }}
+              >
                 <BookOpen className="h-6 w-6 mb-2" />
                 <p className="text-sm font-medium">Create Quiz</p>
               </div>
