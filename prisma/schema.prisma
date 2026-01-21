@@ -152,10 +152,12 @@ model Assessment {
   negativePoints     Float?
   randomOrder        Boolean         @default(false)
   startTime          DateTime?
-  endTime            DateTime?
   creatorId          String
   campusId           String?
   campus             Campus?         @relation(fields: [campusId], references: [id])
+  maxTabs            Int?
+  disableCopyPaste   Boolean         @default(false)
+  accessKey          String?
   createdAt          DateTime        @default(now())
   updatedAt          DateTime        @updatedAt
   assessmentAttempts AssessmentAttempt[]

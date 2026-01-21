@@ -107,8 +107,10 @@ export async function POST(request: NextRequest) {
       negativePoints,
       randomOrder,
       startTime,
-      endTime,
       campusId,
+      maxTabs,
+      disableCopyPaste,
+      accessKey,
     } = data;
 
     const assessment = await db.assessment.create({
@@ -122,8 +124,10 @@ export async function POST(request: NextRequest) {
         negativePoints: negativeMarking ? parseFloat(negativePoints) : null,
         randomOrder,
         startTime: startTime ? new Date(startTime) : null,
-        endTime: endTime ? new Date(endTime) : null,
         campusId: campusId || null,
+        maxTabs: maxTabs ? parseInt(maxTabs) : null,
+        disableCopyPaste: disableCopyPaste || false,
+        accessKey: accessKey || null,
         creatorId: session.user.id,
       },
       include: {

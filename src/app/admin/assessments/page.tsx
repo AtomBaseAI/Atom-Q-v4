@@ -52,7 +52,8 @@ import {
   Users,
   FileQuestion,
   ArrowUpDown,
-  Loader2
+  Loader2,
+  Key
 } from "lucide-react"
 import { toasts } from "@/lib/toasts"
 import { DifficultyLevel, QuizStatus } from "@prisma/client"
@@ -61,6 +62,16 @@ import { DataTable } from "@/components/ui/data-table"
 import { ColumnDef } from "@tanstack/react-table"
 import HexagonLoader from "@/components/Loader/Loading"
 import { LoadingButton } from "@/components/ui/laodaing-button"
+
+// Helper function to generate a 6-digit alphanumeric access key (format: 1a-2b-3c)
+const generateAccessKey = () => {
+  const generatePart = () => {
+    const num = Math.floor(Math.random() * 10).toString()
+    const char = String.fromCharCode(97 + Math.floor(Math.random() * 26)) // a-z
+    return num + char
+  }
+  return `${generatePart()}-${generatePart()}-${generatePart()}`
+}
 
 // Helper function to format dates in dd/mm/yyyy format
 const formatDateDDMMYYYY = (dateString: string) => {
@@ -75,7 +86,7 @@ interface Assessment {
   id: string
   title: string
   description?: string
-  campus?: { name: string }
+  campus?: { name: string; id: string }
   timeLimit?: number
   difficulty: DifficultyLevel
   status: QuizStatus
@@ -83,7 +94,9 @@ interface Assessment {
   negativePoints?: number
   randomOrder: boolean
   startTime?: string
-  endTime?: string
+  maxTabs?: number
+  disableCopyPaste: boolean
+  accessKey?: string
   createdAt: string
   _count: {
     assessmentQuestions: number
@@ -102,8 +115,10 @@ interface CreateFormData {
   negativePoints: string
   randomOrder: boolean
   startTime: string
-  endTime: string
   campusId: string
+  maxTabs: string
+  disableCopyPaste: boolean
+  accessKey: string
 }
 
 interface EditFormData {
@@ -116,8 +131,10 @@ interface EditFormData {
   negativePoints: string
   randomOrder: boolean
   startTime: string
-  endTime: string
   campusId: string
+  maxTabs: string
+  disableCopyPaste: boolean
+  accessKey: string
 }
 
 export default function AssessmentsPage() {
@@ -145,8 +162,10 @@ export default function AssessmentsPage() {
     negativePoints: "",
     randomOrder: false,
     startTime: "",
-    endTime: "",
     campusId: "",
+    maxTabs: "",
+    disableCopyPaste: false,
+    accessKey: "",
   })
 
   const [editFormData, setEditFormData] = useState<EditFormData>({
@@ -159,8 +178,10 @@ export default function AssessmentsPage() {
     negativePoints: "",
     randomOrder: false,
     startTime: "",
-    endTime: "",
     campusId: "",
+    maxTabs: "",
+    disableCopyPaste: false,
+    accessKey: "",
   })
 
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -240,14 +261,6 @@ export default function AssessmentsPage() {
       cell: ({ row }) => {
         const startTime = row.getValue("startTime") as string
         return startTime ? formatDateDDMMYYYY(startTime) : "Not set"
-      },
-    },
-    {
-      accessorKey: "endTime",
-      header: "End Date",
-      cell: ({ row }) => {
-        const endTime = row.getValue("endTime") as string
-        return endTime ? formatDateDDMMYYYY(endTime) : "Not set"
       },
     },
     {
@@ -341,17 +354,6 @@ export default function AssessmentsPage() {
     e.preventDefault()
     setSubmitLoading(true)
 
-    // Validate date inputs
-    if (createFormData.startTime && createFormData.endTime) {
-      const startTime = new Date(createFormData.startTime)
-      const endTime = new Date(createFormData.endTime)
-      if (endTime <= startTime) {
-        toasts.error("End date must be after start date")
-        setSubmitLoading(false)
-        return
-      }
-    }
-
     try {
       const response = await fetch("/api/admin/assessments", {
         method: "POST",
@@ -363,8 +365,10 @@ export default function AssessmentsPage() {
           timeLimit: createFormData.timeLimit ? parseInt(createFormData.timeLimit) : null,
           negativePoints: createFormData.negativePoints ? parseFloat(createFormData.negativePoints) : null,
           startTime: createFormData.startTime || null,
-          endTime: createFormData.endTime || null,
           campusId: createFormData.campusId || null,
+          maxTabs: createFormData.maxTabs ? parseInt(createFormData.maxTabs) : null,
+          disableCopyPaste: createFormData.disableCopyPaste,
+          accessKey: createFormData.accessKey || null,
         }),
       })
 
@@ -390,17 +394,6 @@ export default function AssessmentsPage() {
 
     if (!selectedAssessment) return
 
-    // Validate date inputs
-    if (editFormData.startTime && editFormData.endTime) {
-      const startTime = new Date(editFormData.startTime)
-      const endTime = new Date(editFormData.endTime)
-      if (endTime <= startTime) {
-        toasts.error("End date must be after start date")
-        setSubmitLoading(false)
-        return
-      }
-    }
-
     try {
       const response = await fetch(`/api/admin/assessments/${selectedAssessment.id}`, {
         method: "PUT",
@@ -412,8 +405,10 @@ export default function AssessmentsPage() {
           timeLimit: editFormData.timeLimit ? parseInt(editFormData.timeLimit) : null,
           negativePoints: editFormData.negativePoints ? parseFloat(editFormData.negativePoints) : null,
           startTime: editFormData.startTime || null,
-          endTime: editFormData.endTime || null,
           campusId: editFormData.campusId || null,
+          maxTabs: editFormData.maxTabs ? parseInt(editFormData.maxTabs) : null,
+          disableCopyPaste: editFormData.disableCopyPaste,
+          accessKey: editFormData.accessKey || null,
         }),
       })
 
@@ -488,8 +483,10 @@ export default function AssessmentsPage() {
       negativePoints: assessment.negativePoints?.toString() || "",
       randomOrder: assessment.randomOrder,
       startTime: formatDateTimeLocal(assessment.startTime),
-      endTime: formatDateTimeLocal(assessment.endTime),
       campusId: assessment.campus?.id || "",
+      maxTabs: assessment.maxTabs?.toString() || "",
+      disableCopyPaste: assessment.disableCopyPaste,
+      accessKey: assessment.accessKey || "",
     })
     setIsEditDialogOpen(true)
   }
@@ -511,8 +508,10 @@ export default function AssessmentsPage() {
       negativePoints: "",
       randomOrder: false,
       startTime: "",
-      endTime: "",
       campusId: "",
+      maxTabs: "",
+      disableCopyPaste: false,
+      accessKey: "",
     })
   }
 
@@ -527,8 +526,10 @@ export default function AssessmentsPage() {
       negativePoints: "",
       randomOrder: false,
       startTime: "",
-      endTime: "",
       campusId: "",
+      maxTabs: "",
+      disableCopyPaste: false,
+      accessKey: "",
     })
   }
 
@@ -710,13 +711,50 @@ export default function AssessmentsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="endTime">End Time</Label>
+              <Label htmlFor="maxTabs">Maximum Tabs Allowed</Label>
               <Input
-                id="endTime"
-                type="datetime-local"
-                value={createFormData.endTime}
-                onChange={(e) => setCreateFormData(prev => ({ ...prev, endTime: e.target.value }))}
+                id="maxTabs"
+                type="number"
+                min="0"
+                value={createFormData.maxTabs}
+                onChange={(e) => setCreateFormData(prev => ({ ...prev, maxTabs: e.target.value }))}
+                placeholder="Leave empty for unlimited"
               />
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="disableCopyPaste"
+                checked={createFormData.disableCopyPaste}
+                onCheckedChange={(checked) => setCreateFormData(prev => ({ ...prev, disableCopyPaste: checked }))}
+              />
+              <Label htmlFor="disableCopyPaste">Disable Copy/Paste</Label>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="accessKey">Access Key</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="accessKey"
+                  value={createFormData.accessKey}
+                  onChange={(e) => setCreateFormData(prev => ({ ...prev, accessKey: e.target.value }))}
+                  placeholder="Optional: Enter or generate access key"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setCreateFormData(prev => ({ ...prev, accessKey: generateAccessKey() }))}
+                  className="shrink-0"
+                >
+                  <Key className="h-4 w-4 mr-2" />
+                  Generate
+                </Button>
+              </div>
+              {createFormData.accessKey && (
+                <p className="text-sm text-muted-foreground">
+                  Generated key: <span className="font-mono font-semibold">{createFormData.accessKey}</span>
+                </p>
+              )}
             </div>
 
             <div className="flex items-center space-x-2">
@@ -857,13 +895,50 @@ export default function AssessmentsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="edit-endTime">End Time</Label>
+              <Label htmlFor="edit-maxTabs">Maximum Tabs Allowed</Label>
               <Input
-                id="edit-endTime"
-                type="datetime-local"
-                value={editFormData.endTime}
-                onChange={(e) => setEditFormData(prev => ({ ...prev, endTime: e.target.value }))}
+                id="edit-maxTabs"
+                type="number"
+                min="0"
+                value={editFormData.maxTabs}
+                onChange={(e) => setEditFormData(prev => ({ ...prev, maxTabs: e.target.value }))}
+                placeholder="Leave empty for unlimited"
               />
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="edit-disableCopyPaste"
+                checked={editFormData.disableCopyPaste}
+                onCheckedChange={(checked) => setEditFormData(prev => ({ ...prev, disableCopyPaste: checked }))}
+              />
+              <Label htmlFor="edit-disableCopyPaste">Disable Copy/Paste</Label>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-accessKey">Access Key</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="edit-accessKey"
+                  value={editFormData.accessKey}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, accessKey: e.target.value }))}
+                  placeholder="Optional: Enter or generate access key"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setEditFormData(prev => ({ ...prev, accessKey: generateAccessKey() }))}
+                  className="shrink-0"
+                >
+                  <Key className="h-4 w-4 mr-2" />
+                  Generate
+                </Button>
+              </div>
+              {editFormData.accessKey && (
+                <p className="text-sm text-muted-foreground">
+                  Generated key: <span className="font-mono font-semibold">{editFormData.accessKey}</span>
+                </p>
+              )}
             </div>
 
             <div className="flex items-center space-x-2">

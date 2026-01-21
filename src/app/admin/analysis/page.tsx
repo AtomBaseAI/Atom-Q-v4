@@ -1,172 +1,106 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import {
-  Card, CardContent, CardDescription, CardHeader, CardTitle
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
 } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table"
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Download, ArrowUpDown } from "lucide-react"
-import { toasts } from "@/lib/toasts"
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs"
+import { Progress } from "@/components/ui/progress"
+import {
+  Users,
+  FileText,
+  ClipboardCheck,
+  TrendingUp,
+  Activity,
+  Building2,
+  Clock,
+  Award,
+  BarChart3,
+  Target,
+  BookOpen,
+  CheckCircle2,
+  XCircle,
+  ArrowRight,
+} from "lucide-react"
 import HexagonLoader from "@/components/Loader/Loading"
-import * as XLSX from "xlsx"
+import { toasts } from "@/lib/toasts"
 
-/* =========================
-   HELPERS
-========================= */
-
-const formatDateDDMMYYYY = (dateString: string) => {
-  const d = new Date(dateString)
-  return `${String(d.getDate()).padStart(2, "0")}/${String(
-    d.getMonth() + 1
-  ).padStart(2, "0")}/${d.getFullYear()}`
-}
-
-const formatSecondsToMinutes = (seconds: number) => {
-  const m = Math.floor(seconds / 60)
-  const s = seconds % 60
-  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
-}
-
-/* =========================
-   TYPES
-========================= */
-
-interface Quiz {
+interface Campus {
   id: string
-  title: string
-  difficulty: string
-  status: string
+  name: string
+  shortName: string
+  _count: {
+    users: number
+    quizzes: number
+    assessments: number
+  }
 }
 
-interface LeaderboardEntry {
-  id: string
-  user: { name?: string; email: string }
-  score: number
-  totalPoints: number
-  timeTaken: number
-  submittedAt: string
+interface AnalyticsData {
+  overview: {
+    totalUsers: number
+    totalQuizzes: number
+    totalAssessments: number
+    totalQuizAttempts: number
+    totalAssessmentAttempts: number
+    activeUsers: number
+    avgQuizScore: string
+    avgAssessmentScore: string
+  }
+  campuses: Campus[]
+  recentActivity: {
+    quizAttempts: any[]
+    assessmentAttempts: any[]
+  }
+  difficultyStats: {
+    quizzes: any[]
+    assessments: any[]
+  }
+  statusStats: {
+    quizzes: any[]
+    assessments: any[]
+  }
 }
 
-interface ResultMatrixEntry {
-  id: string
-  user: { email: string }
-  status: string
-  score?: number
-  timeTaken?: number
-  errors?: number
-  submittedAt?: string
-}
-
-/* =========================
-   COMPONENT
-========================= */
-
-export default function AnalysisPage() {
-  const [quizzes, setQuizzes] = useState<Quiz[]>([])
-  const [selectedQuiz, setSelectedQuiz] = useState<Quiz | null>(null)
-  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
-  const [resultMatrix, setResultMatrix] = useState<ResultMatrixEntry[]>([])
+export default function AnalyticsPage() {
+  const router = useRouter()
+  const [data, setData] = useState<AnalyticsData | null>(null)
   const [loading, setLoading] = useState(true)
 
-  const [isLeaderboardDialogOpen, setIsLeaderboardDialogOpen] = useState(false)
-  const [isMatrixDialogOpen, setIsMatrixDialogOpen] = useState(false)
-
-  const [search, setSearch] = useState("")
-  const [scoreOrder, setScoreOrder] = useState<"desc" | "asc">("desc")
-
   useEffect(() => {
-    fetch("/api/admin/quiz")
-      .then(res => res.json())
-      .then(setQuizzes)
-      .catch(toasts.networkError)
-      .finally(() => setLoading(false))
+    fetchAnalytics()
   }, [])
 
-  const fetchLeaderboard = async (quizId: string) => {
-    const res = await fetch(`/api/admin/analysis/${quizId}/leaderboard`)
-    if (!res.ok) return
-    setLeaderboard(await res.json())
-  }
-
-  const fetchResultMatrix = async (quizId: string) => {
-    const res = await fetch(`/api/admin/analysis/${quizId}/result-matrix`)
-    if (res.ok) setResultMatrix(await res.json())
-  }
-
-  /* =========================
-     FILTER + SORT
-  ========================= */
-
-  const filteredLeaderboard = useMemo(() => {
-    return [...leaderboard]
-      .filter(e =>
-        `${e.user.name ?? ""} ${e.user.email}`
-          .toLowerCase()
-          .includes(search.toLowerCase())
-      )
-      .sort((a, b) => {
-        const scoreCompare =
-          scoreOrder === "desc" ? b.score - a.score : a.score - b.score
-        return scoreCompare || a.timeTaken - b.timeTaken
-      })
-  }, [leaderboard, search, scoreOrder])
-
-  const filteredResultMatrix = useMemo(() => {
-    return resultMatrix.filter(e =>
-      e.user.email.toLowerCase().includes(search.toLowerCase())
-    )
-  }, [resultMatrix, search])
-
-  /* =========================
-     EXPORTS
-  ========================= */
-
-  const exportLeaderboardToExcel = () => {
-    if (!selectedQuiz) return
-
-    const data = filteredLeaderboard.map((e, i) => ({
-      Rank: i + 1,
-      Name: e.user.name || "N/A",
-      Email: e.user.email,
-      Score: `${e.score}/${e.totalPoints}`,
-      "Time Taken (mm:ss)": formatSecondsToMinutes(e.timeTaken),
-      "Submitted At": formatDateDDMMYYYY(e.submittedAt)
-    }))
-
-    const ws = XLSX.utils.json_to_sheet(data)
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, "Leaderboard")
-    XLSX.writeFile(wb, `${selectedQuiz.title}_Leaderboard.xlsx`)
-  }
-
-  const exportResultMatrixToExcel = () => {
-    if (!selectedQuiz) return
-
-    const data = filteredResultMatrix.map(e => ({
-      Email: e.user.email,
-      Status: e.status.replace("_", " "),
-      Score: e.score ?? "-",
-      "Time Taken (mm:ss)": e.timeTaken
-        ? formatSecondsToMinutes(e.timeTaken)
-        : "-",
-      Errors: e.errors ?? "-",
-      Submitted: e.submittedAt
-        ? formatDateDDMMYYYY(e.submittedAt)
-        : "-"
-    }))
-
-    const ws = XLSX.utils.json_to_sheet(data)
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, "Results")
-    XLSX.writeFile(wb, `${selectedQuiz.title}_Results.xlsx`)
+  const fetchAnalytics = async () => {
+    try {
+      const res = await fetch("/api/admin/analytics")
+      if (!res.ok) throw new Error("Failed to fetch analytics")
+      setData(await res.json())
+    } catch (error) {
+      toasts.error("Failed to load analytics data")
+    } finally {
+      setLoading(false)
+    }
   }
 
   if (loading) {
@@ -177,162 +111,412 @@ export default function AnalysisPage() {
     )
   }
 
+  if (!data) {
+    return (
+      <div className="text-center py-20">
+        <p className="text-muted-foreground">Failed to load analytics data</p>
+        <Button onClick={fetchAnalytics} className="mt-4">
+          Retry
+        </Button>
+      </div>
+    )
+  }
+
+  const { overview, campuses, recentActivity, difficultyStats, statusStats } = data
+
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Analytics</h1>
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Analytics Dashboard</h1>
+          <p className="text-muted-foreground mt-1">
+            Comprehensive insights across all campuses
+          </p>
+        </div>
+        <Button onClick={fetchAnalytics} variant="outline">
+          <Activity className="mr-2 h-4 w-4" />
+          Refresh
+        </Button>
+      </div>
 
-      {/* QUIZ LIST */}
+      {/* Overview Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{overview.totalUsers}</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {overview.activeUsers} active users
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Quizzes</CardTitle>
+            <FileText className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{overview.totalQuizzes}</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {overview.totalQuizAttempts} attempts
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Assessments</CardTitle>
+            <ClipboardCheck className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{overview.totalAssessments}</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {overview.totalAssessmentAttempts} attempts
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Avg. Score</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {parseFloat(overview.avgQuizScore).toFixed(1)}%
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Quiz average score
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Campus Cards */}
       <Card>
         <CardHeader>
-          <CardTitle>Quiz Analytics</CardTitle>
-          <CardDescription>Select quiz to view analytics</CardDescription>
+          <CardTitle>Campus Overview</CardTitle>
+          <CardDescription>
+            Performance metrics across all campuses
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          {quizzes.map(q => (
-            <div key={q.id} className="flex justify-between p-4 border rounded mb-3">
-              <div>
-                <h3 className="font-medium">{q.title}</h3>
-                <div className="flex gap-2 mt-2">
-                  <Badge>{q.difficulty}</Badge>
-                  <Badge variant="secondary">{q.status}</Badge>
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <Button size="sm" variant="outline" onClick={() => {
-                  setSelectedQuiz(q)
-                  fetchLeaderboard(q.id)
-                  setIsLeaderboardDialogOpen(true)
-                }}>
-                  Leaderboard
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => {
-                  setSelectedQuiz(q)
-                  fetchResultMatrix(q.id)
-                  setIsMatrixDialogOpen(true)
-                }}>
-                  Results
-                </Button>
-              </div>
-            </div>
-          ))}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {campuses.map((campus) => (
+              <Card key={campus.id} className="border-2 hover:border-primary/50 transition-all">
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-2">
+                      <Building2 className="h-5 w-5 text-primary" />
+                      <div>
+                        <CardTitle className="text-base">{campus.name}</CardTitle>
+                        <CardDescription className="text-xs">
+                          {campus.shortName}
+                        </CardDescription>
+                      </div>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Stats Grid */}
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="text-center">
+                      <div className="text-lg font-bold text-primary">
+                        {campus._count.users}
+                      </div>
+                      <div className="text-xs text-muted-foreground">Users</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-lg font-bold text-blue-600">
+                        {campus._count.quizzes}
+                      </div>
+                      <div className="text-xs text-muted-foreground">Quizzes</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-lg font-bold text-purple-600">
+                        {campus._count.assessments}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        Assessments
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="space-y-2 pt-2 border-t">
+                    <Button
+                      className="w-full justify-start"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => router.push(`/admin/analysis/campus/${campus.id}`)}
+                    >
+                      <BarChart3 className="mr-2 h-4 w-4" />
+                      View Campus Analytics
+                      <ArrowRight className="ml-auto h-4 w-4" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </CardContent>
       </Card>
 
-      {/* LEADERBOARD POPUP */}
-      <Dialog open={isLeaderboardDialogOpen} onOpenChange={setIsLeaderboardDialogOpen}>
-        <DialogContent className="min-w-[95vw] h-[95vh] max-w-none flex flex-col">
-          <DialogHeader className="flex flex-row items-center gap-4">
-            <DialogTitle className="whitespace-nowrap">
-              {selectedQuiz?.title} – Leaderboard
-            </DialogTitle>
+      {/* Tabs for detailed analysis */}
+      <Tabs defaultValue="recent" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="recent">
+            <Clock className="mr-2 h-4 w-4" />
+            Recent Activity
+          </TabsTrigger>
+          <TabsTrigger value="difficulty">
+            <Target className="mr-2 h-4 w-4" />
+            Difficulty Analysis
+          </TabsTrigger>
+          <TabsTrigger value="status">
+            <Activity className="mr-2 h-4 w-4" />
+            Status Breakdown
+          </TabsTrigger>
+        </TabsList>
 
-            <Input
-              placeholder="Search name or email"
-              className="max-w-sm"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
+        {/* Recent Activity */}
+        <TabsContent value="recent" className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Recent Quiz Attempts */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  Recent Quiz Attempts
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {recentActivity.quizAttempts.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-4">
+                    No recent quiz attempts
+                  </p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>User</TableHead>
+                        <TableHead>Quiz</TableHead>
+                        <TableHead>Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {recentActivity.quizAttempts.slice(0, 5).map((attempt) => (
+                        <TableRow key={attempt.id}>
+                          <TableCell className="font-medium">
+                            {attempt.user.name || attempt.user.email}
+                          </TableCell>
+                          <TableCell>{attempt.quiz.title}</TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={
+                                attempt.status === "SUBMITTED"
+                                  ? "default"
+                                  : "secondary"
+                              }
+                            >
+                              {attempt.status}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
 
-            <Button
-              variant="outline"
-              onClick={() =>
-                setScoreOrder(o => (o === "desc" ? "asc" : "desc"))
-              }
-            >
-              <ArrowUpDown className="mr-2 h-4 w-4" />
-              Score {scoreOrder === "desc" ? "↓" : "↑"}
-            </Button>
-
-            <div className="ml-auto">
-              <Button variant="outline" onClick={exportLeaderboardToExcel} className="mr-6 text-green-500 hover:text-green-600 hover:bg-green-400/10">
-                <Download className="mr-2 h-4 w-4" /> Export Excel
-              </Button>
-            </div>
-          </DialogHeader>
-
-          <div className="flex-1 overflow-auto">
-            <Table>
-              <TableHeader className="sticky top-0 bg-background">
-                <TableRow>
-                  <TableHead>Rank</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Score</TableHead>
-                  <TableHead>Time</TableHead>
-                  <TableHead>Submitted</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredLeaderboard.map((e, i) => (
-                  <TableRow key={e.id}>
-                    <TableCell>#{i + 1}</TableCell>
-                    <TableCell>{e.user.name || "N/A"}</TableCell>
-                    <TableCell>{e.user.email}</TableCell>
-                    <TableCell>{e.score}/{e.totalPoints}</TableCell>
-                    <TableCell>{formatSecondsToMinutes(e.timeTaken)}</TableCell>
-                    <TableCell>{formatDateDDMMYYYY(e.submittedAt)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            {/* Recent Assessment Attempts */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <ClipboardCheck className="h-5 w-5" />
+                  Recent Assessment Attempts
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {recentActivity.assessmentAttempts.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-4">
+                    No recent assessment attempts
+                  </p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>User</TableHead>
+                        <TableHead>Assessment</TableHead>
+                        <TableHead>Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {recentActivity.assessmentAttempts.slice(0, 5).map((attempt) => (
+                        <TableRow key={attempt.id}>
+                          <TableCell className="font-medium">
+                            {attempt.user.name || attempt.user.email}
+                          </TableCell>
+                          <TableCell>{attempt.assessment.title}</TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={
+                                attempt.status === "SUBMITTED"
+                                  ? "default"
+                                  : "secondary"
+                              }
+                            >
+                              {attempt.status}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
           </div>
-        </DialogContent>
-      </Dialog>
+        </TabsContent>
 
-      {/* RESULT MATRIX POPUP */}
-      <Dialog open={isMatrixDialogOpen} onOpenChange={setIsMatrixDialogOpen}>
-        <DialogContent className="min-w-[95vw] h-[95vh] max-w-none flex flex-col">
-          <DialogHeader className="flex flex-row items-center gap-4">
-            <DialogTitle className="whitespace-nowrap">
-              {selectedQuiz?.title} – Result Matrix
-            </DialogTitle>
+        {/* Difficulty Analysis */}
+        <TabsContent value="difficulty" className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Quiz Difficulty */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Quiz Difficulty Distribution</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {["EASY", "MEDIUM", "HARD"].map((difficulty) => {
+                  const stat = difficultyStats.quizzes.find(
+                    (s: any) => s.difficulty === difficulty
+                  )
+                  return (
+                    <div key={difficulty} className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium">{difficulty}</span>
+                        <span className="text-sm text-muted-foreground">
+                          {stat?._count || 0} quizzes
+                        </span>
+                      </div>
+                      <Progress
+                        value={
+                          difficultyStats.quizzes.length > 0
+                            ? ((stat?._count || 0) / difficultyStats.quizzes.length) * 100
+                            : 0
+                        }
+                        className="h-2"
+                      />
+                    </div>
+                  )
+                })}
+              </CardContent>
+            </Card>
 
-            <Input
-              placeholder="Search email"
-              className="max-w-sm"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
-
-            <div className="ml-auto">
-              <Button variant="outline" onClick={exportResultMatrixToExcel} className="mr-6 text-green-500 hover:text-green-600 hover:bg-green-400/10">
-                <Download className="mr-2 h-4 w-4" /> Export Excel
-              </Button>
-            </div>
-          </DialogHeader>
-
-          <div className="flex-1 overflow-auto">
-            <Table>
-              <TableHeader className="sticky top-0 bg-background">
-                <TableRow>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Score</TableHead>
-                  <TableHead>Time</TableHead>
-                  <TableHead>Errors</TableHead>
-                  <TableHead>Submitted</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredResultMatrix.map(e => (
-                  <TableRow key={e.id}>
-                    <TableCell>{e.user.email}</TableCell>
-                    <TableCell>{e.status}</TableCell>
-                    <TableCell>{e.score ?? "-"}</TableCell>
-                    <TableCell>
-                      {e.timeTaken ? formatSecondsToMinutes(e.timeTaken) : "-"}
-                    </TableCell>
-                    <TableCell>{e.errors ?? "-"}</TableCell>
-                    <TableCell>
-                      {e.submittedAt ? formatDateDDMMYYYY(e.submittedAt) : "-"}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            {/* Assessment Difficulty */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Assessment Difficulty Distribution</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {["EASY", "MEDIUM", "HARD"].map((difficulty) => {
+                  const stat = difficultyStats.assessments.find(
+                    (s: any) => s.difficulty === difficulty
+                  )
+                  return (
+                    <div key={difficulty} className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium">{difficulty}</span>
+                        <span className="text-sm text-muted-foreground">
+                          {stat?._count || 0} assessments
+                        </span>
+                      </div>
+                      <Progress
+                        value={
+                          difficultyStats.assessments.length > 0
+                            ? ((stat?._count || 0) / difficultyStats.assessments.length) * 100
+                            : 0
+                        }
+                        className="h-2"
+                      />
+                    </div>
+                  )
+                })}
+              </CardContent>
+            </Card>
           </div>
-        </DialogContent>
-      </Dialog>
+        </TabsContent>
+
+        {/* Status Breakdown */}
+        <TabsContent value="status" className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Quiz Status */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Quiz Attempt Status</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {["NOT_STARTED", "IN_PROGRESS", "SUBMITTED"].map((status) => {
+                  const stat = statusStats.quizzes.find(
+                    (s: any) => s.status === status
+                  )
+                  return (
+                    <div key={status} className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        {status === "SUBMITTED" ? (
+                          <CheckCircle2 className="h-4 w-4 text-green-600" />
+                        ) : status === "IN_PROGRESS" ? (
+                          <Clock className="h-4 w-4 text-blue-600" />
+                        ) : (
+                          <XCircle className="h-4 w-4 text-gray-600" />
+                        )}
+                        <span className="text-sm font-medium">{status.replace(/_/g, " ")}</span>
+                      </div>
+                      <Badge variant="secondary">{stat?._count || 0}</Badge>
+                    </div>
+                  )
+                })}
+              </CardContent>
+            </Card>
+
+            {/* Assessment Status */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Assessment Attempt Status</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {["NOT_STARTED", "IN_PROGRESS", "SUBMITTED"].map((status) => {
+                  const stat = statusStats.assessments.find(
+                    (s: any) => s.status === status
+                  )
+                  return (
+                    <div key={status} className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        {status === "SUBMITTED" ? (
+                          <CheckCircle2 className="h-4 w-4 text-green-600" />
+                        ) : status === "IN_PROGRESS" ? (
+                          <Clock className="h-4 w-4 text-blue-600" />
+                        ) : (
+                          <XCircle className="h-4 w-4 text-gray-600" />
+                        )}
+                        <span className="text-sm font-medium">{status.replace(/_/g, " ")}</span>
+                      </div>
+                      <Badge variant="secondary">{stat?._count || 0}</Badge>
+                    </div>
+                  )
+                })}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

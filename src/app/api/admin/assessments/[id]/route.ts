@@ -75,8 +75,10 @@ export async function PUT(
       negativePoints,
       randomOrder,
       startTime,
-      endTime,
       campusId,
+      maxTabs,
+      disableCopyPaste,
+      accessKey,
     } = data;
 
     const assessment = await db.assessment.update({
@@ -91,8 +93,10 @@ export async function PUT(
         negativePoints: negativeMarking ? parseFloat(negativePoints) : null,
         randomOrder,
         startTime: startTime ? new Date(startTime) : null,
-        endTime: endTime ? new Date(endTime) : null,
         campusId: campusId || null,
+        maxTabs: maxTabs ? parseInt(maxTabs) : null,
+        disableCopyPaste: disableCopyPaste || false,
+        accessKey: accessKey || null,
       },
       include: {
         creator: {
