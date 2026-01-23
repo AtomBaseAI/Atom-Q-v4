@@ -12,10 +12,12 @@ async function main() {
   await prisma.quizQuestion.deleteMany()
   await prisma.question.deleteMany()
   await prisma.questionGroup.deleteMany()
-  await prisma.quiz.deleteMany() 
+  await prisma.quiz.deleteMany()
   await prisma.user.deleteMany()
   await prisma.department.deleteMany()
   await prisma.campus.deleteMany()
+  await prisma.registrationSettings.deleteMany()
+  await prisma.settings.deleteMany()
 
   console.log('Cleaned existing data...')
 
@@ -124,8 +126,13 @@ async function main() {
       siteTitle: 'Atom Q',
       siteDescription: 'Take quizzes and test your knowledge',
       maintenanceMode: false,
+    },
+  })
+
+  // Create registration settings
+  const regSettings = await prisma.registrationSettings.create({
+    data: {
       allowRegistration: true,
-      enableGithubAuth: false,
     },
   })
 

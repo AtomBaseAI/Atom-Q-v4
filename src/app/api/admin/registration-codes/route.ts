@@ -8,9 +8,9 @@ import { z } from "zod"
 const createCodeSchema = z.object({
   code: z.string().min(1, "Registration code is required"),
   expiry: z.enum(["1 day", "2 days", "1 week", "1 month"]),
-  campusId: z.string().optional(),
-  departmentId: z.string().optional(),
-  batchId: z.string().optional(),
+  campusId: z.string().nullable().optional(),
+  departmentId: z.string().nullable().optional(),
+  batchId: z.string().nullable().optional(),
 })
 
 export async function GET() {
@@ -25,7 +25,6 @@ export async function GET() {
     }
 
     const codes = await db.registrationCode.findMany({
-      where: { isActive: true },
       orderBy: { createdAt: 'desc' },
       include: {
         campus: {
@@ -50,11 +49,24 @@ export async function GET() {
       },
     })
 
-    // Transform the data to include expiry information
+    // Transform data to include expiry information
     const transformedCodes = codes.map(code => {
       const now = new Date()
       const expiryDate = new Date(code.expiry)
-      const daysRemaining = Math.ceil((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 24))
+
+      // Calculate days remaining in milliseconds
+      const msPerDay = 1000 * 60 * 60 * 24
+      const timeDiff = expiryDate.getTime() - now.getTime()
+      const daysRemaining = Math.ceil(timeDiff / msPerDay)
+
+      // Debug log to verify calculation
+      console.log(`Code ${code.code}:`, {
+        now: now.toISOString(),
+        expiry: expiryDate.toISOString(),
+        timeDiff,
+        daysRemaining,
+        isActive: code.isActive,
+      })
 
       let status = 'active'
       let statusColor = 'text-green-600'
@@ -78,6 +90,7 @@ export async function GET() {
         daysRemaining,
         status,
         statusColor,
+        expiry: expiryDate,
       }
     })
 
@@ -140,43 +153,6 @@ export async function POST(request: NextRequest) {
     console.error("Error creating registration code:", error)
     return NextResponse.json(
       { error: "Failed to create registration code" },
-      { status: 500 }
-    )
-  }
-}
-
-export async function DELETE(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-
-    if (!session || session.user.role !== UserRole.ADMIN) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      )
-    }
-
-    const url = new URL(request.url)
-    const codeId = url.pathname.split('/').pop()
-
-    if (!codeId) {
-      return NextResponse.json(
-        { error: "Code ID is required" },
-        { status: 400 }
-      )
-    }
-
-    // Soft delete the registration code
-    const code = await db.registrationCode.update({
-      where: { id: codeId },
-      data: { isActive: false }
-    })
-
-    return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error("Error deleting registration code:", error)
-    return NextResponse.json(
-      { error: "Failed to delete registration code" },
       { status: 500 }
     )
   }

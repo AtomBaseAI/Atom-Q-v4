@@ -15,7 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter, SheetTrigger } from "@/components/ui/sheet"
 import { toasts } from "@/lib/toasts"
-import { Loader2, Save, Settings, CheckCircle, Shield, Server, Info, Download, Code, Copy, Plus, Trash2 } from "lucide-react"
+import { Loader2, Save, Settings, CheckCircle, Shield, Server, Info, Download, Code, Copy, Plus, Trash2, PowerOff } from "lucide-react"
 import { useSettings } from "@/components/providers/settings-provider"
 import { useRegistrationSettings } from "@/components/providers/registration-settings-provider"
 import HexagonLoader from "@/components/Loader/Loading"
@@ -241,13 +241,21 @@ export default function SettingsPage() {
   }
 
   const handleGenerateCode = async () => {
+    // Generate a random registration code and display it
+    const code = Math.random().toString(36).substring(2, 8).toUpperCase()
+    setRegistrationCode(code)
+    toasts.actionSuccess('Registration code generated')
+  }
+
+  const handleSaveCode = async () => {
+    if (!registrationCode) {
+      toasts.error('Please generate a code first')
+      return
+    }
+
     setGeneratingCode(true)
 
     try {
-      // Generate a random registration code
-      const code = Math.random().toString(36).substring(2, 8).toUpperCase()
-      setRegistrationCode(code)
-
       // Calculate expiry date
       const expiryMap: Record<string, number> = {
         "1 day": 1,
@@ -262,7 +270,7 @@ export default function SettingsPage() {
 
       // Prepare data for API
       const payload = {
-        code,
+        code: registrationCode,
         expiry: registrationExpiry,
         campusId: registrationCampus !== "general" ? registrationCampus : null,
         departmentId: registrationDepartment !== "all" ? registrationDepartment : null,
@@ -279,16 +287,35 @@ export default function SettingsPage() {
       })
 
       if (res.ok) {
-        toasts.actionSuccess('Registration code created and saved')
+        toasts.actionSuccess('Registration code saved successfully')
         // Refresh codes list
         fetchRegistrationCodes()
+        // Clear the form
+        setRegistrationCode('')
+        setRegistrationCampus('general')
+        setRegistrationDepartment('all')
+        setRegistrationBatch('all')
+        setSheetOpen(false)
       } else {
-        const errorData = await res.json()
-        throw new Error(errorData.error || 'Failed to create registration code')
+        let errorMessage = 'Failed to create registration code'
+        try {
+          const errorData = await res.json()
+          if (errorData.error) {
+            errorMessage = errorData.error
+          }
+          if (errorData.details && Array.isArray(errorData.details)) {
+            errorMessage += ': ' + errorData.details.map((d: any) => d.message).join(', ')
+          }
+        } catch (e) {
+          // If JSON parsing fails, use status text
+          errorMessage = `Failed to create registration code (${res.status})`
+        }
+        throw new Error(errorMessage)
       }
     } catch (error) {
-      console.error('Error generating code:', error)
-      toasts.actionFailed('Generate code', 'Failed to generate registration code')
+      console.error('Error saving code:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Failed to save registration code'
+      toasts.actionFailed('Save code', errorMessage)
     } finally {
       setGeneratingCode(false)
     }
@@ -317,24 +344,45 @@ export default function SettingsPage() {
     }
   }
 
-  const handleDeleteCode = async (codeId: string, code: string, isActive: boolean) => {
-    try {
-      if (confirm(`Are you sure you want to ${isActive ? 'disable' : 'delete'} registration code "${code}"?`)) {
-        const res = await fetch(`/api/admin/registration-codes/${codeId}`, {
-          method: 'DELETE',
-        })
+  const handleDisableCode = async (codeId: string, code: string) => {
+    if (!confirm(`Are you sure you want to immediately expire registration code "${code}"?`)) {
+      return
+    }
 
-        if (res.ok) {
-          toasts.actionSuccess(`Registration code ${isActive ? 'disabled' : 'deleted'}`) // Fixed variable reference
-          fetchRegistrationCodes()
-        } else {
+    try {
+      console.log('Attempting to disable code:', { codeId, code })
+
+      const res = await fetch(`/api/admin/registration-codes/${codeId}`, {
+        method: 'PATCH',
+      headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+
+      console.log('Response status:', res.status)
+      console.log('Response ok:', res.ok)
+
+      if (res.ok) {
+        toasts.actionSuccess('Registration code disabled immediately')
+        fetchRegistrationCodes()
+      } else {
+        // Try to get error details
+        let errorMessage = 'Failed to disable registration code'
+        try {
           const errorData = await res.json()
-          throw new Error(errorData.error || 'Failed to delete registration code')
+          console.log('Error data:', errorData)
+          errorMessage = errorData.error || errorMessage
+        } catch (jsonError) {
+          console.log('Failed to parse error as JSON:', jsonError)
+          errorMessage = res.statusText || errorMessage
         }
+
+        toasts.actionFailed('Disable code', errorMessage)
       }
     } catch (error) {
-      console.error('Error deleting code:', error)
-      toasts.actionFailed('Delete code', 'Failed to delete registration code')
+      console.error('Error disabling code:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Failed to disable registration code'
+      toasts.actionFailed('Disable code', errorMessage)
     }
   }
 
@@ -377,23 +425,20 @@ export default function SettingsPage() {
 
       <form onSubmit={handleSubmit}>
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="general" className="flex items-center gap-2">
               <Settings className="h-4 w-4" />
-              General
+              General & System
             </TabsTrigger>
             <TabsTrigger value="authentication" className="flex items-center gap-2">
               <Shield className="h-4 w-4" />
               Authentication
             </TabsTrigger>
-            <TabsTrigger value="system" className="flex items-center gap-2">
-              <Server className="h-4 w-4" />
-              System
-            </TabsTrigger>
           </TabsList>
 
-          {/* General Settings Tab */}
+          {/* General & System Settings Tab (Combined) */}
           <TabsContent value="general" className="space-y-6">
+            {/* General Settings Card */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -432,6 +477,135 @@ export default function SettingsPage() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* System Settings Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Server className="h-5 w-5" />
+                  System Settings
+                </CardTitle>
+                <CardDescription>
+                  System-wide configuration options
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label>Maintenance Mode</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Temporarily disable site for maintenance
+                    </p>
+                  </div>
+                  <Switch
+                    checked={formData.maintenanceMode}
+                    onCheckedChange={(checked) => handleInputChange("maintenanceMode", checked)}
+                  />
+                </div>
+                {formData.maintenanceMode && (
+                  <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p className="text-sm text-yellow-800">
+                      <strong>⚠️ Maintenance mode is enabled.</strong> Only administrators can access the site.
+                    </p>
+                  </div>
+                )}
+
+                <Separator />
+
+                {/* Settings Information */}
+                <div className="space-y-4">
+                  <div className="flex justify-between">
+                    <span>Settings ID:</span>
+                    <span className="font-mono">{settings?.id || 'N/A'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Last updated:</span>
+                    <span>{settings?.updatedAt ? new Date(settings.updatedAt).toLocaleString() : 'Never'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Created:</span>
+                    <span>{settings?.createdAt ? new Date(settings.createdAt).toLocaleString() : 'Unknown'}</span>
+                  </div>
+                  <Separator />
+                  <div className="flex justify-between">
+                    <span>Site Title:</span>
+                    <span className="font-medium">{settings?.siteTitle || 'N/A'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Maintenance Mode:</span>
+                    <span className={`font-medium ${settings?.maintenanceMode ? 'text-red-600' : 'text-green-600'}`}>
+                      {settings?.maintenanceMode ? 'Enabled' : 'Disabled'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Registration:</span>
+                    <span className={`font-medium ${registrationSettings?.allowRegistration ? 'text-green-600' : 'text-red-600'}`}>
+                      {registrationSettings?.allowRegistration ? 'Enabled' : 'Disabled'}
+                    </span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Source Code Download Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Download className="h-5 w-5" />
+                  Source Code Management
+                </CardTitle>
+                <CardDescription>
+                  Download complete source code of this application
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="p-4 bg-blue-50 border-blue-200 rounded-lg">
+                  <p className="text-sm text-blue-800 mb-3">
+                    <strong>Source Code Download</strong><br />
+                    Download complete source code as a ZIP file. This includes all application files except node_modules, build artifacts, and git files.
+                  </p>
+                  <LoadingButton
+                    onClick={handleDownloadSource}
+                    isLoading={downloadingSource}
+                    loadingText="Preparing download..."
+                    className="w-full"
+                    variant="outline"
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    Download Source Code
+                  </LoadingButton>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  <p><strong>Note:</strong> The downloaded ZIP file will contain:</p>
+                  <ul className="list-disc list-inside mt-1 space-y-1">
+                    <li>Source code files (.ts, .tsx, .js, .jsx)</li>
+                    <li>Configuration files (package.json, tsconfig.json, etc.)</li>
+                    <li>Database schema and migration files</li>
+                    <li>Documentation and README files</li>
+                  </ul>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Action Buttons - Only show on General & System tab */}
+            <div className="flex items-center justify-between gap-4 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleReset}
+                disabled={!hasChanges || saving}
+              >
+                Reset Changes
+              </Button>
+              <LoadingButton
+                type="submit"
+                isLoading={saving}
+                loadingText="Saving..."
+              >
+                <Save className="mr-2 h-4 w-4" />
+                Save Changes
+              </LoadingButton>
+            </div>
           </TabsContent>
 
           {/* Authentication Settings Tab */}
@@ -447,49 +621,48 @@ export default function SettingsPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Allow User Registration</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Enable new users to register on the site
-                    </p>
-                  </div>
-                  <Switch
-                    checked={registrationSettings.allowRegistration}
-                    onCheckedChange={handleAllowRegistrationChange}
-                  />
-                </div>
-
-                <Separator />
-
                 {/* Registration Code Management Section */}
-                {registrationSettings.allowRegistration && (
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/50">
-                      <div>
-                        <h4 className="font-semibold">Registration Code Management</h4>
-                        <p className="text-sm text-muted-foreground">
-                          Generate and manage registration codes for new users
-                        </p>
-                      </div>
-                      <Button
-                        variant="outline"
-                        onClick={() => setSheetOpen(true)}
-                      >
-                        <Plus className="mr-2 h-4 w-4" />
-                        Manage Registration Codes
-                      </Button>
-                    </div> {/* Added missing closing div */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/50">
+                    <div>
+                      <h4 className="font-semibold">Registration Code Management</h4>
+                      <p className="text-sm text-muted-foreground">
+                        Generate and manage registration codes for new users
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setSheetOpen(true)}
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      Manage Registration Codes
+                    </Button>
+                  </div>
+
+                  {/* Allow User Registration Toggle */}
+                  <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/50">
+                    <div className="space-y-0.5">
+                      <Label>Allow User Registration</Label>
+                      <p className="text-sm text-muted-foreground">
+                        Enable new users to register on the site
+                      </p>
+                    </div>
+                    <Switch
+                      checked={registrationSettings.allowRegistration}
+                      onCheckedChange={handleAllowRegistrationChange}
+                    />
+                  </div>
 
                     <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-                      <SheetContent className="sm:max-w-[600px] w-full">
+                      <SheetContent className="sm:max-w-[600px] w-full flex flex-col">
                         <SheetHeader>
                           <SheetTitle>Registration Code Management</SheetTitle>
                           <SheetDescription>
                             Generate registration codes for new user sign-ups
                           </SheetDescription>
                         </SheetHeader>
-                        <div className="py-4 space-y-4">
+                        <div className="py-4 space-y-4 flex-1 overflow-y-auto">
                           {/* Registration Code */}
                           <div className="space-y-2">
                             <Label htmlFor="registrationCode">Registration Code</Label>
@@ -642,7 +815,7 @@ export default function SettingsPage() {
                           </Alert>
                         </div>
 
-                        <SheetFooter>
+                        <SheetFooter className="flex gap-2 justify-between">
                           <Button
                             type="button"
                             variant="outline"
@@ -650,28 +823,70 @@ export default function SettingsPage() {
                           >
                             Close
                           </Button>
+                          <Button
+                            type="button"
+                            onClick={handleSaveCode}
+                            disabled={generatingCode}
+                            className="min-w-[120px]"
+                          >
+                            {generatingCode ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Saving...
+                              </>
+                            ) : (
+                              <>
+                                <Save className="mr-2 h-4 w-4" />
+                                Save
+                              </>
+                            )}
+                          </Button>
                         </SheetFooter>
                       </SheetContent>
                     </Sheet>
                   </div>
-                )}
 
-                {/* Registration Codes History Table */}
-                {registrationCodes.length > 0 && (
-                  <Card>
+                <Separator />
+
+                {/* Registration Codes History Table - Always Show */}
+                <Card>
                     <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <Code className="h-5 w-5" />
-                        Registration Codes History
-                      </CardTitle>
-                      <CardDescription>
-                        View and manage all generated registration codes
-                      </CardDescription>
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-2">
+                          <Code className="h-5 w-5" />
+                          <div>
+                            <CardTitle className="flex items-center gap-2">
+                              Registration Codes History
+                            </CardTitle>
+                            <CardDescription>
+                              View and manage all generated registration codes
+                            </CardDescription>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Badge variant="default" className="bg-green-100 text-green-800">
+                            Active: {registrationCodes.filter(c => c.status === 'active').length}
+                          </Badge>
+                          <Badge variant="destructive" className="bg-red-100 text-red-800">
+                            Expired: {registrationCodes.filter(c => c.status === 'expired').length}
+                          </Badge>
+                        </div>
+                      </div>
                     </CardHeader>
                     <CardContent>
                       {loadingCodes ? (
                         <div className="flex justify-center py-8">
                           <Loader2 className="h-8 w-8 animate-spin" />
+                        </div>
+                      ) : registrationCodes.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-12 text-center">
+                          <Code className="h-12 w-12 text-muted-foreground mb-4" />
+                          <h3 className="text-lg font-semibold text-muted-foreground mb-2">
+                            No Registration Codes Yet
+                          </h3>
+                          <p className="text-sm text-muted-foreground max-w-md">
+                            Click "Manage Registration Codes" above to generate codes for new user registrations.
+                          </p>
                         </div>
                       ) : (
                         <div className="rounded-md border">
@@ -692,7 +907,9 @@ export default function SettingsPage() {
                               {registrationCodes.map((code) => (
                                 <TableRow key={code.id}>
                                   <TableCell className="font-mono">{code.code}</TableCell>
-                                  <TableCell>{code.daysRemaining} days</TableCell>
+                                  <TableCell>
+                                    {code.daysRemaining !== undefined ? `${code.daysRemaining} days` : 'N/A'}
+                                  </TableCell>
                                   <TableCell>
                                     {code.campus ? (
                                       <span>{code.campus.name}</span>
@@ -734,10 +951,10 @@ export default function SettingsPage() {
                                       type="button"
                                       variant="ghost"
                                       size="icon"
-                                      onClick={() => handleDeleteCode(code.id, code.code, code.isActive)}
+                                      onClick={() => handleDisableCode(code.id, code.code)}
                                       disabled={!code.isActive}
                                     >
-                                      {code.isActive ? <Loader2 className="h-4 w-4" /> : <Trash2 className="h-4 w-4" />}
+                                      <PowerOff className="h-4 w-4" />
                                     </Button>
                                   </TableCell>
                                 </TableRow>
@@ -748,148 +965,11 @@ export default function SettingsPage() {
                       )}
                     </CardContent>
                   </Card>
-                )}
               </CardContent>
             </Card>
           </TabsContent>
 
-          {/* System Settings Tab */}
-          <TabsContent value="system" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Server className="h-5 w-5" />
-                  System Settings
-                </CardTitle>
-                <CardDescription>
-                  System-wide configuration options
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Maintenance Mode</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Temporarily disable site for maintenance
-                    </p>
-                  </div>
-                  <Switch
-                    checked={formData.maintenanceMode}
-                    onCheckedChange={(checked) => handleInputChange("maintenanceMode", checked)}
-                  />
-                </div>
-                {formData.maintenanceMode && (
-                  <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                    <p className="text-sm text-yellow-800">
-                      <strong>⚠️ Maintenance mode is enabled.</strong> Only administrators can access the site.
-                    </p>
-                  </div>
-                )}
-
-                <Separator />
-
-                {/* Settings Information */}
-                <div className="space-y-4">
-                  <div className="flex justify-between">
-                    <span>Settings ID:</span>
-                    <span className="font-mono">{settings?.id || 'N/A'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Last updated:</span>
-                    <span>{settings?.updatedAt ? new Date(settings.updatedAt).toLocaleString() : 'Never'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Created:</span>
-                    <span>{settings?.createdAt ? new Date(settings.createdAt).toLocaleString() : 'Unknown'}</span>
-                  </div>
-                  <Separator />
-
-                  <div className="flex justify-between">
-                    <span>Site Title:</span>
-                    <span className="font-medium">{settings?.siteTitle || 'N/A'}</span>
-                  </div>
-
-                  <div className="flex justify-between">
-                    <span>Maintenance Mode:</span>
-                    <span className={`font-medium ${settings?.maintenanceMode ? 'text-red-600' : 'text-green-600'}`}>
-                      {settings?.maintenanceMode ? 'Enabled' : 'Disabled'}
-                    </span>
-                  </div>
-
-                  <div className="flex justify-between">
-                    <span>Registration:</span>
-                    <span className={`font-medium ${registrationSettings?.allowRegistration ? 'text-green-600' : 'text-red-600'}`}>
-                      {registrationSettings?.allowRegistration ? 'Enabled' : 'Disabled'}
-                    </span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Source Code Download */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Download className="h-5 w-5" />
-                  Source Code Management
-                </CardTitle>
-                <CardDescription>
-                  Download complete source code of this application
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="p-4 bg-blue-50 border-blue-200 rounded-lg">
-                  <p className="text-sm text-blue-800 mb-3">
-                    <strong>Source Code Download</strong><br />
-                    Download of complete source code as a ZIP file. This includes all application files except node_modules, build artifacts, and git files.
-                  </p>
-                  <LoadingButton
-                    onClick={handleDownloadSource}
-                    isLoading={downloadingSource}
-                    loadingText="Preparing download..."
-                    className="w-full"
-                    variant="outline"
-                  >
-                    <Download className="mr-2 h-4 w-4" />
-                    Download Source Code
-                  </LoadingButton>
-                </div>
-
-                <div className="text-xs text-muted-foreground">
-                  <p><strong>Note:</strong> The downloaded ZIP file will contain:</p>
-                  <ul className="list-disc list-inside mt-1 space-y-1">
-                    <li>Source code files (.ts, .tsx, .js, .jsx)</li>
-                    <li>Configuration files (package.json, tsconfig.json, etc.)</li>
-                    <li>Database schema and migration files</li>
-                    <li>Documentation and README files</li>
-                  </ul>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
         </Tabs>
-
-        {/* Action Buttons */}
-        <div className="flex items-center justify-between gap-4 mt-6">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleReset}
-            disabled={!hasChanges || saving}
-          >
-            Reset Changes
-          </Button>
-
-          <LoadingButton
-            type="submit"
-            isLoading={saving}
-            loadingText="Saving..."
-            // disabled={!hasChanges}
-          >
-            <Save className="mr-2 h-4 w-4" />
-            Save Changes
-          </LoadingButton>
-        </div>
       </form>
     </div>
   )
