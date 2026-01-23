@@ -81,6 +81,7 @@ interface User {
   campus?: string
   department?: string
   batch?: string
+  registrationCode?: string
   createdAt: string
 }
 
@@ -89,6 +90,14 @@ interface Campus {
   name: string
   shortName: string
   departments: { id: string; name: string }[]
+}
+
+interface RegistrationCode {
+  id: string
+  code: string
+  campus?: { name: string }
+  department?: { name: string }
+  batch?: { name: string }
 }
 
 interface FormData {
@@ -110,6 +119,7 @@ export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([])
   const [campuses, setCampuses] = useState<Campus[]>([])
   const [batches, setBatches] = useState<{ id: string; name: string }[]>([])
+  const [registrationCodes, setRegistrationCodes] = useState<RegistrationCode[]>([])
   const [loading, setLoading] = useState(true)
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
@@ -230,6 +240,21 @@ export default function UsersPage() {
       cell: ({ row }) => row.getValue("batch") || "-",
     },
     {
+      accessorKey: "registrationCode",
+      header: "Registration Code",
+      filterFn: (row, id, value) => {
+        return value === "all" || row.getValue("registrationCode") === value
+      },
+      cell: ({ row }) => {
+        const code = row.getValue("registrationCode") as string
+        return code ? (
+          <Badge variant="outline" className="font-mono text-xs">
+            {code}
+          </Badge>
+        ) : "-"
+      },
+    },
+    {
       accessorKey: "section",
       header: "Section",
       cell: ({ row }) => {
@@ -306,8 +331,9 @@ export default function UsersPage() {
 
   useEffect(() => {
     if (status === "loading" || !isAuthenticated || !isAdmin) return
-    
+
     fetchCampuses()
+    fetchRegistrationCodes()
     fetchUsers()
   }, [session, status, isAuthenticated, isAdmin, router])
 
@@ -333,7 +359,7 @@ export default function UsersPage() {
     if (!isAuthenticated || !isAdmin) {
       return
     }
-    
+
     try {
       const response = await fetch("/api/admin/campus")
       if (response.ok) {
@@ -347,6 +373,27 @@ export default function UsersPage() {
       }
     } catch (error) {
       toasts.networkError()
+    }
+  }
+
+  const fetchRegistrationCodes = async () => {
+    if (!isAuthenticated || !isAdmin) {
+      return
+    }
+
+    try {
+      const response = await fetch("/api/admin/registration-codes")
+      if (response.ok) {
+        const data = await response.json()
+        setRegistrationCodes(data)
+      } else if (response.status === 401) {
+        toasts.error("Session expired. Please log in again.")
+        router.push('/')
+      } else {
+        toasts.error("Failed to fetch registration codes")
+      }
+    } catch (error) {
+      console.error("Error fetching registration codes:", error)
     }
   }
 
@@ -669,6 +716,14 @@ export default function UsersPage() {
                 options: [
                   { value: "all", label: "All Campuses" },
                   ...uniqueCampuses.map(campus => ({ value: campus, label: campus }))
+                ],
+              },
+              {
+                key: "registrationCode",
+                label: "Registration Code",
+                options: [
+                  { value: "all", label: "All Codes" },
+                  ...registrationCodes.map(code => ({ value: code.code, label: code.code }))
                 ],
               },
             ]}

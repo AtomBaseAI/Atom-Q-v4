@@ -52,6 +52,10 @@ export async function registerAction(formData: FormData) {
     password: formData.get('password') as string,
     confirmPassword: formData.get('confirmPassword') as string,
     phone: formData.get('phone') as string,
+    registrationCode: formData.get('registrationCode') as string,
+    departmentId: formData.get('departmentId') as string,
+    batchId: formData.get('batchId') as string,
+    section: formData.get('section') as string,
   }
 
   const validatedFields = registerSchema.safeParse(rawData)
@@ -85,6 +89,32 @@ export async function registerAction(formData: FormData) {
       })
     }
 
+    // Validate registration code if provided
+    let validRegistrationCode = null
+    if (validatedFields.data.registrationCode) {
+      validRegistrationCode = await db.registrationCode.findUnique({
+        where: { code: validatedFields.data.registrationCode }
+      })
+
+      if (!validRegistrationCode) {
+        return {
+          message: 'Invalid registration code',
+        }
+      }
+
+      if (!validRegistrationCode.isActive) {
+        return {
+          message: 'Registration code is disabled',
+        }
+      }
+
+      if (new Date(validRegistrationCode.expiry) < new Date()) {
+        return {
+          message: 'Registration code has expired',
+        }
+      }
+    }
+
     const existingUser = await db.user.findUnique({
       where: { email: validatedFields.data.email }
     })
@@ -97,15 +127,32 @@ export async function registerAction(formData: FormData) {
 
     const hashedPassword = await hash(validatedFields.data.password, 12)
 
+    // Prepare user data
+    const userData: any = {
+      name: validatedFields.data.name,
+      email: validatedFields.data.email,
+      password: hashedPassword,
+      phone: validatedFields.data.phone || null,
+      role: 'USER',
+      isActive: true,
+      section: validatedFields.data.section || 'A',
+    }
+
+    // If registration code is provided, set the registrationCodeId and related fields
+    if (validRegistrationCode) {
+      userData.registrationCodeId = validRegistrationCode.id
+    }
+
+    // Override with form values if provided
+    if (validatedFields.data.departmentId) {
+      userData.departmentId = validatedFields.data.departmentId
+    }
+    if (validatedFields.data.batchId) {
+      userData.batchId = validatedFields.data.batchId
+    }
+
     await db.user.create({
-      data: {
-        name: validatedFields.data.name,
-        email: validatedFields.data.email,
-        password: hashedPassword,
-        phone: validatedFields.data.phone || null,
-        role: 'USER',
-        isActive: true,
-      }
+      data: userData
     })
 
     revalidatePath('/register')

@@ -66,6 +66,8 @@ model User {
   department           Department?        @relation(fields: [departmentId], references: [id])
   batchId              String?
   batch                Batch?             @relation(fields: [batchId], references: [id])
+  registrationCodeId    String?
+  registrationCode     RegistrationCode? @relation(fields: [registrationCodeId], references: [id])
   isActive             Boolean            @default(true)
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
@@ -335,6 +337,7 @@ model RegistrationCode {
   batch       Batch?   @relation(fields: [batchId], references: [id])
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
+  users       User[]
 
   @@map("registration_codes")
 }

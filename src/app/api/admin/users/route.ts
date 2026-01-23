@@ -8,7 +8,7 @@ import bcrypt from "bcryptjs"
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session || session.user.role !== UserRole.ADMIN) {
       return NextResponse.json(
         { message: "Unauthorized" },
@@ -40,6 +40,11 @@ export async function GET(request: NextRequest) {
             name: true
           }
         },
+        registrationCode: {
+          select: {
+            code: true
+          }
+        },
         createdAt: true,
       },
       orderBy: {
@@ -47,12 +52,13 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    // Transform the data to match frontend expectations
+    // Transform data to match frontend expectations
     const transformedUsers = users.map(user => ({
       ...user,
       campus: user.campus?.name || null,
       department: user.department?.name || null,
-      batch: user.batch?.name || null
+      batch: user.batch?.name || null,
+      registrationCode: user.registrationCode?.code || null
     }))
 
     return NextResponse.json(transformedUsers)
@@ -68,7 +74,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session || session.user.role !== UserRole.ADMIN) {
       return NextResponse.json(
         { message: "Unauthorized" },
@@ -89,10 +95,10 @@ export async function POST(request: NextRequest) {
         try {
           // Skip if required fields are missing
           if (!item.name || !item.email) {
-            results.push({ 
-              email: item.email || 'unknown', 
-              status: 'failed', 
-              message: 'Missing required fields (name, email)' 
+            results.push({
+              email: item.email || 'unknown',
+              status: 'failed',
+              message: 'Missing required fields (name, email)'
             })
             continue
           }
@@ -103,10 +109,10 @@ export async function POST(request: NextRequest) {
           })
 
           if (existingUser) {
-            results.push({ 
-              email: item.email, 
-              status: 'failed', 
-              message: 'User already exists' 
+            results.push({
+              email: item.email,
+              status: 'failed',
+              message: 'User already exists'
             })
             continue
           }
@@ -138,24 +144,24 @@ export async function POST(request: NextRequest) {
             }
           })
 
-          // Transform the user data
+          // Transform user data
           const transformedUser = {
             ...user,
             campus: user.campus?.name || null
           }
 
-          results.push({ 
-            email: item.email, 
-            status: 'success', 
+          results.push({
+            email: item.email,
+            status: 'success',
             user: transformedUser,
-            message: 'User created successfully' 
+            message: 'User created successfully'
           })
         } catch (error) {
           console.error('Error importing user:', error)
-          results.push({ 
-            email: item.email || 'unknown', 
-            status: 'failed', 
-            message: 'Internal server error' 
+          results.push({
+            email: item.email || 'unknown',
+            status: 'failed',
+            message: 'Internal server error'
           })
         }
       }
@@ -245,7 +251,7 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    // Transform the user data
+    // Transform user data
     const transformedUser = {
       ...user,
       campus: user.campus?.name || null,

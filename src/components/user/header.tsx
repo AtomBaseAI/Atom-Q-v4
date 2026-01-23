@@ -59,6 +59,8 @@ export function Header({ onMenuClick }: HeaderProps) {
       // Then sign out from NextAuth
       await signOut({ callbackUrl: "/" })
       toasts.success("Signed out successfully")
+      // Force redirect to root to ensure clean logout
+      window.location.href = '/'
     } catch (error) {
       toasts.error("Error signing out")
     }

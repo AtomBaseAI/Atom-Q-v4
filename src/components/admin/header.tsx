@@ -35,6 +35,8 @@ export function Header({ onMenuClick }: HeaderProps) {
     // Then sign out from NextAuth
     await signOut({ callbackUrl: "/" })
     toast.success("Logged out successfully")
+    // Force redirect to root to ensure clean logout
+    window.location.href = '/'
   }
 
   const toggleTheme = () => {
