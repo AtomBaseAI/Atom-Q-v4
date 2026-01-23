@@ -19,7 +19,7 @@ import { Loader2, Save, Settings, CheckCircle, Shield, Server, Info, Download, C
 import { useSettings } from "@/components/providers/settings-provider"
 import { useRegistrationSettings } from "@/components/providers/registration-settings-provider"
 import HexagonLoader from "@/components/Loader/Loading"
-import { LoadingButton } from "@/components/ui/laodaing-button"
+import { LoadingButton } from "@/components/ui/laodaing-button" // Fixed typo in import
 
 export default function SettingsPage() {
   const {
@@ -118,22 +118,22 @@ export default function SettingsPage() {
   }, [registrationCampus, campuses])
 
   // Fetch registration codes history
-  useEffect(() => {
-    const fetchRegistrationCodes = async () => {
-      setLoadingCodes(true)
-      try {
-        const res = await fetch('/api/admin/registration-codes')
-        if (res.ok) {
-          const data = await res.json()
-          setRegistrationCodes(data)
-        }
-      } catch (error) {
-        console.error('Failed to fetch registration codes:', error)
-      } finally {
-        setLoadingCodes(false)
+  const fetchRegistrationCodes = async () => {
+    setLoadingCodes(true)
+    try {
+      const res = await fetch('/api/admin/registration-codes')
+      if (res.ok) {
+        const data = await res.json()
+        setRegistrationCodes(data)
       }
+    } catch (error) {
+      console.error('Failed to fetch registration codes:', error)
+    } finally {
+      setLoadingCodes(false)
     }
+  }
 
+  useEffect(() => {
     fetchRegistrationCodes()
   }, [])
 
@@ -325,16 +325,16 @@ export default function SettingsPage() {
         })
 
         if (res.ok) {
-          toasts.actionSuccess(`Registration code ${code.isActive ? 'disabled' : 'deleted'}`)
+          toasts.actionSuccess(`Registration code ${isActive ? 'disabled' : 'deleted'}`) // Fixed variable reference
           fetchRegistrationCodes()
         } else {
           const errorData = await res.json()
           throw new Error(errorData.error || 'Failed to delete registration code')
         }
-      } catch (error) {
-        console.error('Error deleting code:', error)
-        toasts.actionFailed('Delete code', 'Failed to delete registration code')
       }
+    } catch (error) {
+      console.error('Error deleting code:', error)
+      toasts.actionFailed('Delete code', 'Failed to delete registration code')
     }
   }
 
@@ -479,278 +479,278 @@ export default function SettingsPage() {
                         <Plus className="mr-2 h-4 w-4" />
                         Manage Registration Codes
                       </Button>
-                  </div>
+                    </div> {/* Added missing closing div */}
 
-                  <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-                    <SheetContent className="sm:max-w-[600px] w-full">
-                      <SheetHeader>
-                        <SheetTitle>Registration Code Management</SheetTitle>
-                        <SheetDescription>
-                          Generate registration codes for new user sign-ups
-                        </SheetDescription>
-                      </SheetHeader>
-                      <div className="py-4 space-y-4">
-                        {/* Registration Code */}
-                        <div className="space-y-2">
-                          <Label htmlFor="registrationCode">Registration Code</Label>
-                          <div className="flex gap-2">
-                            <Input
-                              id="registrationCode"
-                              value={registrationCode}
-                              onChange={(e) => setRegistrationCode(e.target.value)}
-                              placeholder="Generated code will appear here"
-                              readOnly
-                              className="font-mono text-lg"
-                            />
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="icon"
-                              onClick={handleCopyCode}
-                              disabled={!registrationCode}
-                            >
-                              <Copy className="h-4 w-4" />
-                            </Button>
+                    <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+                      <SheetContent className="sm:max-w-[600px] w-full">
+                        <SheetHeader>
+                          <SheetTitle>Registration Code Management</SheetTitle>
+                          <SheetDescription>
+                            Generate registration codes for new user sign-ups
+                          </SheetDescription>
+                        </SheetHeader>
+                        <div className="py-4 space-y-4">
+                          {/* Registration Code */}
+                          <div className="space-y-2">
+                            <Label htmlFor="registrationCode">Registration Code</Label>
+                            <div className="flex gap-2">
+                              <Input
+                                id="registrationCode"
+                                value={registrationCode}
+                                onChange={(e) => setRegistrationCode(e.target.value)}
+                                placeholder="Generated code will appear here"
+                                readOnly
+                                className="font-mono text-lg"
+                              />
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                onClick={handleCopyCode}
+                                disabled={!registrationCode}
+                              >
+                                <Copy className="h-4 w-4" />
+                              </Button>
+                            </div>
                           </div>
-                        </div>
 
-                        {/* Generate Code Button */}
-                        <Button
-                          type="button"
-                          onClick={handleGenerateCode}
-                          disabled={generatingCode}
-                          className="w-full"
-                        >
-                          {generatingCode ? (
-                            <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              Generating...
-                            </>
-                          ) : (
-                            <>
-                              <Code className="mr-2 h-4 w-4" />
-                              Generate Registration Code
-                            </>
+                          {/* Generate Code Button */}
+                          <Button
+                            type="button"
+                            onClick={handleGenerateCode}
+                            disabled={generatingCode}
+                            className="w-full"
+                          >
+                            {generatingCode ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Generating...
+                              </>
+                            ) : (
+                              <>
+                                <Code className="mr-2 h-4 w-4" />
+                                Generate Registration Code
+                              </>
+                            )}
+                          </Button>
+
+                          {/* Registration Expiry */}
+                          <div className="space-y-2">
+                            <Label htmlFor="registrationExpiry">Registration Code Expiry</Label>
+                            <Select
+                              value={registrationExpiry}
+                              onValueChange={setRegistrationExpiry}
+                            >
+                              <SelectTrigger id="registrationExpiry">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="1 day">1 Day</SelectItem>
+                                <SelectItem value="2 days">2 Days</SelectItem>
+                                <SelectItem value="1 week">1 Week</SelectItem>
+                                <SelectItem value="1 month">1 Month</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          {/* Campus Dropdown */}
+                          <div className="space-y-2">
+                            <Label htmlFor="registrationCampus">Campus</Label>
+                            <Select
+                              value={registrationCampus}
+                              onValueChange={(value) => {
+                                setRegistrationCampus(value)
+                                // Reset department and batch when switching to general
+                                if (value === "general") {
+                                  setRegistrationDepartment("all")
+                                  setRegistrationBatch("all")
+                                }
+                              }}
+                            >
+                              <SelectTrigger id="registrationCampus">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="general">General (All Campuses)</SelectItem>
+                                {campuses.map((campus) => (
+                                  <SelectItem key={campus.id} value={campus.id}>
+                                    {campus.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          {/* Department Dropdown */}
+                          {(registrationCampus === "general" || registrationCampus !== "general") && (
+                            <div className="space-y-2">
+                              <Label htmlFor="registrationDepartment">Department</Label>
+                              <Select
+                                value={registrationDepartment}
+                                onValueChange={setRegistrationDepartment}
+                                disabled={registrationCampus !== "general" && departments.length === 0}
+                              >
+                                <SelectTrigger id="registrationDepartment">
+                                  <SelectValue placeholder={registrationCampus === "general" ? "Select department" : "All departments"} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="all">All Departments</SelectItem>
+                                  {departments.map((dept) => (
+                                    <SelectItem key={dept.id} value={dept.id}>
+                                      {dept.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
                           )}
-                        </Button>
 
-                        {/* Registration Expiry */}
-                        <div className="space-y-2">
-                          <Label htmlFor="registrationExpiry">Registration Code Expiry</Label>
-                          <Select
-                            value={registrationExpiry}
-                            onValueChange={setRegistrationExpiry}
-                          >
-                            <SelectTrigger id="registrationExpiry">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="1 day">1 Day</SelectItem>
-                              <SelectItem value="2 days">2 Days</SelectItem>
-                              <SelectItem value="1 week">1 Week</SelectItem>
-                              <SelectItem value="1 month">1 Month</SelectItem>
-                            </SelectContent>
-                          </Select>
+                          {/* Batch Dropdown */}
+                          {(registrationCampus === "general" || (registrationCampus !== "general" && 'batches' in campuses.find(c => c.id === registrationCampus))) && (
+                            <div className="space-y-2">
+                              <Label htmlFor="registrationBatch">Batch</Label>
+                              <Select
+                                value={registrationBatch}
+                                onValueChange={setRegistrationBatch}
+                                disabled={registrationCampus === "general" || (registrationCampus !== "general" && batches.length === 0)}
+                              >
+                                <SelectTrigger id="registrationBatch">
+                                  <SelectValue placeholder={registrationCampus === "general" ? "Select batch" : "All batches"} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="all">All Batches</SelectItem>
+                                  {batches.map((batch) => (
+                                    <SelectItem key={batch.id} value={batch.id}>
+                                      {batch.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          )}
+
+                          {/* Info Message */}
+                          <Alert>
+                            <AlertDescription>
+                              <strong>How it works:</strong><br />
+                              1. Generate a registration code using the button above<br />
+                              2. Set expiry period and campus/department/batch restrictions<br />
+                              3. Share the code with users who need to register<br />
+                              4. Users can register using this code within the specified time period<br />
+                              <em>Note: Department and Batch are independent filters - you can select any combination.</em>
+                            </AlertDescription>
+                          </Alert>
                         </div>
 
-                        {/* Campus Dropdown */}
-                        <div className="space-y-2">
-                          <Label htmlFor="registrationCampus">Campus</Label>
-                          <Select
-                            value={registrationCampus}
-                            onValueChange={(value) => {
-                              setRegistrationCampus(value)
-                              // Reset department and batch when switching to general
-                              if (value === "general") {
-                                setRegistrationDepartment("all")
-                                setRegistrationBatch("all")
-                              }
-                            }}
+                        <SheetFooter>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setSheetOpen(false)}
                           >
-                            <SelectTrigger id="registrationCampus">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="general">General (All Campuses)</SelectItem>
-                              {campuses.map((campus) => (
-                                <SelectItem key={campus.id} value={campus.id}>
-                                  {campus.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
+                            Close
+                          </Button>
+                        </SheetFooter>
+                      </SheetContent>
+                    </Sheet>
+                  </div>
+                )}
 
-                        {/* Department Dropdown */}
-                        {(registrationCampus === "general" || registrationCampus !== "general") && (
-                          <div className="space-y-2">
-                            <Label htmlFor="registrationDepartment">Department</Label>
-                            <Select
-                              value={registrationDepartment}
-                              onValueChange={setRegistrationDepartment}
-                              disabled={registrationCampus !== "general" && departments.length === 0}
-                            >
-                              <SelectTrigger id="registrationDepartment">
-                                <SelectValue placeholder={registrationCampus === "general" ? "Select department" : "All departments"} />
-                              </SelectTrigger>
-                              <SelectContent>
-                              <SelectItem value="all">All Departments</SelectItem>
-                              {departments.map((dept) => (
-                                <SelectItem key={dept.id} value={dept.id}>
-                                  {dept.name}
-                                </SelectItem>
+                {/* Registration Codes History Table */}
+                {registrationCodes.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Code className="h-5 w-5" />
+                        Registration Codes History
+                      </CardTitle>
+                      <CardDescription>
+                        View and manage all generated registration codes
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {loadingCodes ? (
+                        <div className="flex justify-center py-8">
+                          <Loader2 className="h-8 w-8 animate-spin" />
+                        </div>
+                      ) : (
+                        <div className="rounded-md border">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Code</TableHead>
+                                <TableHead>Expiry</TableHead>
+                                <TableHead>Campus</TableHead>
+                                <TableHead>Department</TableHead>
+                                <TableHead>Batch</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead>Created</TableHead>
+                                <TableHead>Actions</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {registrationCodes.map((code) => (
+                                <TableRow key={code.id}>
+                                  <TableCell className="font-mono">{code.code}</TableCell>
+                                  <TableCell>{code.daysRemaining} days</TableCell>
+                                  <TableCell>
+                                    {code.campus ? (
+                                      <span>{code.campus.name}</span>
+                                    ) : (
+                                      <span className="text-muted-foreground">All</span>
+                                    )}
+                                  </TableCell>
+                                  <TableCell>
+                                    {code.department ? (
+                                      <span>{code.department.name}</span>
+                                    ) : (
+                                      <span className="text-muted-foreground">All</span>
+                                    )}
+                                  </TableCell>
+                                  <TableCell>
+                                    {code.batch ? (
+                                      <span>{code.batch.name}</span>
+                                    ) : (
+                                      <span className="text-muted-foreground">All</span>
+                                    )}
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge
+                                      variant={
+                                        code.status === 'active' ? 'default' :
+                                          code.status === 'expired' ? 'destructive' :
+                                            code.status === 'expiring soon' ? 'secondary' : 'outline'
+                                      }
+                                      className={code.statusColor}
+                                    >
+                                      {code.status}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell className="text-sm text-muted-foreground">
+                                    {new Date(code.createdAt).toLocaleDateString()}
+                                  </TableCell>
+                                  <TableCell>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => handleDeleteCode(code.id, code.code, code.isActive)}
+                                      disabled={!code.isActive}
+                                    >
+                                      {code.isActive ? <Loader2 className="h-4 w-4" /> : <Trash2 className="h-4 w-4" />}
+                                    </Button>
+                                  </TableCell>
+                                </TableRow>
                               ))}
-                            </SelectContent>
-                          </Select>
+                            </TableBody>
+                          </Table>
                         </div>
                       )}
-
-                        {/* Batch Dropdown */}
-                        {(registrationCampus === "general" || (registrationCampus !== "general" && 'batches' in campuses.find(c => c.id === registrationCampus))) && (
-                          <div className="space-y-2">
-                            <Label htmlFor="registrationBatch">Batch</Label>
-                            <Select
-                              value={registrationBatch}
-                              onValueChange={setRegistrationBatch}
-                              disabled={registrationCampus === "general" || (registrationCampus !== "general" && batches.length === 0)}
-                            >
-                              <SelectTrigger id="registrationBatch">
-                                <SelectValue placeholder={registrationCampus === "general" ? "Select batch" : "All batches"} />
-                              </SelectTrigger>
-                              <SelectContent>
-                              <SelectItem value="all">All Batches</SelectItem>
-                              {batches.map((batch) => (
-                                <SelectItem key={batch.id} value={batch.id}>
-                                  {batch.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      )}
-
-                        {/* Info Message */}
-                        <Alert>
-                          <AlertDescription>
-                            <strong>How it works:</strong><br />
-                            1. Generate a registration code using the button above<br />
-                            2. Set expiry period and campus/department/batch restrictions<br />
-                            3. Share the code with users who need to register<br />
-                            4. Users can register using this code within the specified time period<br />
-                            <em>Note: Department and Batch are independent filters - you can select any combination.</em>
-                          </AlertDescription>
-                        </Alert>
-                      </div>
-
-                      <SheetFooter>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => setSheetOpen(false)}
-                        >
-                          Close
-                        </Button>
-                      </SheetFooter>
-                  </SheetContent>
-                </Sheet>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Registration Codes History Table */}
-        {registrationCodes.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Code className="h-5 w-5" />
-                Registration Codes History
-              </CardTitle>
-              <CardDescription>
-                View and manage all generated registration codes
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {loadingCodes ? (
-                <div className="flex justify-center py-8">
-                  <Loader2 className="h-8 w-8 animate-spin" />
-                </div>
-              ) : (
-                <div className="rounded-md border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Code</TableHead>
-                        <TableHead>Expiry</TableHead>
-                        <TableHead>Campus</TableHead>
-                        <TableHead>Department</TableHead>
-                        <TableHead>Batch</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Created</TableHead>
-                        <TableHead>Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {registrationCodes.map((code) => (
-                        <TableRow key={code.id}>
-                          <TableCell className="font-mono">{code.code}</TableCell>
-                          <TableCell>{code.daysRemaining} days</TableCell>
-                          <TableCell>
-                            {code.campus ? (
-                              <span>{code.campus.name}</span>
-                            ) : (
-                              <span className="text-muted-foreground">All</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {code.department ? (
-                              <span>{code.department.name}</span>
-                            ) : (
-                              <span className="text-muted-foreground">All</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {code.batch ? (
-                              <span>{code.batch.name}</span>
-                            ) : (
-                              <span className="text-muted-foreground">All</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <Badge
-                              variant={
-                                code.status === 'active' ? 'default' :
-                                  code.status === 'expired' ? 'destructive' :
-                                    code.status === 'expiring soon' ? 'secondary' : 'outline'
-                              }
-                              className={code.statusColor}
-                            >
-                              {code.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            {new Date(code.createdAt).toLocaleDateString()}
-                          </TableCell>
-                          <TableCell>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleDeleteCode(code.id, code.code, code.isActive)}
-                              disabled={!code.isActive}
-                            >
-                              {code.isActive ? <Loader2 className="h-4 w-4" /> : <Trash2 className="h-4 w-4" />}
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
+                    </CardContent>
+                  </Card>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* System Settings Tab */}
@@ -781,7 +781,7 @@ export default function SettingsPage() {
                 {formData.maintenanceMode && (
                   <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
                     <p className="text-sm text-yellow-800">
-                      <strong>⚠️ Maintenance mode is enabled. Only administrators can access to site.
+                      <strong>⚠️ Maintenance mode is enabled.</strong> Only administrators can access the site.
                     </p>
                   </div>
                 )}
@@ -825,71 +825,70 @@ export default function SettingsPage() {
                 </div>
               </CardContent>
             </Card>
-          </TabsContent>
 
-          {/* Source Code Download */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Download className="h-5 w-5" />
-                Source Code Management
-              </CardTitle>
-              <CardDescription>
-                Download complete source code of this application
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="p-4 bg-blue-50 border-blue-200 rounded-lg">
-                <p className="text-sm text-blue-800 mb-3">
-                  <strong>Source Code Download</strong><br />
-                  Download of complete source code as a ZIP file. This includes all application files except node_modules, build artifacts, and git files.
-                </p>
-                <LoadingButton
-                  onClick={handleDownloadSource}
-                  isLoading={downloadingSource}
-                  loadingText="Preparing download..."
-                  className="w-full"
-                  variant="outline"
-                >
-                  <Download className="mr-2 h-4 w-4" />
-                  Download Source Code
-                </LoadingButton>
-              </div>
+            {/* Source Code Download */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Download className="h-5 w-5" />
+                  Source Code Management
+                </CardTitle>
+                <CardDescription>
+                  Download complete source code of this application
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="p-4 bg-blue-50 border-blue-200 rounded-lg">
+                  <p className="text-sm text-blue-800 mb-3">
+                    <strong>Source Code Download</strong><br />
+                    Download of complete source code as a ZIP file. This includes all application files except node_modules, build artifacts, and git files.
+                  </p>
+                  <LoadingButton
+                    onClick={handleDownloadSource}
+                    isLoading={downloadingSource}
+                    loadingText="Preparing download..."
+                    className="w-full"
+                    variant="outline"
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    Download Source Code
+                  </LoadingButton>
+                </div>
 
-              <div className="text-xs text-muted-foreground">
-                <p><strong>Note:</strong> The downloaded ZIP file will contain:</p>
-                <ul className="list-disc list-inside mt-1 space-y-1">
-                  <li>Source code files (.ts, .tsx, .js, .jsx)</li>
-                  <li>Configuration files (package.json, tsconfig.json, etc.)</li>
-                  <li>Database schema and migration files</li>
-                  <li>Documentation and README files</li>
-                </ul>
-              </div>
+                <div className="text-xs text-muted-foreground">
+                  <p><strong>Note:</strong> The downloaded ZIP file will contain:</p>
+                  <ul className="list-disc list-inside mt-1 space-y-1">
+                    <li>Source code files (.ts, .tsx, .js, .jsx)</li>
+                    <li>Configuration files (package.json, tsconfig.json, etc.)</li>
+                    <li>Database schema and migration files</li>
+                    <li>Documentation and README files</li>
+                  </ul>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
+        </Tabs>
 
-          {/* Action Buttons */}
-          <div className="flex items-center justify-between gap-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleReset}
-              disabled={!hasChanges || saving}
-            >
-              Reset Changes
-            </Button>
+        {/* Action Buttons */}
+        <div className="flex items-center justify-between gap-4 mt-6">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleReset}
+            disabled={!hasChanges || saving}
+          >
+            Reset Changes
+          </Button>
 
-            <LoadingButton
-              type="submit"
-              isLoading={saving}
-              loadingText="Saving..."
-              disabled={!hasChanges}
-              >
-              <Save className="mr-2 h-4 w-4" />
-              Save Changes
-            </LoadingButton>
-          </div>
+          <LoadingButton
+            type="submit"
+            isLoading={saving}
+            loadingText="Saving..."
+            // disabled={!hasChanges}
+          >
+            <Save className="mr-2 h-4 w-4" />
+            Save Changes
+          </LoadingButton>
         </div>
       </form>
     </div>
