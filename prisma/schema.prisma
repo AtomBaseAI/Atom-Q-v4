@@ -21,6 +21,7 @@ model Campus {
   users        User[]
   quizzes      Quiz[]
   assessments  Assessment[]
+  registrationCodes RegistrationCode[]
 
   @@map("campuses")
 }
@@ -28,12 +29,13 @@ model Campus {
 model Batch {
   id        String   @id @default(cuid())
   name      String   // e.g., "2014-2018"
-  campusId  String
+  campusId String
   campus    Campus   @relation(fields: [campusId], references: [id], onDelete: Cascade)
   users     User[]
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  registrationCodes RegistrationCode[]
 
   @@map("batches")
 }
@@ -44,6 +46,7 @@ model Department {
   campusId String
   campus   Campus @relation(fields: [campusId], references: [id], onDelete: Cascade)
   users    User[]
+  registrationCodes RegistrationCode[]
 
   @@map("departments")
 }
@@ -82,7 +85,7 @@ model QuestionGroup {
   id          String     @id @default(cuid())
   name        String
   description String?
-  isActive    Boolean    @default(true)
+  isActive    Boolean  @default(true)
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
   questions   Question[]
@@ -107,7 +110,7 @@ model Question {
   quizQuestions       QuizQuestion[]
   assessmentQuestions AssessmentQuestion[]
   groupId             String
-  group               QuestionGroup?  @relation(fields: [groupId], references: [id])
+  group               QuestionGroup? @relation(fields: [groupId], references: [id])
   reportedQuestions   ReportedQuestion[]
 
   @@map("questions")
@@ -139,33 +142,6 @@ model Quiz {
   checkAnswerEnabled Boolean         @default(false)
 
   @@map("quizzes")
-}
-
-model Assessment {
-  id                 String          @id @default(cuid())
-  title              String
-  description        String?
-  timeLimit          Int?
-  difficulty         DifficultyLevel @default(MEDIUM)
-  status             QuizStatus      @default(ACTIVE)
-  negativeMarking    Boolean         @default(false)
-  negativePoints     Float?
-  randomOrder        Boolean         @default(false)
-  startTime          DateTime?
-  creatorId          String
-  campusId           String?
-  campus             Campus?         @relation(fields: [campusId], references: [id])
-  maxTabs            Int?
-  disableCopyPaste   Boolean         @default(false)
-  accessKey          String?
-  createdAt          DateTime        @default(now())
-  updatedAt          DateTime        @updatedAt
-  assessmentAttempts AssessmentAttempt[]
-  assessmentQuestions AssessmentQuestion[]
-  assessmentUsers    AssessmentUser[]
-  creator            User            @relation("AssessmentCreator", fields: [creatorId], references: [id])
-
-  @@map("assessments")
 }
 
 model QuizQuestion {
@@ -227,6 +203,33 @@ model QuizAnswer {
   @@map("quiz_answers")
 }
 
+model Assessment {
+  id                 String          @id @default(cuid())
+  title              String
+  description        String?
+  timeLimit          Int?
+  difficulty         DifficultyLevel @default(MEDIUM)
+  status             QuizStatus      @default(ACTIVE)
+  negativeMarking    Boolean         @default(false)
+  negativePoints     Float?
+  randomOrder        Boolean         @default(false)
+  startTime          DateTime?
+  creatorId          String
+  campusId           String?
+  campus             Campus?         @relation(fields: [campusId], references: [id])
+  maxTabs            Int?
+  disableCopyPaste   Boolean         @default(false)
+  accessKey          String?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  assessmentAttempts AssessmentAttempt[]
+  assessmentQuestions AssessmentQuestion[]
+  assessmentUsers    AssessmentUser[]
+  creator            User            @relation("AssessmentCreator", fields: [creatorId], references: [id])
+
+  @@map("assessments")
+}
+
 model AssessmentQuestion {
   id            String      @id @default(cuid())
   assessmentId  String
@@ -244,9 +247,9 @@ model AssessmentUser {
   id            String      @id @default(cuid())
   assessmentId  String
   userId        String
-  createdAt     DateTime    @default(now())
+  createdAt     DateTime @default(now())
   assessment    Assessment  @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
-  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([assessmentId, userId])
   @@map("assessment_users")
@@ -265,21 +268,21 @@ model AssessmentAttempt {
   createdAt     DateTime         @default(now())
   updatedAt     DateTime         @updatedAt
   answers       AssessmentAnswer[]
-  assessment    Assessment       @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  assessment    Assessment      @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
   user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("assessment_attempts")
 }
 
 model AssessmentAnswer {
-  id             String            @id @default(cuid())
+  id             String      @id @default(cuid())
   attemptId      String
   questionId     String
   userAnswer     String
   isCorrect      Boolean?
   pointsEarned   Float?
   timeSpent      Int?
-  createdAt      DateTime          @default(now())
+  createdAt      DateTime    @default(now())
   attempt        AssessmentAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
 
   @@unique([attemptId, questionId])
@@ -305,12 +308,35 @@ model Settings {
   siteTitle         String   @default("Atom Q")
   siteDescription   String   @default("Take quizzes and test your knowledge")
   maintenanceMode   Boolean  @default(false)
-  allowRegistration Boolean  @default(true)
-  enableGithubAuth  Boolean  @default(false)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
   @@map("settings")
+}
+
+model RegistrationSettings {
+  id                String   @id @default(cuid())
+  allowRegistration Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("registration_settings")
+}
+
+model RegistrationCode {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  expiry      DateTime
+  campusId    String?
+  campus      Campus?   @relation(fields: [campusId], references: [id])
+  departmentId String?
+  department  Department?   @relation(fields: [departmentId], references: [id])
+  batchId     String?
+  batch       Batch?   @relation(fields: [batchId], references: [id])
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  @@map("registration_codes")
 }
 
 enum UserRole {

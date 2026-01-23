@@ -16,6 +16,7 @@ function LoginPage() {
   const [error, setError] = useState("")
   const [siteTitle, setSiteTitle] = useState("Atom Q")
   const [isMaintenanceMode, setIsMaintenanceMode] = useState(false)
+  const [allowRegistration, setAllowRegistration] = useState(true)
   const router = useRouter()
   const { theme, setTheme } = useTheme()
   const { data: session, status } = useSession()
@@ -26,17 +27,18 @@ function LoginPage() {
   useEffect(() => {
     const fetchLoginSettings = async () => {
       try {
-        const response = await fetch('/api/admin/settings')
+        const response = await fetch('/api/public/settings')
         if (response.ok) {
           const data = await response.json()
           setSiteTitle(data.siteTitle || "Atom Q")
           setIsMaintenanceMode(data.maintenanceMode || false)
+          setAllowRegistration(data.allowRegistration !== undefined ? data.allowRegistration : true)
         }
       } catch (error) {
         console.error('Failed to fetch login settings:', error)
       }
     }
-    
+
     fetchLoginSettings()
   }, [])
 
@@ -151,12 +153,14 @@ function LoginPage() {
           />
         </CardContent>
         <CardFooter className="flex flex-col space-y-4 pt-0">
-          <div className="text-center text-sm">
-            Don't have an account?{" "}
-            <a href="/register" className="text-primary hover:underline">
-              Sign up
-            </a>
-          </div>
+          {allowRegistration && (
+            <div className="text-center text-sm">
+              Don't have an account?{" "}
+              <a href="/register" className="text-primary hover:underline">
+                Sign up
+              </a>
+            </div>
+          )}
         </CardFooter>
       </Card>
     </div>

@@ -1,7 +1,7 @@
 
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -17,7 +17,6 @@ import { registerSchema } from "@/schema/auth"
 import { registerAction } from "@/actions/auth"
 import type { z } from "zod"
 import { LoadingButton } from "@/components/ui/laodaing-button"
-import { useSettingsSync } from "@/hooks/use-settings-sync"
 import { AnimatedThemeToggler } from "@/components/magicui/animated-theme-toggler"
 
 type RegisterFormData = z.infer<typeof registerSchema>
@@ -25,9 +24,36 @@ type RegisterFormData = z.infer<typeof registerSchema>
 export default function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
+  const [siteTitle, setSiteTitle] = useState("Atom Q")
+  const [allowRegistration, setAllowRegistration] = useState(true)
   const router = useRouter()
   const { theme, setTheme } = useTheme()
-  const { siteTitle, allowRegistration } = useSettingsSync()
+
+  // Fetch public settings
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const [settingsRes, registrationRes] = await Promise.all([
+          fetch('/api/public/settings'),
+          fetch('/api/public/registration-settings')
+        ])
+
+        if (settingsRes.ok) {
+          const settings = await settingsRes.json()
+          setSiteTitle(settings.siteTitle || "Atom Q")
+        }
+
+        if (registrationRes.ok) {
+          const registrationSettings = await registrationRes.json()
+          setAllowRegistration(registrationSettings.allowRegistration ?? true)
+        }
+      } catch (error) {
+        console.error('Failed to fetch settings:', error)
+      }
+    }
+
+    fetchSettings()
+  }, [])
 
   const form = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),

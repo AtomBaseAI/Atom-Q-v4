@@ -14,12 +14,12 @@ interface UseSettingsSyncOptions {
  * Provides real-time updates when settings change
  */
 export function useSettingsSync(options: UseSettingsSyncOptions = {}) {
-  const { 
-    settings, 
-    isLoading, 
-    error 
+  const {
+    settings,
+    isLoading,
+    error
   } = useSettings()
-  
+
   const { user } = useUserStore()
 
   // Call onUpdate callback when settings change
@@ -44,6 +44,5 @@ export function useSettingsSync(options: UseSettingsSyncOptions = {}) {
     isMaintenanceMode: settings?.maintenanceMode || false,
     siteTitle: settings?.siteTitle || "Atom Q",
     siteDescription: settings?.siteDescription || "Knowledge testing portal powered by Atom Labs",
-    allowRegistration: settings?.allowRegistration ?? true,
   }
 }

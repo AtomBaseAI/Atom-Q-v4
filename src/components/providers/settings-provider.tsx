@@ -17,8 +17,6 @@ const SettingsContext = createContext<SettingsContextType>({
     siteTitle: "Atom Q",
     siteDescription: "Knowledge testing portal powered by Atom Labs",
     maintenanceMode: false,
-    allowRegistration: true,
-    enableGithubAuth: false,
   },
   isLoading: false,
   error: null,
@@ -33,11 +31,11 @@ interface SettingsProviderProps {
 }
 
 export function SettingsProvider({ children }: SettingsProviderProps) {
-  const { 
-    settings, 
-    isLoading, 
-    error, 
-    setSettings, 
+  const {
+    settings,
+    isLoading,
+    error,
+    setSettings,
     updateSettings: updateStoreSettings,
     setLoading,
     setError,

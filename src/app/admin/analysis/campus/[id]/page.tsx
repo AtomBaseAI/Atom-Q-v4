@@ -260,7 +260,7 @@ export default function CampusAnalysisPage() {
             <Award className="h-4 w-4 text-yellow-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{topPerformers.length}</div>
+            <div className="text-2xl font-bold">{topPerformers?.length || 0}</div>
             <p className="text-xs text-muted-foreground mt-1">
               Active achievers
             </p>
@@ -291,7 +291,7 @@ export default function CampusAnalysisPage() {
 
         {/* Quizzes Tab */}
         <TabsContent value="quizzes" className="space-y-4">
-          {quizzes.length === 0 ? (
+          {!quizzes || quizzes.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center">
                 <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
@@ -332,7 +332,7 @@ export default function CampusAnalysisPage() {
 
         {/* Assessments Tab */}
         <TabsContent value="assessments" className="space-y-4">
-          {assessments.length === 0 ? (
+          {!assessments || assessments.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center">
                 <ClipboardCheck className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
@@ -397,7 +397,7 @@ export default function CampusAnalysisPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {users.length === 0 ? (
+              {!users || users.length === 0 ? (
                 <p className="text-center py-8 text-muted-foreground">
                   No active users found
                 </p>
@@ -449,7 +449,7 @@ export default function CampusAnalysisPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                {batches.length === 0 ? (
+                {!batches || batches.length === 0 ? (
                   <p className="text-center py-8 text-muted-foreground">
                     No batches found
                   </p>
@@ -483,7 +483,7 @@ export default function CampusAnalysisPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                {departments.length === 0 ? (
+                {!departments || departments.length === 0 ? (
                   <p className="text-center py-8 text-muted-foreground">
                     No departments found
                   </p>

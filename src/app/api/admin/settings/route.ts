@@ -1,4 +1,3 @@
-
 import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
@@ -9,22 +8,22 @@ export async function GET() {
   try {
     console.log("Settings API: Attempting to fetch settings...")
     const session = await getServerSession(authOptions)
-    
+
     if (!session) {
       console.log("Settings API: No session found")
       return NextResponse.json({ error: "Unauthorized - No session" }, { status: 401 })
     }
-    
+
     if (session.user.role !== UserRole.ADMIN) {
       console.log("Settings API: User role is not admin:", session.user.role)
       return NextResponse.json({ error: "Unauthorized - Not admin" }, { status: 401 })
     }
 
     console.log("Settings API: User authenticated as admin, fetching settings...")
-    
+
     // Get settings, create default if not exists
     let settings = await db.settings.findFirst()
-    
+
     if (!settings) {
       console.log("Settings API: No settings found, creating defaults...")
       settings = await db.settings.create({
@@ -32,8 +31,6 @@ export async function GET() {
           siteTitle: "Atom Q",
           siteDescription: "Take quizzes and test your knowledge",
           maintenanceMode: false,
-          allowRegistration: true,
-          enableGithubAuth: false,
         }
       })
       console.log("Settings API: Default settings created:", settings.id)
@@ -59,7 +56,7 @@ export async function GET() {
 export async function PUT(request: Request) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session || session.user.role !== UserRole.ADMIN) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
@@ -68,14 +65,12 @@ export async function PUT(request: Request) {
     const {
       siteTitle,
       siteDescription,
-      maintenanceMode,
-      allowRegistration,
-      enableGithubAuth
+      maintenanceMode
     } = body
 
     // Get existing settings or create new
     let settings = await db.settings.findFirst()
-    
+
     if (settings) {
       // Update existing settings
       settings = await db.settings.update({
@@ -83,9 +78,7 @@ export async function PUT(request: Request) {
         data: {
           siteTitle,
           siteDescription,
-          maintenanceMode,
-          allowRegistration,
-          enableGithubAuth
+          maintenanceMode
         }
       })
     } else {
@@ -94,9 +87,7 @@ export async function PUT(request: Request) {
         data: {
           siteTitle,
           siteDescription,
-          maintenanceMode,
-          allowRegistration,
-          enableGithubAuth
+          maintenanceMode
         }
       })
     }
