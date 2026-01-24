@@ -72,7 +72,7 @@ export const mockDb = {
 
   questions: {
     findAll: () => questions,
-    findByQuizId: (quizId: string) => questions.filter(q => q.quizId === quizId),
+    findByQuizId: (_quizId: string) => [], // Questions don't have quizId directly in schema
     findByGroupId: (groupId: string) => questions.filter(q => q.groupId === groupId),
     findById: (id: string) => questions.find(q => q.id === id),
     create: (question: any) => {

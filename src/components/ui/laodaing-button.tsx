@@ -42,6 +42,7 @@ export interface LoadingButtonProps
   loadingText?: string
   children: React.ReactNode
   asChild?: boolean
+  disabled?: boolean
 }
 
 const LoadingButton = React.forwardRef<HTMLButtonElement, LoadingButtonProps>(

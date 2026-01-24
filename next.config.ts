@@ -2,7 +2,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Allow cross-origin requests from Replit domains
+  // Allow cross-origin requests
   async headers() {
     return [
       {
@@ -24,8 +24,8 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-  // Disable static optimization for Replit compatibility
-  output: 'standalone',
+  // Use standalone output for Docker/self-hosted, Vercel handles this automatically
+  output: process.env.OUTPUT_MODE === 'standalone' ? 'standalone' : undefined,
 };
 
 export default nextConfig;

@@ -17,7 +17,11 @@ export async function GET(
     const assessment = await db.assessment.findUnique({
       where: { id: params.id },
       include: {
-        questions: true,
+        assessmentQuestions: {
+          include: {
+            question: true
+          }
+        },
         assessmentAttempts: {
           include: {
             user: {
@@ -75,7 +79,8 @@ export async function GET(
     });
 
     // Question performance
-    const questionStats = assessment.questions.map(question => {
+    const questionStats = assessment.assessmentQuestions.map(qq => {
+      const question = qq.question;
       const totalAttempts = assessment.assessmentAttempts.length;
       const correctAnswers = assessment.assessmentAttempts.filter(attempt =>
         attempt.answers.find(answer =>
@@ -90,9 +95,9 @@ export async function GET(
         difficulty: question.difficulty,
         totalAttempts,
         correctAnswers,
-        accuracy: totalAttempts > 0 ? ((correctAnswers / totalAttempts) * 100).toFixed(1) : 0,
+        accuracy: totalAttempts > 0 ? ((correctAnswers / totalAttempts) * 100).toFixed(1) : "0",
       };
-    }).sort((a, b) => parseFloat(a.accuracy) - parseFloat(b.accuracy));
+    }).sort((a, b) => parseFloat(a.accuracy as string) - parseFloat(b.accuracy as string));
 
     // Top performers
     const topPerformers = [...submittedAttempts]
@@ -135,7 +140,7 @@ export async function GET(
         maxTabs: assessment.maxTabs,
         disableCopyPaste: assessment.disableCopyPaste,
         hasAccessKey: !!assessment.accessKey,
-        questionCount: assessment.questions.length,
+        questionCount: assessment.assessmentQuestions.length,
         startTime: assessment.startTime,
       },
       stats,

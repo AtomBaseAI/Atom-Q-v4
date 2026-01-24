@@ -582,9 +582,9 @@ export default function AssessmentQuestionsPage() {
             }
           })
 
-          const results = await Promise.all(importPromises)
-          const successful = results.filter(r => r && r.ok).length
-          const failed = results.length - successful
+          const importResults = await Promise.all(importPromises)
+          const successful = importResults.filter(r => r && r.ok).length
+          const failed = importResults.length - successful
 
           if (successful > 0) {
             toast.success(`Successfully imported ${successful} question${successful !== 1 ? 's' : ''}`)
@@ -852,7 +852,7 @@ export default function AssessmentQuestionsPage() {
             <LoadingButton
               onClick={() => handleAddQuestions(selectedQuestionsToAdd)}
               disabled={selectedQuestionsToAdd.length === 0}
-              loading={false}
+              isLoading={false}
             >
               Add {selectedQuestionsToAdd.length} Question{selectedQuestionsToAdd.length !== 1 ? 's' : ''}
             </LoadingButton>

@@ -482,7 +482,7 @@ export default function QuestionGroupsPage() {
               </div>
             </div>
             <SheetFooter>
-              <LoadingButton type="submit" loading={submitLoading} loadingText="Creating...">
+              <LoadingButton type="submit" isLoading={submitLoading} loadingText="Creating...">
                 Create
               </LoadingButton>
             </SheetFooter>
@@ -532,7 +532,7 @@ export default function QuestionGroupsPage() {
               <Button type="button" variant="outline" onClick={() => setIsEditDialogOpen(false)}>
                 Cancel
               </Button>
-              <LoadingButton type="submit" loading={submitLoading} loadingText="Updating...">
+              <LoadingButton type="submit" isLoading={submitLoading} loadingText="Updating...">
                 Update
               </LoadingButton>
             </SheetFooter>

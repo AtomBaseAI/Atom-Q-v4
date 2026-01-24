@@ -794,7 +794,7 @@ export default function AssessmentsPage() {
               <Button type="button" variant="outline" onClick={() => setIsAddDialogOpen(false)}>
                 Cancel
               </Button>
-              <LoadingButton type="submit" loading={submitLoading}>
+              <LoadingButton type="submit" isLoading={submitLoading}>
                 Create Assessment
               </LoadingButton>
             </SheetFooter>
@@ -978,7 +978,7 @@ export default function AssessmentsPage() {
               <Button type="button" variant="outline" onClick={() => setIsEditDialogOpen(false)}>
                 Cancel
               </Button>
-              <LoadingButton type="submit" loading={submitLoading}>
+              <LoadingButton type="submit" isLoading={submitLoading}>
                 Update Assessment
               </LoadingButton>
             </SheetFooter>
@@ -1018,7 +1018,7 @@ export default function AssessmentsPage() {
             </AlertDialogCancel>
             <LoadingButton
               onClick={() => assessmentToDelete && handleDeleteAssessment(assessmentToDelete.id)}
-              loading={deleteLoading === assessmentToDelete?.id}
+              isLoading={deleteLoading === assessmentToDelete?.id}
               variant="destructive"
               disabled={deleteConfirmation !== "CONFIRM DELETE"}
             >

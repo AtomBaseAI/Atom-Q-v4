@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
               { email: { contains: search } }
             ]
           }),
-          ...(campus && { campus: { contains: campus } })
+          ...(campus && { campus: { name: { contains: campus } } })
         },
         select: {
           id: true,
@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
           { email: { contains: search, mode: "insensitive" } }
         ]
       }),
-      ...(campus && { campus: { contains: campus, mode: "insensitive" } })
+      ...(campus && { campus: { name: { contains: campus, mode: "insensitive" } } })
     }
 
     // Only add notIn filter if there are enrolled students

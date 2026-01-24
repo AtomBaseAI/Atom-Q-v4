@@ -800,9 +800,9 @@ export default function ReportedQuestionsPage() {
             </div>
 
             <DialogFooter>
-              <LoadingButton 
-                type="submit" 
-                loading={submitLoading}
+              <LoadingButton
+                type="submit"
+                isLoading={submitLoading}
                 loadingText="Updating..."
               >
                 Update

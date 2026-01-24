@@ -17,7 +17,11 @@ export async function GET(
     const quiz = await db.quiz.findUnique({
       where: { id: params.id },
       include: {
-        questions: true,
+        quizQuestions: {
+          include: {
+            question: true
+          }
+        },
         quizAttempts: {
           include: {
             user: {
@@ -72,7 +76,8 @@ export async function GET(
     });
 
     // Question performance
-    const questionStats = quiz.questions.map(question => {
+    const questionStats = quiz.quizQuestions.map(qq => {
+      const question = qq.question;
       const totalAttempts = quiz.quizAttempts.length;
       const correctAnswers = quiz.quizAttempts.filter(attempt =>
         attempt.answers.find(answer =>
@@ -87,9 +92,9 @@ export async function GET(
         difficulty: question.difficulty,
         totalAttempts,
         correctAnswers,
-        accuracy: totalAttempts > 0 ? ((correctAnswers / totalAttempts) * 100).toFixed(1) : 0,
+        accuracy: totalAttempts > 0 ? ((correctAnswers / totalAttempts) * 100).toFixed(1) : "0",
       };
-    }).sort((a, b) => parseFloat(a.accuracy) - parseFloat(b.accuracy));
+    }).sort((a, b) => parseFloat(a.accuracy as string) - parseFloat(b.accuracy as string));
 
     // Top performers
     const topPerformers = [...submittedAttempts]
@@ -115,7 +120,7 @@ export async function GET(
         title: quiz.title,
         difficulty: quiz.difficulty,
         timeLimit: quiz.timeLimit,
-        questionCount: quiz.questions.length,
+        questionCount: quiz.quizQuestions.length,
       },
       stats,
       scoreDistribution: scoreRanges,

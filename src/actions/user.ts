@@ -45,7 +45,7 @@ export async function createUserAction(formData: FormData) {
         email: validatedFields.data.email,
         password: hashedPassword,
         phone: validatedFields.data.phone || null,
-        campus: validatedFields.data.campus || null,
+        campusId: validatedFields.data.campus || null,
         role: validatedFields.data.role,
         isActive: validatedFields.data.isActive,
       }

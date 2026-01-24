@@ -25,8 +25,13 @@ export async function POST() {
         siteTitle: "Atom Q",
         siteDescription: "Take quizzes and test your knowledge",
         maintenanceMode: false,
+      }
+    })
+
+    // Create default registration settings
+    await db.registrationSettings.create({
+      data: {
         allowRegistration: true,
-        enableGithubAuth: false,
       }
     })
 

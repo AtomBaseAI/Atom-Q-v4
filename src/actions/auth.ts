@@ -69,22 +69,18 @@ export async function registerAction(formData: FormData) {
 
   try {
     // Check if registration is allowed
-    const settings = await db.settings.findFirst()
-    if (settings && !settings.allowRegistration) {
+    const registrationSettings = await db.registrationSettings.findFirst()
+    if (registrationSettings && !registrationSettings.allowRegistration) {
       return {
         message: 'Registration is currently disabled',
       }
     }
 
-    // If no settings exist, create default settings and allow registration
-    if (!settings) {
-      await db.settings.create({
+    // If no registration settings exist, create default settings and allow registration
+    if (!registrationSettings) {
+      await db.registrationSettings.create({
         data: {
-          siteTitle: 'Atom Q',
-          siteDescription: 'Take quizzes and test your knowledge',
-          maintenanceMode: false,
           allowRegistration: true,
-          enableGithubAuth: false,
         },
       })
     }

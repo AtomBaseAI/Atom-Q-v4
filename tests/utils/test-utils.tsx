@@ -1,6 +1,7 @@
 import { ReactElement } from 'react'
 import { render, RenderOptions } from '@testing-library/react'
 import { Session } from 'next-auth'
+import { vi } from 'vitest'
 
 // Custom render function with providers
 interface AllTheProvidersProps {

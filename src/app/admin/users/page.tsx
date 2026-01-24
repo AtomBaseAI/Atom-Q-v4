@@ -545,6 +545,8 @@ export default function UsersPage() {
       phone: user.phone || "",
       campus: user.campus || "",
       department: user.department || "",
+      batch: user.batch || "",
+      section: (user.section || "A") as StudentSection,
       isActive: user.isActive,
     })
     setIsEditDialogOpen(true)

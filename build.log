@@ -1,0 +1,123 @@
+$ bun x prisma generate && next build
+Environment variables loaded from .env
+Prisma schema loaded from prisma/schema.prisma
+
+✔ Generated Prisma Client (v6.19.1) to ./node_modules/@prisma/client in 238ms
+
+Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
+
+Tip: Interested in query caching in just a few lines of code? Try Accelerate today! https://pris.ly/tip-3-accelerate
+
+   ▲ Next.js 15.4.10
+   - Environments: .env
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully in 17.0s
+   Linting and checking validity of types ...
+   Collecting page data ...
+   Generating static pages (0/43) ...
+   Generating static pages (10/43) 
+   Generating static pages (21/43) 
+   Generating static pages (32/43) 
+ ✓ Generating static pages (43/43)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                                                    Size  First Load JS
+┌ ○ /                                                       8.73 kB         182 kB
+├ ○ /_not-found                                               999 B         101 kB
+├ ○ /admin                                                  2.14 kB         111 kB
+├ ○ /admin/analysis                                         4.43 kB         137 kB
+├ ƒ /admin/analysis/assessment/[id]                         6.41 kB         131 kB
+├ ƒ /admin/analysis/campus/[id]                             3.07 kB         136 kB
+├ ƒ /admin/analysis/quiz/[id]                               11.5 kB         129 kB
+├ ○ /admin/assessments                                      14.3 kB         223 kB
+├ ƒ /admin/assessments/[id]/enrollments                     7.04 kB         165 kB
+├ ƒ /admin/assessments/[id]/questions                       5.68 kB         325 kB
+├ ƒ /admin/assessments/[id]/submissions                     8.92 kB         173 kB
+├ ○ /admin/campus                                           13.8 kB         190 kB
+├ ○ /admin/question-groups                                  6.41 kB         196 kB
+├ ƒ /admin/question-groups/[id]/questions                   5.45 kB         344 kB
+├ ƒ /admin/question-groups/[id]/reported-questions          6.71 kB         336 kB
+├ ○ /admin/quiz                                             5.08 kB         214 kB
+├ ƒ /admin/quiz/[id]/edit                                   8.43 kB         202 kB
+├ ƒ /admin/quiz/[id]/questions                              8.73 kB         328 kB
+├ ƒ /admin/quiz/[id]/users                                    11 kB         185 kB
+├ ○ /admin/settings                                         18.4 kB         172 kB
+├ ○ /admin/users                                            8.03 kB         223 kB
+├ ƒ /admin/users/[id]/delete-info                             274 B         100 kB
+├ ƒ /admin/users/[id]/quiz-attempts                           274 B         100 kB
+├ ƒ /api/admin/analysis/[id]/leaderboard                      274 B         100 kB
+├ ƒ /api/admin/analysis/[id]/result-matrix                    274 B         100 kB
+├ ƒ /api/admin/analytics                                      274 B         100 kB
+├ ƒ /api/admin/analytics/assessment/[id]                      274 B         100 kB
+├ ƒ /api/admin/analytics/campus/[id]                          274 B         100 kB
+├ ƒ /api/admin/analytics/quiz/[id]                            274 B         100 kB
+├ ƒ /api/admin/assessments                                    274 B         100 kB
+├ ƒ /api/admin/assessments/[id]                               274 B         100 kB
+├ ƒ /api/admin/assessments/[id]/enrollments                   274 B         100 kB
+├ ƒ /api/admin/assessments/[id]/questions                     274 B         100 kB
+├ ƒ /api/admin/assessments/[id]/submissions                   274 B         100 kB
+├ ƒ /api/admin/campus                                         274 B         100 kB
+├ ƒ /api/admin/campus/[id]                                    274 B         100 kB
+├ ƒ /api/admin/campus/[id]/delete-data                        274 B         100 kB
+├ ƒ /api/admin/campus/[id]/delete-info                        274 B         100 kB
+├ ƒ /api/admin/campus/[id]/delete-students                    274 B         100 kB
+├ ƒ /api/admin/download/source                                274 B         100 kB
+├ ƒ /api/admin/download/source-v2                             274 B         100 kB
+├ ƒ /api/admin/question-groups                                274 B         100 kB
+├ ƒ /api/admin/question-groups/[id]                           274 B         100 kB
+├ ƒ /api/admin/question-groups/[id]/questions                 274 B         100 kB
+├ ƒ /api/admin/question-groups/[id]/questions/[questionId]    274 B         100 kB
+├ ƒ /api/admin/question-groups/[id]/reported-questions        274 B         100 kB
+├ ƒ /api/admin/quiz                                           274 B         100 kB
+├ ƒ /api/admin/quiz/[id]                                      274 B         100 kB
+├ ƒ /api/admin/quiz/[id]/available-questions                  274 B         100 kB
+├ ƒ /api/admin/quiz/[id]/questions                            274 B         100 kB
+├ ƒ /api/admin/quiz/[id]/questions/[questionId]               274 B         100 kB
+├ ƒ /api/admin/quiz/[id]/questions/reorder                    274 B         100 kB
+├ ƒ /api/admin/quiz/[id]/users                                274 B         100 kB
+├ ƒ /api/admin/quiz/[id]/users/[userId]                       274 B         100 kB
+├ ƒ /api/admin/registration-codes                             274 B         100 kB
+├ ƒ /api/admin/registration-codes/[id]                        274 B         100 kB
+├ ƒ /api/admin/registration-settings                          274 B         100 kB
+├ ƒ /api/admin/settings                                       274 B         100 kB
+├ ƒ /api/admin/settings/init                                  274 B         100 kB
+├ ƒ /api/admin/stats                                          274 B         100 kB
+├ ƒ /api/admin/students/available                             274 B         100 kB
+├ ƒ /api/admin/users                                          274 B         100 kB
+├ ƒ /api/admin/users/[id]                                     274 B         100 kB
+├ ƒ /api/admin/users/[id]/delete-info                         274 B         100 kB
+├ ƒ /api/admin/users/[id]/enrollments                         274 B         100 kB
+├ ƒ /api/auth/[...nextauth]                                   274 B         100 kB
+├ ƒ /api/health                                               274 B         100 kB
+├ ƒ /api/public/registration-settings                         274 B         100 kB
+├ ƒ /api/public/settings                                      274 B         100 kB
+├ ƒ /api/public/verify-code                                   274 B         100 kB
+├ ƒ /api/user/change-password                                 274 B         100 kB
+├ ƒ /api/user/leaderboard                                     274 B         100 kB
+├ ƒ /api/user/profile                                         274 B         100 kB
+├ ƒ /api/user/question/report                                 274 B         100 kB
+├ ƒ /api/user/quiz                                            274 B         100 kB
+├ ƒ /api/user/quiz/[id]/attempt                               274 B         100 kB
+├ ƒ /api/user/quiz/[id]/result                                274 B         100 kB
+├ ƒ /api/user/quiz/[id]/start                                 274 B         100 kB
+├ ƒ /api/user/quiz/[id]/submit                                274 B         100 kB
+├ ƒ /api/user/recent-activity                                 274 B         100 kB
+├ ƒ /api/user/stats                                           274 B         100 kB
+├ ○ /register                                               4.08 kB         198 kB
+├ ○ /user                                                   6.34 kB         128 kB
+├ ○ /user/leaderboard                                        7.1 kB         155 kB
+├ ○ /user/quiz                                              7.79 kB         135 kB
+├ ƒ /user/quiz/[id]/result                                  9.71 kB         268 kB
+├ ƒ /user/quiz/[id]/take                                    20.7 kB         339 kB
+└ ○ /user/settings                                           9.5 kB         157 kB
++ First Load JS shared by all                               99.8 kB
+  ├ chunks/4bd1b696-9909f507f95988b8.js                     54.1 kB
+  ├ chunks/5964-dfec9828fe56d7ab.js                         43.8 kB
+  └ other shared chunks (total)                             1.88 kB
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+

@@ -362,7 +362,7 @@ export default function AssessmentEnrollmentsPage() {
                             <AlertDialogCancel>Cancel</AlertDialogCancel>
                             <LoadingButton
                               onClick={() => handleUnenrollUser(enrollment.id)}
-                              loading={unenrollLoading === enrollment.id}
+                              isLoading={unenrollLoading === enrollment.id}
                               variant="destructive"
                             >
                               Unenroll
@@ -461,7 +461,7 @@ export default function AssessmentEnrollmentsPage() {
             <LoadingButton
               onClick={() => handleEnrollUsers(selectedUsersToEnroll)}
               disabled={selectedUsersToEnroll.length === 0}
-              loading={enrollLoading}
+              isLoading={enrollLoading}
             >
               Enroll {selectedUsersToEnroll.length} User{selectedUsersToEnroll.length !== 1 ? 's' : ''}
             </LoadingButton>

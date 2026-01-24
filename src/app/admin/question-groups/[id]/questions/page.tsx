@@ -905,9 +905,9 @@ export default function QuestionGroupPage() {
             </div>
 
             <DialogFooter>
-              <LoadingButton 
-                type="submit" 
-                loading={submitLoading}
+              <LoadingButton
+                type="submit"
+                isLoading={submitLoading}
                 loadingText={editingQuestion ? "Updating..." : "Creating..."}
               >
                 {editingQuestion ? "Update" : "Create"}
