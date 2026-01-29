@@ -14,7 +14,6 @@ import { Loader2, Moon, Sun, CheckCircle2 } from "lucide-react"
 import { useTheme } from "next-themes"
 import { toasts } from "@/lib/toasts"
 import { registerSchema } from "@/schema/auth"
-import { registerAction } from "@/actions/auth"
 import type { z } from "zod"
 import { LoadingButton } from "@/components/ui/laodaing-button"
 import { AnimatedThemeToggler } from "@/components/magicui/animated-theme-toggler"
@@ -148,20 +147,30 @@ export default function RegisterPage() {
     setError("")
 
     try {
-      const formData = new FormData()
-      formData.append('name', data.name)
-      formData.append('email', data.email)
-      formData.append('password', data.password)
-      formData.append('confirmPassword', data.confirmPassword)
-      if (data.phone) formData.append('phone', data.phone)
-      if (data.registrationCode) formData.append('registrationCode', data.registrationCode)
-      if (data.departmentId) formData.append('departmentId', data.departmentId)
-      if (data.batchId) formData.append('batchId', data.batchId)
-      if (data.section) formData.append('section', data.section)
+      const payload: any = {
+        name: data.name,
+        email: data.email,
+        password: data.password,
+        confirmPassword: data.confirmPassword,
+        phone: data.phone,
+        // Use verifiedCode from state instead of form data
+        registrationCode: verifiedCode ? verifiedCode.code : data.registrationCode,
+        departmentId: data.departmentId,
+        batchId: data.batchId,
+        section: data.section,
+      }
 
-      const result = await registerAction(formData)
+      const response = await fetch('/api/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      })
 
-      if (result?.errors) {
+      const result = await response.json()
+
+      if (result.errors) {
         Object.entries(result.errors).forEach(([field, messages]) => {
           form.setError(field as keyof RegisterFormData, {
             message: messages?.[0]
@@ -169,12 +178,12 @@ export default function RegisterPage() {
         })
         setError(result.message || "Validation failed")
         toasts.registrationFailed(result.message || "Validation failed")
-      } else if (result?.success) {
+      } else if (result.success) {
         toasts.registrationSuccess()
         setTimeout(() => {
           router.push("/")
         }, 1500)
-      } else if (result?.message) {
+      } else if (result.message) {
         setError(result.message)
         toasts.registrationFailed(result.message)
       } else {

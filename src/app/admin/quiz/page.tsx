@@ -217,8 +217,11 @@ export default function QuizzesPage() {
       accessorKey: "timeLimit",
       header: "Time Limit",
       cell: ({ row }) => {
-        const timeLimit = row.getValue("timeLimit") as number
-        return timeLimit ? `${timeLimit} min` : "No limit"
+        const timeLimit = row.getValue("timeLimit") as number | null
+        if (timeLimit === null || timeLimit === undefined || isNaN(timeLimit)) {
+          return "Unlimited"
+        }
+        return `${timeLimit} min`
       },
     },
     {

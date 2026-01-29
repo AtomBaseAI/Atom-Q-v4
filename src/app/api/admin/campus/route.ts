@@ -25,6 +25,7 @@ export async function GET() {
       )
     }
 
+    // Get campuses with departments, batches, and their user counts
     const campuses = await db.campus.findMany({
       include: {
         _count: {
@@ -75,8 +76,35 @@ export async function GET() {
       }
     })
 
+    // Count general students (without department or batch) for each campus
+    const campusesWithGeneralCounts = await Promise.all(
+      campuses.map(async (campus) => {
+        const generalDepartmentStudents = await db.user.count({
+          where: {
+            campusId: campus.id,
+            role: "USER",
+            departmentId: null
+          }
+        })
+
+        const generalBatchStudents = await db.user.count({
+          where: {
+            campusId: campus.id,
+            role: "USER",
+            batchId: null
+          }
+        })
+
+        return {
+          ...campus,
+          generalDepartmentStudents,
+          generalBatchStudents
+        }
+      })
+    )
+
     // Transform the data to include assessments count and rename users to students
-    const transformedCampuses = campuses.map(campus => ({
+    const transformedCampuses = campusesWithGeneralCounts.map(campus => ({
       ...campus,
       _count: {
         departments: campus._count.departments,

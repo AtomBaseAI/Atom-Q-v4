@@ -137,6 +137,7 @@ export async function registerAction(formData: FormData) {
     // If registration code is provided, set the registrationCodeId and related fields
     if (validRegistrationCode) {
       userData.registrationCodeId = validRegistrationCode.id
+      userData.campusId = validRegistrationCode.campusId
     }
 
     // Override with form values if provided

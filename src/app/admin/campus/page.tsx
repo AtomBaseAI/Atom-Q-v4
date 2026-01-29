@@ -100,6 +100,8 @@ interface Campus {
   }
   departments: { id: string; name: string; _count: { users: number } }[]
   batches: { id: string; name: string; _count: { users: number } }[]
+  generalDepartmentStudents?: number
+  generalBatchStudents?: number
 }
 
 interface CreateFormData {
@@ -876,10 +878,6 @@ export default function CampusPage() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => router.push(`/admin/campus/${campus.id}/departments`)}>
-                                <Building2 className="mr-2 h-4 w-4" />
-                                Manage Departments
-                              </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => router.push(`/admin/campus/${campus.id}/users`)}>
                                 <Users className="mr-2 h-4 w-4" />
                                 Users
@@ -920,21 +918,19 @@ export default function CampusPage() {
                               }
                             >
                               <div className="space-y-2 py-2">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-2">
-                                    <Building2 className="w-4 h-4 text-muted-foreground" />
-                                    <span className="font-medium">Departments</span>
-                                  </div>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => router.push(`/admin/campus/${campus.id}/departments`)}
-                                  >
-                                    <Plus className="w-4 h-4 mr-1" />
-                                    Add Department
-                                  </Button>
+                                <div className="flex items-center gap-2">
+                                  <Building2 className="w-4 h-4 text-muted-foreground" />
+                                  <span className="font-medium">Departments</span>
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 ml-6">
+                                  {/* General category for students without department - shown first */}
+                                  <div className="flex items-center justify-between p-2 bg-muted/50 rounded border border-muted-foreground/20">
+                                    <span className="text-sm font-medium">General</span>
+                                    <Badge variant="outline" className="text-xs">
+                                      <Users className="w-3 h-3 mr-1" />
+                                      {campus.generalDepartmentStudents || 0} students
+                                    </Badge>
+                                  </div>
                                   {campus.departments.map((dept) => (
                                     <div
                                       key={dept.id}
@@ -947,7 +943,7 @@ export default function CampusPage() {
                                       </Badge>
                                     </div>
                                   ))}
-                                  {campus.departments.length === 0 && (
+                                  {campus.departments.length === 0 && (campus.generalDepartmentStudents || 0) === 0 && (
                                     <div className="text-sm text-muted-foreground col-span-full ml-6">
                                       No departments found
                                     </div>
@@ -976,21 +972,19 @@ export default function CampusPage() {
                               }
                             >
                               <div className="space-y-2 py-2">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-2">
-                                    <BookOpen className="w-4 h-4 text-muted-foreground" />
-                                    <span className="font-medium">Batches</span>
-                                  </div>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => router.push(`/admin/campus/${campus.id}/batches`)}
-                                  >
-                                    <Plus className="w-4 h-4 mr-1" />
-                                    Add Batch
-                                  </Button>
+                                <div className="flex items-center gap-2">
+                                  <BookOpen className="w-4 h-4 text-muted-foreground" />
+                                  <span className="font-medium">Batches</span>
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 ml-6">
+                                  {/* General category for students without batch - shown first */}
+                                  <div className="flex items-center justify-between p-2 bg-muted/50 rounded border border-muted-foreground/20">
+                                    <span className="text-sm font-medium">General</span>
+                                    <Badge variant="outline" className="text-xs">
+                                      <Users className="w-3 h-3 mr-1" />
+                                      {campus.generalBatchStudents || 0} students
+                                    </Badge>
+                                  </div>
                                   {campus.batches.map((batch) => (
                                     <div
                                       key={batch.id}
@@ -1003,7 +997,7 @@ export default function CampusPage() {
                                       </Badge>
                                     </div>
                                   ))}
-                                  {campus.batches.length === 0 && (
+                                  {campus.batches.length === 0 && (campus.generalBatchStudents || 0) === 0 && (
                                     <div className="text-sm text-muted-foreground col-span-full ml-6">
                                       No batches found
                                     </div>

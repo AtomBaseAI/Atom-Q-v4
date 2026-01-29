@@ -78,11 +78,11 @@ export async function POST(request: NextRequest) {
             data: {
               title: quizData.title,
               description: quizData.description || null,
-              timeLimit: quizData.timeLimit ? parseInt(quizData.timeLimit) : null,
+              timeLimit: quizData.timeLimit && quizData.timeLimit.trim() !== "" ? parseInt(quizData.timeLimit) : null,
               difficulty: quizData.difficulty || DifficultyLevel.MEDIUM,
               status: quizData.status || QuizStatus.ACTIVE,
               negativeMarking: quizData.negativeMarking === true || quizData.negativeMarking === "true",
-              negativePoints: quizData.negativePoints ? parseFloat(quizData.negativePoints) : 0.5,
+              negativePoints: quizData.negativePoints && quizData.negativePoints.trim() !== "" ? parseFloat(quizData.negativePoints) : 0.5,
               randomOrder: quizData.randomOrder === true || quizData.randomOrder === "true",
               maxAttempts: quizData.maxAttempts && quizData.maxAttempts !== "" ? parseInt(quizData.maxAttempts) : null,
               checkAnswerEnabled: quizData.checkAnswerEnabled === true || quizData.checkAnswerEnabled === "true",
