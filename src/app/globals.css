@@ -291,3 +291,16 @@
     animation: none;
     mix-blend-mode: normal;
 }
+
+/* Remove border radius from sonner toasts */
+[data-sonner-toast] {
+  border-radius: 0 !important;
+}
+
+[data-sonner-toaster] [data-sonner-toast] {
+  border-radius: 0 !important;
+}
+
+.toaster [data-sonner-toast] {
+  border-radius: 0 !important;
+}

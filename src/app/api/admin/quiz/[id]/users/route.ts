@@ -35,7 +35,26 @@ export async function GET(
         id: true,
         name: true,
         email: true,
-        campus:true,
+        campus: {
+          select: {
+            id: true,
+            name: true,
+            shortName: true,
+          }
+        },
+        department: {
+          select: {
+            id: true,
+            name: true,
+          }
+        },
+        batch: {
+          select: {
+            id: true,
+            name: true,
+          }
+        },
+        section: true,
       }
     })
 

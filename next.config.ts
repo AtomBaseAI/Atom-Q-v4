@@ -1,4 +1,3 @@
-
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
@@ -23,6 +22,20 @@ const nextConfig: NextConfig = {
         ],
       },
     ];
+  },
+  // Configure images to allow all external sources
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '**',
+      },
+      {
+        protocol: 'http',
+        hostname: '**',
+      },
+    ],
+    unoptimized: false,
   },
   // Use standalone output for Docker/self-hosted, Vercel handles this automatically
   output: process.env.OUTPUT_MODE === 'standalone' ? 'standalone' : undefined,

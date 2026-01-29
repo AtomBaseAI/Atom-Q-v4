@@ -15,84 +15,96 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const { searchParams } = new URL(request.url)
+    const searchParams = request.nextUrl.searchParams
     const quizId = searchParams.get("quizId")
     const search = searchParams.get("search") || ""
     const campus = searchParams.get("campus") || ""
+    const department = searchParams.get("department") || ""
+    const batch = searchParams.get("batch") || ""
+    const section = searchParams.get("section") || ""
 
-    if (!quizId) {
-      // Return all students if no specific quiz is specified
-      const students = await db.user.findMany({
-        where: {
-          role: UserRole.USER,
-          isActive: true,
-          ...(search && {
-            OR: [
-              { name: { contains: search } },
-              { email: { contains: search } }
-            ]
-          }),
-          ...(campus && { campus: { name: { contains: campus } } })
-        },
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          campus: true
-        }
-      })
-
-      return NextResponse.json(students)
-    }
-
-    // Get students who are NOT enrolled in this quiz
-    const enrolledStudentIds = await db.quizUser.findMany({
-      where: { quizId },
-      select: { userId: true }
-    })
-
-    const enrolledIds = enrolledStudentIds.map(enrollment => enrollment.userId)
-
-    // Build the where clause dynamically
-    const whereClause: any = {
+    // Build where clause
+    const where: any = {
       role: UserRole.USER,
       isActive: true,
-      ...(search && {
-        OR: [
-          { name: { contains: search, mode: "insensitive" } },
-          { email: { contains: search, mode: "insensitive" } }
-        ]
-      }),
-      ...(campus && { campus: { name: { contains: campus, mode: "insensitive" } } })
     }
 
-    // Only add notIn filter if there are enrolled students
-    if (enrolledIds.length > 0) {
-      whereClause.id = {
-        notIn: enrolledIds
+    // Exclude users already enrolled in this quiz
+    if (quizId) {
+      where.quizUsers = {
+        none: {
+          quizId: quizId
+        }
       }
     }
 
-    const availableStudents = await db.user.findMany({
-      where: whereClause,
+    // Add search filter
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: "insensitive" } },
+        { email: { contains: search, mode: "insensitive" } },
+      ]
+    }
+
+    // Add campus filter
+    if (campus && campus !== "all") {
+      where.campus = {
+        shortName: campus
+      }
+    }
+
+    // Add department filter
+    if (department && department !== "all") {
+      where.department = {
+        name: department
+      }
+    }
+
+    // Add batch filter
+    if (batch && batch !== "all") {
+      where.batch = {
+        name: batch
+      }
+    }
+
+    // Add section filter
+    if (section && section !== "all") {
+      where.section = section
+    }
+
+    const availableUsers = await db.user.findMany({
+      where,
       select: {
         id: true,
         name: true,
         email: true,
-        campus: true
+        campus: {
+          select: {
+            id: true,
+            name: true,
+            shortName: true,
+          }
+        },
+        department: {
+          select: {
+            id: true,
+            name: true,
+          }
+        },
+        batch: {
+          select: {
+            id: true,
+            name: true,
+          }
+        },
+        section: true,
       },
-      orderBy: { name: "asc" }
+      orderBy: {
+        name: 'asc'
+      }
     })
 
-    const formattedStudents = availableStudents.map(student => ({
-      id: student.id,
-      name: student.name,
-      email: student.email,
-      campus: student.campus,
-      enrolled: false
-    }))
-
-    return NextResponse.json(formattedStudents)
+    return NextResponse.json(availableUsers)
   } catch (error) {
     console.error("Error fetching available students:", error)
     return NextResponse.json(
