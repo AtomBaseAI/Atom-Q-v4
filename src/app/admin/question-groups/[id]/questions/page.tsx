@@ -728,10 +728,10 @@ export default function QuestionGroupPage() {
               {editingQuestion ? "Update the question details below" : "Create a new question for this group"}
             </DialogDescription>
           </DialogHeader>
-          <div className="flex flex-row w-full h-full justify-center items-center gap-[8%]">
+          <div className="flex flex-row w-full h-full justify-center items-center gap-[10%]">
 
 
-            <form onSubmit={handleSubmit} className="w-[65%]">
+            <form onSubmit={handleSubmit} className="w-[45%]">
               <div className="space-y-6">
                 <div className="space-y-2">
                   <Label htmlFor="title">Title</Label>
@@ -917,8 +917,8 @@ export default function QuestionGroupPage() {
                 </LoadingButton>
               </DialogFooter>
             </form>
-            <div className="w-[25%] justify-center itmes-center border border-1 h-full">
-                preview 
+            <div className="w-[45%] justify-center itmes-center border border-1 h-full">
+              preview
             </div>
           </div>
         </DialogContent>
