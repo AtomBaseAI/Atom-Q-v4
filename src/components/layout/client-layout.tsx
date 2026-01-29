@@ -38,7 +38,7 @@ export default function ClientLayout({
                   {children}
                 </motion.div>
               </AnimatePresence>
-              <Toaster richColors position="top-right" />
+              <Toaster richColors position="bottom-right" />
             </RegistrationSettingsProvider>
           </SettingsProvider>
         </AccentColorProvider>
