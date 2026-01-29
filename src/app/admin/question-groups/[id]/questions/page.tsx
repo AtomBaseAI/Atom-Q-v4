@@ -3,16 +3,18 @@
 import { useState, useEffect, useRef } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { RichTextEditor } from "@/components/ui/rich-text-editor"
+import { RichTextDisplay } from "@/components/ui/rich-text-display"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Switch } from "@/components/ui/switch"
 import { Checkbox } from "@/components/ui/checkbox"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, ArrowLeft, Loader2, ChevronLeft, FileDown, FileUp, Trash2 } from "lucide-react"
+import { Plus, ArrowLeft, Loader2, ChevronLeft, FileDown, FileUp, Trash2, Brain } from "lucide-react"
 import { format } from "date-fns"
 import { QuestionType, DifficultyLevel } from "@prisma/client"
 import Papa from "papaparse"
@@ -917,8 +919,176 @@ export default function QuestionGroupPage() {
                 </LoadingButton>
               </DialogFooter>
             </form>
-            <div className="w-[45%] justify-center itmes-center border border-1 h-full">
-              preview
+            <div className="w-[45%] h-full">
+              <div className="sticky top-0">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <Brain className="h-5 w-5 text-primary" />
+                  User Preview
+                </h3>
+                <Card className="bg-card/90 dark:bg-card/90 backdrop-blur-sm shadow-lg border border-border/50">
+                  <CardHeader className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <Brain className="h-5 w-5 text-primary dark:text-sidebar-primary" />
+                        <Badge variant="outline" className="bg-primary/10 text-primary dark:bg-sidebar-primary/10 dark:text-sidebar-primary-foreground">
+                          1 point
+                        </Badge>
+                      </div>
+                      <Badge variant={formData.isActive ? "default" : "secondary"}>
+                        {formData.isActive ? "Active" : "Inactive"}
+                      </Badge>
+                    </div>
+                    <div className="text-sm text-muted-foreground font-medium">
+                      {formData.title || "Question Title"}
+                    </div>
+                    <div className="text-xl leading-relaxed">
+                      {formData.content ? (
+                        <RichTextDisplay content={formData.content} />
+                      ) : (
+                        <span className="text-muted-foreground italic">Question content will appear here...</span>
+                      )}
+                    </div>
+                  </CardHeader>
+
+                  <CardContent className="space-y-4">
+                    {/* Multiple Choice & True/False Questions */}
+                    {(formData.type === QuestionType.MULTIPLE_CHOICE || formData.type === QuestionType.TRUE_FALSE) && (
+                      <RadioGroup>
+                        {formData.options.filter(o => o.trim()).length > 0 ? (
+                          formData.options
+                            .filter(o => o.trim())
+                            .map((option, index) => {
+                              const isSelected = formData.correctAnswer === option;
+                              return (
+                                <div
+                                  key={index}
+                                  className={`flex items-center space-x-3 p-4 rounded-lg border-2 transition-all duration-200 ${
+                                    isSelected
+                                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                                      : 'border-gray-200 dark:border-gray-700'
+                                  }`}
+                                >
+                                  <RadioGroupItem value={option} id={`preview-option-${index}`} disabled />
+                                  <Label
+                                    htmlFor={`preview-option-${index}`}
+                                    className="cursor-pointer flex-1 text-base"
+                                  >
+                                    {option}
+                                  </Label>
+                                  {isSelected && (
+                                    <div className="text-blue-500">
+                                      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                      </svg>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })
+                        ) : (
+                          <p className="text-sm text-muted-foreground text-center py-4">
+                            Options will appear here...
+                          </p>
+                        )}
+                      </RadioGroup>
+                    )}
+
+                    {/* Multi-Select Questions */}
+                    {formData.type === QuestionType.MULTI_SELECT && (
+                      <div className="space-y-3">
+                        {formData.options.filter(o => o.trim()).length > 0 ? (
+                          formData.options
+                            .filter(o => o.trim())
+                            .map((option, index) => {
+                              const isSelected = formData.correctAnswers.includes(option);
+                              return (
+                                <div
+                                  key={index}
+                                  className={`flex items-center space-x-3 p-4 rounded-lg border-2 transition-all duration-200 ${
+                                    isSelected
+                                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                                      : 'border-gray-200 dark:border-gray-700'
+                                  }`}
+                                >
+                                  <Checkbox
+                                    id={`preview-option-${index}`}
+                                    checked={isSelected}
+                                    disabled
+                                  />
+                                  <Label
+                                    htmlFor={`preview-option-${index}`}
+                                    className="cursor-pointer flex-1 text-base"
+                                  >
+                                    {option}
+                                  </Label>
+                                  {isSelected && (
+                                    <div className="text-blue-500">
+                                      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                      </svg>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })
+                        ) : (
+                          <p className="text-sm text-muted-foreground text-center py-4">
+                            Options will appear here...
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Fill in Blank Questions */}
+                    {formData.type === QuestionType.FILL_IN_BLANK && (
+                      <div className="space-y-3">
+                        <div className="p-4 rounded-lg border-2 border-gray-200 dark:border-gray-700">
+                          <Label className="text-sm text-muted-foreground">Your Answer:</Label>
+                          {formData.correctAnswer ? (
+                            <p className="mt-2 text-base font-medium text-blue-600 dark:text-blue-400">
+                              {formData.correctAnswer}
+                            </p>
+                          ) : (
+                            <p className="mt-2 text-base text-muted-foreground italic">
+                              Correct answer will appear here...
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Explanation Preview */}
+                    {formData.explanation && (
+                      <div className="mt-6 pt-4 border-t border-border/50">
+                        <div className="text-sm font-medium text-muted-foreground mb-2">Explanation:</div>
+                        <RichTextDisplay content={formData.explanation} />
+                      </div>
+                    )}
+
+                    {/* Difficulty Badge */}
+                    <div className="flex items-center justify-between pt-4 border-t border-border/50">
+                      <Badge
+                        variant="outline"
+                        className={
+                          formData.difficulty === DifficultyLevel.EASY
+                            ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100"
+                            : formData.difficulty === DifficultyLevel.MEDIUM
+                            ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100"
+                            : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100"
+                        }
+                      >
+                        {formData.difficulty.toLowerCase()}
+                      </Badge>
+                      <Badge variant="outline">
+                        {formData.type === QuestionType.MULTIPLE_CHOICE && "Multiple Choice"}
+                        {formData.type === QuestionType.TRUE_FALSE && "True/False"}
+                        {formData.type === QuestionType.FILL_IN_BLANK && "Fill in Blank"}
+                        {formData.type === QuestionType.MULTI_SELECT && "Multi-Select"}
+                      </Badge>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
             </div>
           </div>
         </DialogContent>

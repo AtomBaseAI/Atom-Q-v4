@@ -42,10 +42,10 @@ export function RichTextDisplay({ content, className }: RichTextDisplayProps) {
       attributes: {
         class: cn(
           "prose prose-sm max-w-none focus:outline-none",
-          "dark:prose-invert prose-p:my-2 prose-headings:my-3",
-          "prose-ul:my-2 prose-ol:my-2 prose-li:my-1",
-          "prose-blockquote:my-2 prose-code:my-1",
-          "prose-pre:my-2 prose-table:my-2",
+          "dark:prose-invert prose-p:my-0 prose-headings:my-1.5",
+          "prose-ul:my-1.5 prose-ol:my-1.5 prose-li:my-0.5",
+          "prose-blockquote:my-1.5 prose-code:my-0.5",
+          "prose-pre:my-1.5 prose-table:my-1.5",
           "prose-h1:text-2xl prose-h2:text-xl prose-h3:text-lg",
           "prose-h4:text-base prose-h5:text-sm prose-h6:text-xs",
           "prose-img:max-w-full prose-img:h-auto prose-img:rounded-lg",

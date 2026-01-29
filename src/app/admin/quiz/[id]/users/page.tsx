@@ -58,7 +58,7 @@ interface User {
   id: string
   name: string
   email: string
-  campus?: string
+  campus?: string | { name: string }
   enrolled: boolean
 }
 
@@ -253,13 +253,35 @@ export default function QuizUsersPage() {
 
   // Get unique campuses for filters
   const uniqueCampuses = useMemo(() => {
-    const campuses = users.map(user => user.campus).filter(Boolean) as string[]
+    const campuses = users.map(user => {
+      // Handle both string and object campus values
+      if (typeof user.campus === 'string') {
+        return user.campus
+      } else if (user.campus && typeof user.campus === 'object') {
+        // Extract name from campus object, handle nested structures
+        return user.campus.name ||
+               user.campus.shortName ||
+               JSON.stringify(user.campus)
+      }
+      return null
+    }).filter(Boolean) as string[]
     return [...new Set(campuses)]
   }, [users])
 
   // Get unique campuses for enrollment filters
   const enrollUniqueCampuses = useMemo(() => {
-    const campuses = availableUsers.map(user => user.campus).filter(Boolean) as string[]
+    const campuses = availableUsers.map(user => {
+      // Handle both string and object campus values
+      if (typeof user.campus === 'string') {
+        return user.campus
+      } else if (user.campus && typeof user.campus === 'object') {
+        // Extract name from campus object, handle nested structures
+        return user.campus.name ||
+               user.campus.shortName ||
+               JSON.stringify(user.campus)
+      }
+      return null
+    }).filter(Boolean) as string[]
     return [...new Set(campuses)]
   }, [availableUsers])
 
@@ -286,7 +308,15 @@ export default function QuizUsersPage() {
     {
       accessorKey: "campus",
       header: "Campus",
-      cell: ({ row }) => row.getValue("campus") || "-",
+      cell: ({ row }) => {
+        const campus = row.getValue("campus")
+        if (typeof campus === 'string') {
+          return campus || "-"
+        } else if (campus && typeof campus === 'object') {
+          return campus.name || campus.shortName || "-"
+        }
+        return "-"
+      },
     },
     {
       id: "actions",
@@ -369,7 +399,11 @@ export default function QuizUsersPage() {
             label: "Campus",
             options: [
               { value: "all", label: "All Campuses" },
-              ...uniqueCampuses.map(campus => ({ value: campus, label: campus }))
+              ...uniqueCampuses.map((campus, index) => {
+                // Ensure campus is always a string
+                const campusString = typeof campus === 'string' ? campus : String(campus)
+                return { value: campusString, label: campusString }
+              })
             ],
           },
         ]}
@@ -403,11 +437,16 @@ export default function QuizUsersPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Campuses</SelectItem>
-                      {enrollUniqueCampuses.map(campus => (
-                        <SelectItem key={campus} value={campus}>
-                          {campus}
-                        </SelectItem>
-                      ))}
+                      {enrollUniqueCampuses.map((campus, index) => {
+                        // Ensure campus is always a string
+                        const campusString = typeof campus === 'string' ? campus : String(campus)
+                        const campusKey = campusString === '[object Object]' ? `campus-${index}` : campusString
+                        return (
+                          <SelectItem key={campusKey} value={campusString}>
+                            {campusString}
+                          </SelectItem>
+                        )
+                      })}
                     </SelectContent>
                   </Select>
 
