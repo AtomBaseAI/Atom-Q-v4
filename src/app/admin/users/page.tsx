@@ -614,7 +614,7 @@ export default function UsersPage() {
         setDeletionStatus({ enrollments: 'pending', user: 'pending' })
       } else {
         const error = await response.json()
-        
+
         if (error.error === "CANNOT_DELETE_USER_WITH_ENROLLMENTS") {
           toasts.error("User has enrollments that must be deleted first")
           setDeletionStatus(prev => ({ ...prev, user: 'pending' }))
@@ -878,7 +878,7 @@ export default function UsersPage() {
                     setFilterBatchId('all')
                     setFilterSection('all')
                   }}
-                  // className="w-full xl:w-[180px]"
+                // className="w-full xl:w-[180px]"
                 >
                   <SelectTrigger className="h-9">
                     <SelectValue placeholder="Campuses" />
@@ -901,7 +901,7 @@ export default function UsersPage() {
                     setFilterSection('all')
                   }}
                   disabled={filterCampusId === 'all'}
-                  // className="w-full xl:w-[160px]"
+                // className="w-full xl:w-[160px]"
                 >
                   <SelectTrigger className="h-9">
                     <SelectValue placeholder={filterCampusId === 'all' ? 'All Departments' : 'Department'} />
@@ -923,7 +923,7 @@ export default function UsersPage() {
                     setFilterSection('all')
                   }}
                   disabled={filterCampusId === 'all'}
-                  // className="w-full xl:w-[140px]"
+                // className="w-full xl:w-[140px]"
                 >
                   <SelectTrigger className="h-9">
                     <SelectValue placeholder={filterCampusId === 'all' ? 'All Batches' : 'Batch'} />
@@ -984,7 +984,11 @@ export default function UsersPage() {
 
           <DataTable
             columns={columns}
+
             data={filteredUsers}
+
+            searchKey="name"
+            searchPlaceholder="Search enrolled users..."
           />
         </CardContent>
       </Card>
@@ -1058,8 +1062,8 @@ export default function UsersPage() {
               </div>
               <div className="grid gap-3">
                 <Label htmlFor="add-department">Department</Label>
-                <Select 
-                  value={formData.department} 
+                <Select
+                  value={formData.department}
                   onValueChange={(value) => setFormData({ ...formData, department: value })}
                   disabled={formData.campus === "" || formData.campus === "general"}
                 >
@@ -1068,7 +1072,7 @@ export default function UsersPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="general">General</SelectItem>
-                    {formData.campus && formData.campus !== "general" && 
+                    {formData.campus && formData.campus !== "general" &&
                       campuses.find(c => c.id === formData.campus)?.departments.map((dept) => (
                         <SelectItem key={dept.id} value={dept.id}>
                           {dept.name}
@@ -1080,8 +1084,8 @@ export default function UsersPage() {
               </div>
               <div className="grid gap-3">
                 <Label htmlFor="add-batch">Batch</Label>
-                <Select 
-                  value={formData.batch} 
+                <Select
+                  value={formData.batch}
                   onValueChange={(value) => setFormData({ ...formData, batch: value })}
                   disabled={formData.campus === "" || formData.campus === "general"}
                 >
@@ -1100,8 +1104,8 @@ export default function UsersPage() {
               </div>
               <div className="grid gap-3">
                 <Label htmlFor="add-section">Section</Label>
-                <Select 
-                  value={formData.section} 
+                <Select
+                  value={formData.section}
                   onValueChange={(value: StudentSection) => setFormData({ ...formData, section: value })}
                 >
                   <SelectTrigger>
@@ -1223,8 +1227,8 @@ export default function UsersPage() {
               </div>
               <div className="grid gap-3">
                 <Label htmlFor="edit-department">Department</Label>
-                <Select 
-                  value={formData.department} 
+                <Select
+                  value={formData.department}
                   onValueChange={(value) => setFormData({ ...formData, department: value })}
                   disabled={formData.campus === "" || formData.campus === "general"}
                 >
@@ -1233,7 +1237,7 @@ export default function UsersPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="general">General</SelectItem>
-                    {formData.campus && formData.campus !== "general" && 
+                    {formData.campus && formData.campus !== "general" &&
                       campuses.find(c => c.id === formData.campus)?.departments.map((dept) => (
                         <SelectItem key={dept.id} value={dept.id}>
                           {dept.name}
