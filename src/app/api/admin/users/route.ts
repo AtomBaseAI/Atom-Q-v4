@@ -16,7 +16,33 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    const { searchParams } = new URL(request.url)
+    const campusId = searchParams.get('campusId')
+    const departmentId = searchParams.get('departmentId')
+    const batchId = searchParams.get('batchId')
+    const section = searchParams.get('section')
+
+    // Build where clause for filtering
+    const whereClause: any = {}
+
+    if (campusId && campusId !== 'all') {
+      whereClause.campusId = campusId
+    }
+
+    if (departmentId && departmentId !== 'all') {
+      whereClause.departmentId = departmentId
+    }
+
+    if (batchId && batchId !== 'all') {
+      whereClause.batchId = batchId
+    }
+
+    if (section && section !== 'all') {
+      whereClause.section = section
+    }
+
     const users = await db.user.findMany({
+      where: whereClause,
       select: {
         id: true,
         email: true,
@@ -27,16 +53,19 @@ export async function GET(request: NextRequest) {
         section: true,
         campus: {
           select: {
+            id: true,
             name: true
           }
         },
         department: {
           select: {
+            id: true,
             name: true
           }
         },
         batch: {
           select: {
+            id: true,
             name: true
           }
         },
@@ -58,7 +87,10 @@ export async function GET(request: NextRequest) {
       campus: user.campus?.name || null,
       department: user.department?.name || null,
       batch: user.batch?.name || null,
-      registrationCode: user.registrationCode?.code || null
+      registrationCode: user.registrationCode?.code || null,
+      campusId: user.campus?.id || null,
+      departmentId: user.department?.id || null,
+      batchId: user.batch?.id || null
     }))
 
     return NextResponse.json(transformedUsers)

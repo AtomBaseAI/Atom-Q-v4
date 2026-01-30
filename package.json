@@ -94,7 +94,7 @@
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^5.1.2",
     "@vitest/coverage-v8": "^4.0.17",
-    "@vitest/ui": "^0.4.19",
+    "@vitest/ui": "^4.0.17",
     "eslint": "^9.33.0",
     "eslint-config-next": "^15.4.6",
     "happy-dom": "^20.3.4",

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, useMemo } from "react"
+import { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { useAdminAuth } from "@/hooks/use-admin-auth"
 import { Button } from "@/components/ui/button"
@@ -11,6 +11,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuCheckboxItem,
 } from "@/components/ui/dropdown-menu"
 import {
   Sheet,
@@ -52,6 +53,7 @@ import {
   X,
   CheckCircle2 as CheckCircle,
   BookOpen,
+  ChevronDown,
 } from "lucide-react"
 import { toasts } from "@/lib/toasts"
 import { UserRole, StudentSection } from "@prisma/client"
@@ -60,6 +62,7 @@ import { DataTable } from "@/components/ui/data-table"
 import { ColumnDef } from "@tanstack/react-table"
 import HexagonLoader from "@/components/Loader/Loading"
 import { LoadingButton } from "@/components/ui/laodaing-button"
+// import { LoadingButton } from "@/components/ui/loading-button"
 
 // Helper function to format dates in dd/mm/yyyy format
 const formatDateDDMMYYYY = (dateString: string) => {
@@ -79,8 +82,11 @@ interface User {
   phone?: string
   section?: string
   campus?: string
+  campusId?: string | null
   department?: string
+  departmentId?: string | null
   batch?: string
+  batchId?: string | null
   registrationCode?: string
   createdAt: string
 }
@@ -129,6 +135,11 @@ export default function UsersPage() {
   const [deleteConfirmation, setDeleteConfirmation] = useState("")
   const [submitLoading, setSubmitLoading] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState<string | null>(null)
+  const [columnVisibility, setColumnVisibility] = useState({
+    role: false,
+    phone: false,
+    createdAt: false
+  })
 
   // Student deletion tracking state
   const [deleteInfo, setDeleteInfo] = useState<{
@@ -161,13 +172,75 @@ export default function UsersPage() {
   })
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // Cascading filter states
+  const [filterCampusId, setFilterCampusId] = useState<string>('all')
+  const [filterDepartmentId, setFilterDepartmentId] = useState<string>('all')
+  const [filterBatchId, setFilterBatchId] = useState<string>('all')
+  const [filterSection, setFilterSection] = useState<string>('all')
+  const [availableDepartments, setAvailableDepartments] = useState<{ id: string; name: string }[]>([])
+  const [availableBatches, setAvailableBatches] = useState<{ id: string; name: string }[]>([])
+  const [availableSections, setAvailableSections] = useState<string[]>([])
+
+  // Additional filter states
+  const [searchQuery, setSearchQuery] = useState<string>('')
+  const [registrationCodeFilter, setRegistrationCodeFilter] = useState<string>('all')
+  const [roleFilter, setRoleFilter] = useState<string>('all')
+  const [statusFilter, setStatusFilter] = useState<string>('all')
+
   // Get unique campuses for filters
   const uniqueCampuses = useMemo(() => {
-    const campuses = users.map(user => user.campus).filter(Boolean) as string[]
-    return [...new Set(campuses)]
-  }, [users])
+    return campuses.map(c => ({ id: c.id, name: c.name }))
+  }, [campuses])
 
+  // Filter users based on all filters
+  const filteredUsers = useMemo(() => {
+    return users.filter(user => {
+      // Search query filter
+      if (searchQuery && !user.name?.toLowerCase().includes(searchQuery.toLowerCase())) {
+        return false
+      }
 
+      // Role filter
+      if (roleFilter !== 'all' && user.role !== roleFilter) {
+        return false
+      }
+
+      // Status filter
+      if (statusFilter !== 'all') {
+        const isActive = statusFilter === 'true'
+        if (user.isActive !== isActive) {
+          return false
+        }
+      }
+
+      // Registration code filter
+      if (registrationCodeFilter !== 'all' && user.registrationCode !== registrationCodeFilter) {
+        return false
+      }
+
+      // Campus filter
+      if (filterCampusId !== 'all' && user.campusId !== filterCampusId) {
+        return false
+      }
+
+      // Department filter
+      if (filterDepartmentId !== 'all' && user.departmentId !== filterDepartmentId) {
+        return false
+      }
+
+      // Batch filter
+      if (filterBatchId !== 'all' && user.batchId !== filterBatchId) {
+        return false
+      }
+
+      // Section filter
+      if (filterSection !== 'all' && user.section !== filterSection) {
+        return false
+      }
+
+      return true
+    })
+  }, [users, searchQuery, roleFilter, statusFilter, registrationCodeFilter, filterCampusId, filterDepartmentId, filterBatchId, filterSection])
 
   const columns: ColumnDef<User>[] = [
     {
@@ -204,9 +277,6 @@ export default function UsersPage() {
     {
       accessorKey: "role",
       header: "Role",
-      filterFn: (row, id, value) => {
-        return value === "all" || row.getValue("role") === value
-      },
       cell: ({ row }) => {
         const role = row.getValue("role") as UserRole
         return (
@@ -222,14 +292,6 @@ export default function UsersPage() {
       cell: ({ row }) => row.getValue("phone") || "-",
     },
     {
-      accessorKey: "campus",
-      header: "Campus",
-      filterFn: (row, id, value) => {
-        return value === "all" || row.getValue("campus") === value
-      },
-      cell: ({ row }) => row.getValue("campus") || "-",
-    },
-    {
       accessorKey: "department",
       header: "Department",
       cell: ({ row }) => row.getValue("department") || "-",
@@ -242,9 +304,6 @@ export default function UsersPage() {
     {
       accessorKey: "registrationCode",
       header: "Registration Code",
-      filterFn: (row, id, value) => {
-        return value === "all" || row.getValue("registrationCode") === value
-      },
       cell: ({ row }) => {
         const code = row.getValue("registrationCode") as string
         return code ? (
@@ -265,11 +324,6 @@ export default function UsersPage() {
     {
       accessorKey: "isActive",
       header: "Status",
-      filterFn: (row, id, value) => {
-        if (value === "all") return true
-        const isActive = row.getValue("isActive") as boolean
-        return isActive === (value === "true")
-      },
       cell: ({ row }) => {
         const isActive = row.getValue("isActive") as boolean
         return (
@@ -326,23 +380,66 @@ export default function UsersPage() {
           </DropdownMenu>
         )
       },
-    },
+    }
   ]
 
-  useEffect(() => {
-    if (status === "loading" || !isAuthenticated || !isAdmin) return
+  // Filter columns based on visibility
+  const visibleColumns = useMemo(() => {
+    return columns.filter(column => {
+      if (column.id && columnVisibility.hasOwnProperty(column.id)) {
+        return columnVisibility[column.id as keyof typeof columnVisibility]
+      }
+      return true
+    })
+  }, [columns, columnVisibility])
 
-    fetchCampuses()
-    fetchRegistrationCodes()
-    fetchUsers()
-  }, [session, status, isAuthenticated, isAdmin, router])
+  const fetchFilterOptions = useCallback(async () => {
+    if (!isAuthenticated || !isAdmin) {
+      setAvailableDepartments([])
+      setAvailableBatches([])
+      setAvailableSections([])
+      return
+    }
+
+    try {
+      const params = new URLSearchParams({ campusId: filterCampusId })
+      if (filterDepartmentId && filterDepartmentId !== 'all') {
+        params.append('departmentId', filterDepartmentId)
+      }
+      if (filterBatchId && filterBatchId !== 'all') {
+        params.append('batchId', filterBatchId)
+      }
+
+      const response = await fetch(`/api/admin/users/filter-options?${params.toString()}`)
+      if (response.ok) {
+        const data = await response.json()
+        setAvailableDepartments(data.departments || [])
+        setAvailableBatches(data.batches || [])
+        setAvailableSections(data.sections || [])
+      }
+    } catch (error) {
+      console.error("Error fetching filter options:", error)
+    }
+  }, [isAuthenticated, isAdmin, filterCampusId, filterDepartmentId, filterBatchId])
+
+  // Fetch filter options when campus, department, or batch changes
+  useEffect(() => {
+    fetchFilterOptions()
+  }, [filterCampusId, filterDepartmentId, filterBatchId, fetchFilterOptions])
+
+  // Refetch users when any filter changes
+  useEffect(() => {
+    if (isAuthenticated && isAdmin && !loading) {
+      fetchUsers()
+    }
+  }, [filterCampusId, filterDepartmentId, filterBatchId, filterSection, isAuthenticated, isAdmin])
 
   const fetchBatches = async (campusId: string) => {
     if (!campusId || campusId === "general") {
       setBatches([])
       return
     }
-    
+
     try {
       const response = await fetch(`/api/admin/campus/${campusId}`)
       if (response.ok) {
@@ -401,9 +498,24 @@ export default function UsersPage() {
     if (!isAuthenticated || !isAdmin) {
       return
     }
-    
+
     try {
-      const response = await fetch("/api/admin/users")
+      const params = new URLSearchParams()
+      if (filterCampusId && filterCampusId !== 'all') {
+        params.append('campusId', filterCampusId)
+      }
+      if (filterDepartmentId && filterDepartmentId !== 'all') {
+        params.append('departmentId', filterDepartmentId)
+      }
+      if (filterBatchId && filterBatchId !== 'all') {
+        params.append('batchId', filterBatchId)
+      }
+      if (filterSection && filterSection !== 'all') {
+        params.append('section', filterSection)
+      }
+
+      const url = params.toString() ? `/api/admin/users?${params.toString()}` : "/api/admin/users"
+      const response = await fetch(url)
       if (response.ok) {
         const data = await response.json()
         setUsers(data)
@@ -649,6 +761,23 @@ export default function UsersPage() {
     }
   }
 
+  useEffect(() => {
+    const loadData = async () => {
+      if (isAuthenticated && isAdmin) {
+        setLoading(true)
+        await Promise.all([
+          fetchUsers(),
+          fetchCampuses(),
+          fetchRegistrationCodes(),
+          fetchFilterOptions()
+        ])
+        setLoading(false)
+      }
+    }
+
+    loadData()
+  }, [isAuthenticated, isAdmin])
+
   if (loading || isLoading) {
     return <div className="flex items-center justify-center h-[80vh] "><HexagonLoader size={80} /></div>
   }
@@ -686,49 +815,218 @@ export default function UsersPage() {
       </div>
 
       <Card>
-        <CardContent>
-        
+        <CardContent className="pt-6">
+          {/* Custom Filter Bar - All filters in one row */}
+          <div className="mb-6">
+            <div className="flex flex-col xl:flex-row gap-4 items-start xl:items-center">
+              {/* Search Input */}
+              <div className="flex-1 min-w-[200px] max-w-[300px]">
+                <Input
+                  placeholder="Search users..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="h-9"
+                />
+              </div>
+
+              {/* Registration Code Filter */}
+              <div className="w-full xl:w-[180px]">
+                <Select
+                  value={registrationCodeFilter}
+                  onValueChange={setRegistrationCodeFilter}
+                >
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder="All Codes" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Codes</SelectItem>
+                    {registrationCodes.map((code) => (
+                      <SelectItem key={code.code} value={code.code}>
+                        {code.code}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Role Filter */}
+              <div className="w-full xl:w-[120px]">
+                <Select
+                  value={roleFilter}
+                  onValueChange={setRoleFilter}
+                >
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder="All Roles" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Roles</SelectItem>
+                    <SelectItem value="ADMIN">Admin</SelectItem>
+                    <SelectItem value="USER">User</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Status Filter */}
+              <div className="w-full xl:w-[120px]">
+                <Select
+                  value={statusFilter}
+                  onValueChange={setStatusFilter}
+                >
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder="All Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="true">Active</SelectItem>
+                    <SelectItem value="false">Inactive</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Cascading Filters: Campus, Department, Batch, Section */}
+              <div className="flex flex-wrap gap-2 w-full xl:w-auto">
+                <Select
+                  value={filterCampusId}
+                  onValueChange={(value) => {
+                    setFilterCampusId(value)
+                    setFilterDepartmentId('all')
+                    setFilterBatchId('all')
+                    setFilterSection('all')
+                  }}
+                  // className="w-full xl:w-[180px]"
+                >
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder="All Campuses" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Campuses</SelectItem>
+                    {uniqueCampuses.map((campus) => (
+                      <SelectItem key={campus.id} value={campus.id}>
+                        {campus.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select
+                  value={filterDepartmentId}
+                  onValueChange={(value) => {
+                    setFilterDepartmentId(value)
+                    setFilterBatchId('all')
+                    setFilterSection('all')
+                  }}
+                  disabled={filterCampusId === 'all'}
+                  // className="w-full xl:w-[160px]"
+                >
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder={filterCampusId === 'all' ? 'All Departments' : 'Department'} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Departments</SelectItem>
+                    {availableDepartments.map((dept) => (
+                      <SelectItem key={dept.id} value={dept.id}>
+                        {dept.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select
+                  value={filterBatchId}
+                  onValueChange={(value) => {
+                    setFilterBatchId(value)
+                    setFilterSection('all')
+                  }}
+                  disabled={filterCampusId === 'all'}
+                  // className="w-full xl:w-[140px]"
+                >
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder={filterCampusId === 'all' ? 'All Batches' : 'Batch'} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Batches</SelectItem>
+                    {availableBatches.map((batch) => (
+                      <SelectItem key={batch.id} value={batch.id}>
+                        {batch.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select
+                  // className="w-full xl:w-[120px]"
+                  value={filterSection}
+                  onValueChange={setFilterSection}
+                  disabled={filterCampusId === 'all' || (filterDepartmentId === 'all' && filterBatchId === 'all')}
+                >
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder={filterCampusId === 'all' || (filterDepartmentId === 'all' && filterBatchId === 'all') ? 'All Sections' : 'Section'} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Sections</SelectItem>
+                    {availableSections.map((section) => (
+                      <SelectItem key={section} value={section}>
+                        Section {section}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Clear Filters Button */}
+              {(filterCampusId !== 'all' || filterDepartmentId !== 'all' || filterBatchId !== 'all' || filterSection !== 'all' || registrationCodeFilter !== 'all' || roleFilter !== 'all' || statusFilter !== 'all' || searchQuery) && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setFilterCampusId('all')
+                    setFilterDepartmentId('all')
+                    setFilterBatchId('all')
+                    setFilterSection('all')
+                    setRegistrationCodeFilter('all')
+                    setRoleFilter('all')
+                    setStatusFilter('all')
+                    setSearchQuery('')
+                  }}
+                  className="h-9 whitespace-nowrap"
+                >
+                  Clear
+                </Button>
+              )}
+
+              {/* Column Visibility Toggle */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-9 whitespace-nowrap">
+                    Columns <ChevronDown className="ml-1 h-3 w-3" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {columns.map((column) => {
+                    if (column.id === 'actions') return null
+                    return (
+                      <DropdownMenuCheckboxItem
+                        key={column.id}
+                        checked={columnVisibility[column.id as keyof typeof columnVisibility] || true}
+                        onCheckedChange={(checked) =>
+                          setColumnVisibility((prev) => ({
+                            ...prev,
+                            [column.id]: checked
+                          }))
+                        }
+                      >
+                        {column.id as string}
+                      </DropdownMenuCheckboxItem>
+                    )
+                  })}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </div>
+
           <DataTable
-            columns={columns}
-            data={users}
-            searchKey="name"
-            searchPlaceholder="Search users..."
-            filters={[
-              {
-                key: "role",
-                label: "Role",
-                options: [
-                  { value: "all", label: "All Roles" },
-                  { value: "ADMIN", label: "ADMIN" },
-                  { value: "USER", label: "USER" },
-                ],
-              },
-              {
-                key: "isActive",
-                label: "Status",
-                options: [
-                  { value: "all", label: "All Status" },
-                  { value: "true", label: "Active" },
-                  { value: "false", label: "Inactive" },
-                ],
-              },
-              {
-                key: "campus",
-                label: "Campus",
-                options: [
-                  { value: "all", label: "All Campuses" },
-                  ...uniqueCampuses.map(campus => ({ value: campus, label: campus }))
-                ],
-              },
-              {
-                key: "registrationCode",
-                label: "Registration Code",
-                options: [
-                  { value: "all", label: "All Codes" },
-                  ...registrationCodes.map(code => ({ value: code.code, label: code.code }))
-                ],
-              },
-            ]}
+            columns={visibleColumns}
+            data={filteredUsers}
           />
         </CardContent>
       </Card>
