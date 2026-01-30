@@ -135,11 +135,6 @@ export default function UsersPage() {
   const [deleteConfirmation, setDeleteConfirmation] = useState("")
   const [submitLoading, setSubmitLoading] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState<string | null>(null)
-  const [columnVisibility, setColumnVisibility] = useState({
-    role: false,
-    phone: false,
-    createdAt: false
-  })
 
   // Student deletion tracking state
   const [deleteInfo, setDeleteInfo] = useState<{
@@ -382,16 +377,6 @@ export default function UsersPage() {
       },
     }
   ]
-
-  // Filter columns based on visibility
-  const visibleColumns = useMemo(() => {
-    return columns.filter(column => {
-      if (column.id && columnVisibility.hasOwnProperty(column.id)) {
-        return columnVisibility[column.id as keyof typeof columnVisibility]
-      }
-      return true
-    })
-  }, [columns, columnVisibility])
 
   const fetchFilterOptions = useCallback(async () => {
     if (!isAuthenticated || !isAdmin) {
@@ -994,38 +979,11 @@ export default function UsersPage() {
                 </Button>
               )}
 
-              {/* Column Visibility Toggle */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="h-9 whitespace-nowrap">
-                    Columns <ChevronDown className="ml-1 h-3 w-3" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {columns.map((column) => {
-                    if (column.id === 'actions') return null
-                    return (
-                      <DropdownMenuCheckboxItem
-                        key={column.id}
-                        checked={columnVisibility[column.id as keyof typeof columnVisibility] || true}
-                        onCheckedChange={(checked) =>
-                          setColumnVisibility((prev) => ({
-                            ...prev,
-                            [column.id]: checked
-                          }))
-                        }
-                      >
-                        {column.id as string}
-                      </DropdownMenuCheckboxItem>
-                    )
-                  })}
-                </DropdownMenuContent>
-              </DropdownMenu>
             </div>
           </div>
 
           <DataTable
-            columns={visibleColumns}
+            columns={columns}
             data={filteredUsers}
           />
         </CardContent>

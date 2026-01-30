@@ -1,48 +1,18 @@
 "use client"
 
-import { useSession, signOut } from "next-auth/react"
 import { Button } from "@/components/ui/button"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Moon, Sun, LogOut, Menu } from "lucide-react"
-import { useTheme } from "next-themes"
-import { toasts } from "@/lib/toasts"
+import { Menu } from "lucide-react"
 import { useEffect } from "react"
-import { useUserStore } from "@/stores/user"
 import { useSettingsSync } from "@/hooks/use-settings-sync"
-import { SettingsMenu } from "@/components/ui/settings-menu"
-import { AnimatedThemeToggler } from "../magicui/animated-theme-toggler"
+import { useUserStore } from "@/stores/user"
 
 interface HeaderProps {
   onMenuClick: () => void
 }
 
 export function Header({ onMenuClick }: HeaderProps) {
-  const { data: session, update } = useSession()
-  const { theme, setTheme } = useTheme()
-  const { user, setUser } = useUserStore()
   const { siteTitle, isMaintenanceMode } = useSettingsSync()
-
-  // Sync session with user store
-  useEffect(() => {
-    if (session?.user) {
-      setUser({
-        id: session.user.id,
-        name: session.user.name || '',
-        email: session.user.email || '',
-        role: session.user.role,
-        avatar: session.user.avatar,
-        phone: session.user.phone,
-      })
-    }
-  }, [session, setUser])
+  const { user } = useUserStore()
 
   // Handle maintenance mode
   useEffect(() => {
@@ -51,26 +21,6 @@ export function Header({ onMenuClick }: HeaderProps) {
       window.location.href = '/'
     }
   }, [isMaintenanceMode, user?.role])
-
-  const handleSignOut = async () => {
-    try {
-      // Clear user store first to prevent redirect loops
-      setUser(null)
-      // Then sign out from NextAuth
-      await signOut({ callbackUrl: "/" })
-      toasts.success("Signed out successfully")
-      // Force redirect to root to ensure clean logout
-      window.location.href = '/'
-    } catch (error) {
-      toasts.error("Error signing out")
-    }
-  }
-
-  const displayName = user?.name || session?.user?.name || 'User'
-
-  const toggleTheme = () => {
-    setTheme(theme === "light" ? "dark" : "light")
-  }
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -88,40 +38,6 @@ export function Header({ onMenuClick }: HeaderProps) {
         <div className="flex flex-1 items-center justify-between">
           <div className="flex items-center space-x-2">
             <h1 className="text-lg font-semibold">{siteTitle}</h1>
-          </div>
-
-          <div className="flex items-center justify-end space-x-2 ml-auto">
-            <AnimatedThemeToggler className="mt-[3px] mr-4" />
-            {/* <SettingsMenu /> */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src={session?.user.avatar || ""} alt={session?.user.name || ""} />
-                    <AvatarFallback>
-                      {session?.user.name?.charAt(0).toUpperCase() || "U"}
-                    </AvatarFallback>
-                  </Avatar>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-56" align="end" forceMount>
-                <DropdownMenuLabel className="font-normal">
-                  <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">
-                      {displayName}
-                    </p>
-                    <p className="text-xs leading-none text-muted-foreground">
-                      {session?.user?.email}
-                    </p>
-                  </div>
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleSignOut}>
-                  <LogOut className="mr-2 h-4 w-4" />
-                  <span>Sign out</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
           </div>
         </div>
       </div>
