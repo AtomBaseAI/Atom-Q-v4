@@ -803,7 +803,7 @@ export default function UsersPage() {
         <CardContent className="pt-6">
           {/* Custom Filter Bar - All filters in one row */}
           <div className="mb-6">
-            <div className="flex flex-col xl:flex-row gap-4 items-start xl:items-center">
+            <div className="flex flex-col xl:flex-row gap-3 items-start xl:items-center">
               {/* Search Input */}
               <div className="flex-1 min-w-[200px] max-w-[300px]">
                 <Input
@@ -815,7 +815,7 @@ export default function UsersPage() {
               </div>
 
               {/* Registration Code Filter */}
-              <div className="w-full xl:w-[180px]">
+              <div className="w-full xl:w-[85px]">
                 <Select
                   value={registrationCodeFilter}
                   onValueChange={setRegistrationCodeFilter}
@@ -824,7 +824,7 @@ export default function UsersPage() {
                     <SelectValue placeholder="All Codes" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Codes</SelectItem>
+                    <SelectItem value="all">Codes</SelectItem>
                     {registrationCodes.map((code) => (
                       <SelectItem key={code.code} value={code.code}>
                         {code.code}
@@ -835,7 +835,7 @@ export default function UsersPage() {
               </div>
 
               {/* Role Filter */}
-              <div className="w-full xl:w-[120px]">
+              <div className="w-full xl:w-[80px]">
                 <Select
                   value={roleFilter}
                   onValueChange={setRoleFilter}
@@ -844,7 +844,7 @@ export default function UsersPage() {
                     <SelectValue placeholder="All Roles" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Roles</SelectItem>
+                    <SelectItem value="all">Roles</SelectItem>
                     <SelectItem value="ADMIN">Admin</SelectItem>
                     <SelectItem value="USER">User</SelectItem>
                   </SelectContent>
@@ -852,7 +852,7 @@ export default function UsersPage() {
               </div>
 
               {/* Status Filter */}
-              <div className="w-full xl:w-[120px]">
+              <div className="w-full xl:w-[100px]">
                 <Select
                   value={statusFilter}
                   onValueChange={setStatusFilter}
@@ -881,10 +881,10 @@ export default function UsersPage() {
                   // className="w-full xl:w-[180px]"
                 >
                   <SelectTrigger className="h-9">
-                    <SelectValue placeholder="All Campuses" />
+                    <SelectValue placeholder="Campuses" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Campuses</SelectItem>
+                    <SelectItem value="all">Campuses</SelectItem>
                     {uniqueCampuses.map((campus) => (
                       <SelectItem key={campus.id} value={campus.id}>
                         {campus.name}
@@ -907,7 +907,7 @@ export default function UsersPage() {
                     <SelectValue placeholder={filterCampusId === 'all' ? 'All Departments' : 'Department'} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Departments</SelectItem>
+                    <SelectItem value="all">Departments</SelectItem>
                     {availableDepartments.map((dept) => (
                       <SelectItem key={dept.id} value={dept.id}>
                         {dept.name}
@@ -929,7 +929,7 @@ export default function UsersPage() {
                     <SelectValue placeholder={filterCampusId === 'all' ? 'All Batches' : 'Batch'} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Batches</SelectItem>
+                    <SelectItem value="all">Batches</SelectItem>
                     {availableBatches.map((batch) => (
                       <SelectItem key={batch.id} value={batch.id}>
                         {batch.name}
@@ -948,7 +948,7 @@ export default function UsersPage() {
                     <SelectValue placeholder={filterCampusId === 'all' || (filterDepartmentId === 'all' && filterBatchId === 'all') ? 'All Sections' : 'Section'} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Sections</SelectItem>
+                    <SelectItem value="all">Sections</SelectItem>
                     {availableSections.map((section) => (
                       <SelectItem key={section} value={section}>
                         Section {section}
