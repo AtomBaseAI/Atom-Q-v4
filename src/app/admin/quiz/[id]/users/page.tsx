@@ -270,6 +270,30 @@ export default function QuizUsersPage() {
     return [...new Set(campuses)]
   }, [users])
 
+  // Get unique departments for filters
+  const uniqueDepartments = useMemo(() => {
+    const departments = users
+      .map(user => user.department?.name)
+      .filter(Boolean) as string[]
+    return [...new Set(departments)]
+  }, [users])
+
+  // Get unique batches for filters
+  const uniqueBatches = useMemo(() => {
+    const batches = users
+      .map(user => user.batch?.name)
+      .filter(Boolean) as string[]
+    return [...new Set(batches)]
+  }, [users])
+
+  // Get unique sections for filters
+  const uniqueSections = useMemo(() => {
+    const sections = users
+      .map(user => user.section)
+      .filter(Boolean) as string[]
+    return [...new Set(sections)]
+  }, [users])
+
   // Get unique campuses for enrollment filters
   const enrollUniqueCampuses = useMemo(() => {
     const campuses = availableUsers
@@ -440,7 +464,7 @@ export default function QuizUsersPage() {
             label: "Department",
             options: [
               { value: "all", label: "All Departments" },
-              ...uniqueCampuses.map(dept => ({
+              ...uniqueDepartments.map(dept => ({
                 value: dept,
                 label: dept
               }))
@@ -451,7 +475,7 @@ export default function QuizUsersPage() {
             label: "Batch",
             options: [
               { value: "all", label: "All Batches" },
-              ...uniqueCampuses.map(batch => ({
+              ...uniqueBatches.map(batch => ({
                 value: batch,
                 label: batch
               }))
@@ -462,7 +486,10 @@ export default function QuizUsersPage() {
             label: "Section",
             options: [
               { value: "all", label: "All Sections" },
-              "A", "B", "C", "D", "E", "F"
+              ...uniqueSections.map(section => ({
+                value: section,
+                label: section
+              }))
             ],
           },
         ]}
@@ -470,7 +497,7 @@ export default function QuizUsersPage() {
 
       {/* Enroll Users Sheet */}
       <Sheet open={isEnrollSheetOpen} onOpenChange={setIsEnrollSheetOpen}>
-        <SheetContent className="overflow-y-auto px-0.5" style={{ minWidth: '99vw' }}>
+        <SheetContent className="overflow-y-auto px-0.5" style={{ minWidth: '100vw' }}>
           <SheetHeader>
             <SheetTitle>Enroll Users to Quiz</SheetTitle>
             <SheetDescription>
@@ -478,9 +505,9 @@ export default function QuizUsersPage() {
             </SheetDescription>
           </SheetHeader>
 
-          <div className="space-y-4 mt-6">
+          <div className="space-y-2">
             {/* Filters Section */}
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
               <div className="relative w-full">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -591,7 +618,7 @@ export default function QuizUsersPage() {
             </div>
 
             {/* Users List */}
-            <ScrollArea className="h-[70vh] min-h-[300px] border rounded-md p-4">
+            <ScrollArea className="h-[50vh] min-h-[300px] border rounded-md p-4">
               {availableUsers.length > 0 ? (
                 <div className="space-y-2">
                   {availableUsers.map((user) => (
