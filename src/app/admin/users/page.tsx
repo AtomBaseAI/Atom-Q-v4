@@ -131,6 +131,7 @@ export default function UsersPage() {
   const [deleteLoading, setDeleteLoading] = useState<string | null>(null)
   const [selectedUserIds, setSelectedUserIds] = useState<Record<string, boolean>>({})
   const [bulkUpdateLoading, setBulkUpdateLoading] = useState(false)
+  const [tableKey, setTableKey] = useState(0)
 
   // Student deletion tracking state
   const [deleteInfo, setDeleteInfo] = useState<{
@@ -553,18 +554,11 @@ export default function UsersPage() {
       if (response.ok) {
         const result = await response.json()
         toasts.success(result.message || `Successfully updated ${userIds.length} users`)
-
-        // Optimistically update the local state
-        setUsers(prevUsers =>
-          prevUsers.map(user =>
-            userIds.includes(user.id) ? { ...user, isActive: !!isActive } : user
-          )
-        )
-
         setSelectedUserIds({})
-
-        // Then refresh from server to ensure data is in sync
-        setTimeout(() => fetchUsers(), 100)
+        // Refresh data from server
+        await fetchUsers()
+        // Force table remount to clear any stale state
+        setTableKey(prev => prev + 1)
       } else {
         const error = await response.json()
         toasts.error(error.message || "Failed to update users")
@@ -664,8 +658,10 @@ export default function UsersPage() {
       password: "",
       role: user.role,
       phone: user.phone || "",
-      campus: user.campus || "",
-      department: user.department || "",
+      campus: user.campusId || "",
+      department: user.departmentId || "",
+      batch: user.batchId || "",
+      section: user.section as StudentSection || StudentSection.A,
       isActive: user.isActive,
     })
     setIsEditDialogOpen(true)
@@ -974,6 +970,7 @@ export default function UsersPage() {
           </div>
 
           <DataTable
+            key={tableKey}
             columns={columns}
             data={users}
             searchKey="name"

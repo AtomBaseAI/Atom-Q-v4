@@ -95,6 +95,8 @@ export function DataTable<TData, TValue>({
     getFilteredRowModel: getFilteredRowModel(),
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: handleRowSelectionChange,
+    enableRowSelection: true,
+    getRowId: (row, index) => (row as any).id || index.toString(),
     state: {
       sorting,
       columnFilters,
