@@ -711,7 +711,7 @@ export default function AssessmentsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="maxTabs">Maximum Tabs Allowed</Label>
+              <Label htmlFor="maxTabs">Max Tab Switches</Label>
               <Input
                 id="maxTabs"
                 type="number"
@@ -895,7 +895,7 @@ export default function AssessmentsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="edit-maxTabs">Maximum Tabs Allowed</Label>
+              <Label htmlFor="edit-maxTabs">Max Tab Switches</Label>
               <Input
                 id="edit-maxTabs"
                 type="number"

@@ -1,29 +1,20 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { LoadingButton } from "@/components/ui/laodaing-button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,10 +24,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Label } from "@/components/ui/label"
 import {
   Select,
   SelectContent,
@@ -45,37 +33,51 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import {
+  ArrowLeft,
   Search,
-  Plus,
-  ChevronLeft,
-  Trash2,
+  UserPlus,
+  UserMinus,
   Users,
-  Download,
-  Upload,
+  ArrowUpDown,
+  ChevronLeft,
+  Filter,
   X,
+  CheckCircle2
 } from "lucide-react"
 import { toast } from "sonner"
-import Papa from "papaparse"
+import { DataTable } from "@/components/ui/data-table"
+import { ColumnDef } from "@tanstack/react-table"
 import HexagonLoader from "@/components/Loader/Loading"
+import { ScrollArea } from "@/components/ui/scroll-area"
 
 interface User {
   id: string
   name: string
   email: string
   campus?: {
+    id: string
+    name: string
+    shortName: string
+  }
+  department?: {
+    id: string
     name: string
   }
-}
-
-interface Enrollment {
-  id: string
-  user: User
-  createdAt: string
+  batch?: {
+    id: string
+    name: string
+  }
+  section: string
 }
 
 interface Assessment {
   id: string
   title: string
+  description?: string
+  category?: { name: string }
+  timeLimit?: number
+  difficulty: string
+  status: string
 }
 
 export default function AssessmentEnrollmentsPage() {
@@ -83,29 +85,38 @@ export default function AssessmentEnrollmentsPage() {
   const router = useRouter()
   const assessmentId = params.id as string
 
-  const [enrollments, setEnrollments] = useState<Enrollment[]>([])
-  const [availableUsers, setAvailableUsers] = useState<User[]>([])
   const [assessment, setAssessment] = useState<Assessment | null>(null)
+  const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
-  const [searchTerm, setSearchTerm] = useState("")
-  const [campusFilter, setCampusFilter] = useState<string>("all")
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
-  const [selectedUsersToEnroll, setSelectedUsersToEnroll] = useState<string[]>([])
-  const [enrollLoading, setEnrollLoading] = useState(false)
-  const [unenrollLoading, setUnenrollLoading] = useState<string | null>(null)
-  const [deleteEnrollmentId, setDeleteEnrollmentId] = useState<string | null>(null)
+
+  // Sheet states
+  const [isEnrollSheetOpen, setIsEnrollSheetOpen] = useState(false)
+  const [availableUsers, setAvailableUsers] = useState<User[]>([])
+  const [selectedUsers, setSelectedUsers] = useState<string[]>([])
+
+  // Sheet filter states
+  const [enrollSearchTerm, setEnrollSearchTerm] = useState("")
+  const [enrollCampusFilter, setEnrollCampusFilter] = useState<string>("all")
+  const [enrollDepartmentFilter, setEnrollDepartmentFilter] = useState<string>("all")
+  const [enrollBatchFilter, setEnrollBatchFilter] = useState<string>("all")
+  const [enrollSectionFilter, setEnrollSectionFilter] = useState<string>("all")
+  const [isEnrolling, setIsEnrolling] = useState(false)
+
+  // Unenroll states
+  const [isUnenrollDialogOpen, setIsUnenrollDialogOpen] = useState(false)
+  const [userToUnenroll, setUserToUnenroll] = useState<User | null>(null)
+  const [isUnenrolling, setIsUnenrolling] = useState(false)
 
   useEffect(() => {
-    fetchAssessment()
-    fetchEnrollments()
-    fetchAvailableUsers()
+    fetchAssessmentData()
+    fetchEnrolledUsers()
   }, [assessmentId])
 
   useEffect(() => {
     fetchAvailableUsers()
-  }, [searchTerm, campusFilter])
+  }, [isEnrollSheetOpen, enrollSearchTerm, enrollCampusFilter, enrollDepartmentFilter, enrollBatchFilter, enrollSectionFilter])
 
-  const fetchAssessment = async () => {
+  const fetchAssessmentData = async () => {
     try {
       const response = await fetch(`/api/admin/assessments/${assessmentId}`)
       if (response.ok) {
@@ -113,19 +124,20 @@ export default function AssessmentEnrollmentsPage() {
         setAssessment(data)
       }
     } catch (error) {
-      console.error("Failed to fetch assessment:", error)
+      console.error("Error fetching assessment:", error)
     }
   }
 
-  const fetchEnrollments = async () => {
+  const fetchEnrolledUsers = async () => {
+    setLoading(true)
     try {
       const response = await fetch(`/api/admin/assessments/${assessmentId}/enrollments`)
       if (response.ok) {
         const data = await response.json()
-        setEnrollments(data)
+        setUsers(data)
       }
     } catch (error) {
-      toast.error("Failed to fetch enrollments")
+      console.error("Error fetching enrolled users:", error)
     } finally {
       setLoading(false)
     }
@@ -133,341 +145,593 @@ export default function AssessmentEnrollmentsPage() {
 
   const fetchAvailableUsers = async () => {
     try {
-      const params = new URLSearchParams()
-      if (searchTerm) params.append("search", searchTerm)
-      if (campusFilter !== "all") params.append("campusId", campusFilter)
-      
-      const response = await fetch(`/api/admin/assessments/${assessmentId}/available-users?${params}`)
+      const params = new URLSearchParams({
+        assessmentId,
+        ...(enrollSearchTerm && { search: enrollSearchTerm }),
+        ...(enrollCampusFilter && enrollCampusFilter !== "all" && { campus: enrollCampusFilter }),
+        ...(enrollDepartmentFilter && enrollDepartmentFilter !== "all" && { department: enrollDepartmentFilter }),
+        ...(enrollBatchFilter && enrollBatchFilter !== "all" && { batch: enrollBatchFilter }),
+        ...(enrollSectionFilter && enrollSectionFilter !== "all" && { section: enrollSectionFilter }),
+      })
+
+      const response = await fetch(`/api/admin/students/available?${params}`)
       if (response.ok) {
         const data = await response.json()
         setAvailableUsers(data)
       }
     } catch (error) {
-      toast.error("Failed to fetch available users")
+      console.error("Error fetching available users:", error)
     }
   }
 
-  const handleEnrollUsers = async (userIds: string[]) => {
-    if (userIds.length === 0) return
-    
-    setEnrollLoading(true)
-    
+  const handleEnrollUsers = async () => {
+    if (selectedUsers.length === 0) return
+
+    setIsEnrolling(true)
+
     try {
       const response = await fetch(`/api/admin/assessments/${assessmentId}/enrollments`, {
-        method: "POST",
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ userIds }),
+        body: JSON.stringify({
+          userIds: selectedUsers
+        })
       })
 
       if (response.ok) {
-        const results = await response.json()
-        const successful = results.filter((r: any) => r.success).length
-        const failed = results.length - successful
-        
-        if (successful > 0) {
-          toast.success(`Successfully enrolled ${successful} user${successful !== 1 ? 's' : ''}`)
-        }
-        
-        if (failed > 0) {
-          toast.error(`Failed to enroll ${failed} user${failed !== 1 ? 's' : ''}`)
-        }
-        
-        setIsAddDialogOpen(false)
-        setSelectedUsersToEnroll([])
-        fetchEnrollments()
-        fetchAvailableUsers()
+        const result = await response.json()
+        toast.success(result.message || `${selectedUsers.length} user(s) enrolled successfully`)
+        setIsEnrollSheetOpen(false)
+        setSelectedUsers([])
+        // Reset filters
+        setEnrollSearchTerm("")
+        setEnrollCampusFilter("all")
+        setEnrollDepartmentFilter("all")
+        setEnrollBatchFilter("all")
+        setEnrollSectionFilter("all")
+        fetchEnrolledUsers()
       } else {
-        toast.error("Failed to enroll users")
+        const error = await response.json()
+        toast.error(error.message || 'Failed to enroll users')
       }
     } catch (error) {
-      toast.error("Failed to enroll users")
+      toast.error('Failed to enroll users')
     } finally {
-      setEnrollLoading(false)
+      setIsEnrolling(false)
     }
   }
 
-  const handleUnenrollUser = async (enrollmentId: string) => {
-    setUnenrollLoading(enrollmentId)
-    
+  const handleUnenrollUser = async () => {
+    if (!userToUnenroll) return
+
+    setIsUnenrolling(true)
+
     try {
-      const response = await fetch(`/api/admin/assessments/${assessmentId}/enrollments/${enrollmentId}`, {
-        method: "DELETE",
+      const response = await fetch(`/api/admin/assessments/${assessmentId}/enrollments/${userToUnenroll.id}`, {
+        method: 'DELETE'
       })
 
       if (response.ok) {
-        toast.success("User unenrolled successfully")
-        setEnrollments(enrollments.filter(e => e.id !== enrollmentId))
-        fetchAvailableUsers()
-        setDeleteEnrollmentId(null)
+        toast.success('User unenrolled successfully')
+        setIsUnenrollDialogOpen(false)
+        setUserToUnenroll(null)
+        fetchEnrolledUsers()
       } else {
-        toast.error("Failed to unenroll user")
+        const error = await response.json()
+        toast.error(error.message || 'Failed to unenroll user')
       }
     } catch (error) {
-      toast.error("Failed to unenroll user")
+      toast.error('Failed to unenroll user')
     } finally {
-      setUnenrollLoading(null)
+      setIsUnenrolling(false)
     }
   }
 
-  const handleExportEnrollments = () => {
-    const csvContent = [
-      ["Name", "Email", "Campus", "Enrolled At"],
-      ...enrollments.map(enrollment => [
-        enrollment.user.name || "",
-        enrollment.user.email,
-        enrollment.user.campus?.name || "General",
-        new Date(enrollment.createdAt).toLocaleString()
-      ])
-    ].map(row =>
-      row.map(cell => {
-        if (cell === null || cell === undefined) return ""
-        const str = cell.toString()
-        if (str.includes(",") || str.includes('"') || str.includes("\n")) {
-          return `"${str.replace(/"/g, '""')}"`
-        }
-        return str
-      }).join(",")
-    ).join("\n")
-
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8" })
-    const url = window.URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `${assessment?.title?.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'assessment'}_enrollments.csv`
-    a.click()
-    window.URL.revokeObjectURL(url)
-    toast.success("Enrollments exported to CSV")
+  // Helper functions for user selection
+  const hasActiveEnrollFilters = () => {
+    return enrollSearchTerm !== "" ||
+           enrollCampusFilter !== "all" ||
+           enrollDepartmentFilter !== "all" ||
+           enrollBatchFilter !== "all" ||
+           enrollSectionFilter !== "all"
   }
 
-  const handleQuestionSelect = (userId: string, checked: boolean) => {
-    if (checked) {
-      setSelectedUsersToEnroll(prev => [...prev, userId])
-    } else {
-      setSelectedUsersToEnroll(prev => prev.filter(id => id !== userId))
-    }
+  const selectAllUsers = () => {
+    const allUserIds = availableUsers.map(u => u.id)
+    setSelectedUsers(allUserIds)
   }
 
-  const handleSelectAll = (checked: boolean) => {
-    if (checked) {
-      setSelectedUsersToEnroll(availableUsers.map(u => u.id))
-    } else {
-      setSelectedUsersToEnroll([])
-    }
+  const selectFilteredUsers = () => {
+    const filteredUserIds = availableUsers.map(u => u.id)
+    setSelectedUsers(filteredUserIds)
   }
+
+  const clearUserSelection = () => {
+    setSelectedUsers([])
+  }
+
+  const toggleUserSelection = (userId: string) => {
+    setSelectedUsers(prev =>
+      prev.includes(userId)
+        ? prev.filter(id => id !== userId)
+        : [...prev, userId]
+    )
+  }
+
+  const isUserSelected = (userId: string) => selectedUsers.includes(userId)
+
+  // Get unique campuses for filters
+  const uniqueCampuses = useMemo(() => {
+    const campuses = users
+      .map(user => user.campus?.shortName)
+      .filter(Boolean) as string[]
+    return [...new Set(campuses)]
+  }, [users])
+
+  // Get unique departments for filters
+  const uniqueDepartments = useMemo(() => {
+    const departments = users
+      .map(user => user.department?.name)
+      .filter(Boolean) as string[]
+    return [...new Set(departments)]
+  }, [users])
+
+  // Get unique batches for filters
+  const uniqueBatches = useMemo(() => {
+    const batches = users
+      .map(user => user.batch?.name)
+      .filter(Boolean) as string[]
+    return [...new Set(batches)]
+  }, [users])
+
+  // Get unique sections for filters
+  const uniqueSections = useMemo(() => {
+    const sections = users
+      .map(user => user.section)
+      .filter(Boolean) as string[]
+    return [...new Set(sections)]
+  }, [users])
+
+  // Get unique campuses for enrollment filters
+  const enrollUniqueCampuses = useMemo(() => {
+    const campuses = availableUsers
+      .map(user => user.campus?.shortName)
+      .filter(Boolean) as string[]
+    return [...new Set(campuses)]
+  }, [availableUsers])
+
+  // Get unique departments for enrollment filters
+  const enrollUniqueDepartments = useMemo(() => {
+    const departments = availableUsers
+      .map(user => user.department?.name)
+      .filter(Boolean) as string[]
+    return [...new Set(departments)]
+  }, [availableUsers])
+
+  // Get unique batches for enrollment filters
+  const enrollUniqueBatches = useMemo(() => {
+    const batches = availableUsers
+      .map(user => user.batch?.name)
+      .filter(Boolean) as string[]
+    return [...new Set(batches)]
+  }, [availableUsers])
+
+  // Get unique sections for enrollment filters
+  const enrollUniqueSections = useMemo(() => {
+    const sections = availableUsers
+      .map(user => user.section)
+      .filter(Boolean) as string[]
+    return [...new Set(sections)]
+  }, [availableUsers])
+
+  const columns: ColumnDef<User>[] = [
+    {
+      accessorKey: "name",
+      header: ({ column }) => {
+        return (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+            className="h-auto p-0 font-medium"
+          >
+            Name
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          </Button>
+        )
+      },
+    },
+    {
+      accessorKey: "email",
+      header: "Email",
+    },
+    {
+      accessorKey: "campus",
+      header: "Campus",
+      cell: ({ row }) => {
+        const campus = row.getValue("campus") as User["campus"]
+        return campus?.name || campus?.shortName || "-"
+      },
+    },
+    {
+      accessorKey: "department",
+      header: "Department",
+      cell: ({ row }) => {
+        const department = row.getValue("department") as User["department"]
+        return department?.name || "-"
+      },
+    },
+    {
+      accessorKey: "batch",
+      header: "Batch",
+      cell: ({ row }) => {
+        const batch = row.getValue("batch") as User["batch"]
+        return batch?.name || "-"
+      },
+    },
+    {
+      accessorKey: "section",
+      header: "Section",
+      cell: ({ row }) => {
+        const section = row.getValue("section") as string
+        return section || "-"
+      },
+    },
+    {
+      id: "actions",
+      header: "Actions",
+      cell: ({ row }) => {
+        const user = row.original
+        return (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setUserToUnenroll(user)
+              setIsUnenrollDialogOpen(true)
+            }}
+            className="text-red-600 hover:text-red-700"
+          >
+            <UserMinus className="h-4 w-4 mr-1" />
+            Unenroll
+          </Button>
+        )
+      },
+    },
+  ]
 
   if (loading) {
-    return <HexagonLoader />
+    return (
+      <div className="flex items-center justify-center h-[80vh]">
+        <HexagonLoader size={80} />
+      </div>
+    )
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => router.back()}
-        >
-          <ChevronLeft className="h-4 w-4 mr-2" />
-          Back to Assessments
-        </Button>
+      {/* Header */}
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Assessment Enrollments</h1>
-          <p className="text-muted-foreground">
-            Manage user enrollments for "{assessment?.title}"
-          </p>
+          <h1 className="text-2xl font-bold">{assessment?.title}</h1>
+          <p className="text-sm text-muted-foreground">{users.length} enrolled users</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={() => {
+              setEnrollSearchTerm("")
+              setEnrollCampusFilter("all")
+              setEnrollDepartmentFilter("all")
+              setEnrollBatchFilter("all")
+              setEnrollSectionFilter("all")
+              setIsEnrollSheetOpen(true)
+            }}
+          >
+            <UserPlus className="h-4 w-4 mr-2" />
+            Enroll Users
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => router.back()}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <div className="flex justify-between items-center">
-            <div>
-              <CardTitle>Enrolled Users</CardTitle>
-              <CardDescription>
-                Users enrolled in this assessment ({enrollments.length} total)
-              </CardDescription>
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={handleExportEnrollments}>
-                <Download className="mr-2 h-4 w-4" />
-                Export
-              </Button>
-              <Button onClick={() => setIsAddDialogOpen(true)}>
-                <Plus className="mr-2 h-4 w-4" />
-                Enroll Users
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {enrollments.length === 0 ? (
-            <div className="text-center py-12">
-              <Users className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-              <p className="text-muted-foreground mb-4">
-                No users enrolled in this assessment yet
-              </p>
-              <Button onClick={() => setIsAddDialogOpen(true)}>
-                <Plus className="mr-2 h-4 w-4" />
-                Enroll Users
-              </Button>
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Campus</TableHead>
-                  <TableHead>Enrolled At</TableHead>
-                  <TableHead className="w-24">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {enrollments.map((enrollment) => (
-                  <TableRow key={enrollment.id}>
-                    <TableCell className="font-medium">
-                      {enrollment.user.name || "N/A"}
-                    </TableCell>
-                    <TableCell>{enrollment.user.email}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">
-                        {enrollment.user.campus?.name || "General"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {new Date(enrollment.createdAt).toLocaleString()}
-                    </TableCell>
-                    <TableCell>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-red-600"
-                            onClick={() => setDeleteEnrollmentId(enrollment.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Unenroll User</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Are you sure you want to unenroll "{enrollment.user.name || enrollment.user.email}" from this assessment? This action cannot be undone.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <LoadingButton
-                              onClick={() => handleUnenrollUser(enrollment.id)}
-                              isLoading={unenrollLoading === enrollment.id}
-                              variant="destructive"
-                            >
-                              Unenroll
-                            </LoadingButton>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+      {/* Users Table */}
+      <DataTable
+        columns={columns}
+        data={users}
+        searchKey="name"
+        searchPlaceholder="Search enrolled users..."
+        filters={[
+          {
+            key: "campus",
+            label: "Campus",
+            options: [
+              { value: "all", label: "All Campuses" },
+              ...uniqueCampuses.map(campus => ({
+                value: campus,
+                label: campus
+              }))
+            ],
+          },
+          {
+            key: "department",
+            label: "Department",
+            options: [
+              { value: "all", label: "All Departments" },
+              ...uniqueDepartments.map(dept => ({
+                value: dept,
+                label: dept
+              }))
+            ],
+          },
+          {
+            key: "batch",
+            label: "Batch",
+            options: [
+              { value: "all", label: "All Batches" },
+              ...uniqueBatches.map(batch => ({
+                value: batch,
+                label: batch
+              }))
+            ],
+          },
+          {
+            key: "section",
+            label: "Section",
+            options: [
+              { value: "all", label: "All Sections" },
+              ...uniqueSections.map(section => ({
+                value: section,
+                label: section
+              }))
+            ],
+          },
+        ]}
+      />
 
-      {/* Enroll Users Dialog */}
-      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Enroll Users in Assessment</DialogTitle>
-            <DialogDescription>
-              Select users to enroll in this assessment
-            </DialogDescription>
-          </DialogHeader>
+      {/* Enroll Users Sheet */}
+      <Sheet open={isEnrollSheetOpen} onOpenChange={setIsEnrollSheetOpen}>
+        <SheetContent className="overflow-y-auto px-0.5" style={{ minWidth: '100vw' }}>
+          <SheetHeader>
+            <SheetTitle>Enroll Users to Assessment</SheetTitle>
+            <SheetDescription>
+              Select users to enroll in "{assessment?.title}"
+            </SheetDescription>
+          </SheetHeader>
 
-          {/* Filters */}
-          <div className="flex gap-4 p-4 border-b">
-            <div className="flex-1">
-              <Input
-                placeholder="Search users..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full"
-              />
-            </div>
-            <Select value={campusFilter} onValueChange={setCampusFilter}>
-              <SelectTrigger className="w-40">
-                <SelectValue placeholder="Campus" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Campuses</SelectItem>
-                <SelectItem value="">General</SelectItem>
-                {/* Add more campus options as needed */}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Users List */}
-          <div className="max-h-96 overflow-y-auto">
-            {availableUsers.length === 0 ? (
-              <div className="text-center py-8">
-                <Users className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-                <p className="text-muted-foreground">No available users found</p>
+          <div className="space-y-2">
+            {/* Filters Section */}
+            <div className="flex flex-col gap-2">
+              <div className="relative w-full">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search users by name or email..."
+                  value={enrollSearchTerm}
+                  onChange={(e) => setEnrollSearchTerm(e.target.value)}
+                  className="pl-9"
+                />
               </div>
-            ) : (
-              <div className="space-y-2 p-4">
-                <div className="flex items-center space-x-2 pb-2 border-b">
-                  <Checkbox
-                    id="select-all"
-                    checked={selectedUsersToEnroll.length === availableUsers.length && availableUsers.length > 0}
-                    onCheckedChange={handleSelectAll}
-                  />
-                  <Label htmlFor="select-all" className="text-sm font-medium">
-                    Select All ({selectedUsersToEnroll.length} selected)
-                  </Label>
-                </div>
-                {availableUsers.map((user) => (
-                  <div key={user.id} className="flex items-center space-x-3 p-3 border rounded-lg">
-                    <Checkbox
-                      id={user.id}
-                      checked={selectedUsersToEnroll.includes(user.id)}
-                      onCheckedChange={(checked) => handleQuestionSelect(user.id, checked as boolean)}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <Label htmlFor={user.id} className="text-sm font-medium cursor-pointer">
-                        {user.name || "N/A"}
-                      </Label>
-                      <p className="text-xs text-muted-foreground">{user.email}</p>
-                      {user.campus && (
-                        <Badge variant="outline" className="text-xs mt-1">
-                          {user.campus.name}
-                        </Badge>
+              <div className="flex flex-wrap gap-2">
+                <Select value={enrollCampusFilter} onValueChange={setEnrollCampusFilter}>
+                  <SelectTrigger className="w-[150px]">
+                    <SelectValue placeholder="Campus" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Campuses</SelectItem>
+                    {enrollUniqueCampuses.map(campus => (
+                      <SelectItem key={campus} value={campus}>
+                        {campus}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={enrollDepartmentFilter} onValueChange={setEnrollDepartmentFilter}>
+                  <SelectTrigger className="w-[150px]">
+                    <SelectValue placeholder="Department" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Departments</SelectItem>
+                    {enrollUniqueDepartments.map(dept => (
+                      <SelectItem key={dept} value={dept}>
+                        {dept}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={enrollBatchFilter} onValueChange={setEnrollBatchFilter}>
+                  <SelectTrigger className="w-[150px]">
+                    <SelectValue placeholder="Batch" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Batches</SelectItem>
+                    {enrollUniqueBatches.map(batch => (
+                      <SelectItem key={batch} value={batch}>
+                        {batch}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={enrollSectionFilter} onValueChange={setEnrollSectionFilter}>
+                  <SelectTrigger className="w-[150px]">
+                    <SelectValue placeholder="Section" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Sections</SelectItem>
+                    {enrollUniqueSections.map(section => (
+                      <SelectItem key={section} value={section}>
+                        {section}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {(enrollSearchTerm || enrollCampusFilter !== "all" || enrollDepartmentFilter !== "all" || enrollBatchFilter !== "all" || enrollSectionFilter !== "all") && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setEnrollSearchTerm("")
+                      setEnrollCampusFilter("all")
+                      setEnrollDepartmentFilter("all")
+                      setEnrollBatchFilter("all")
+                      setEnrollSectionFilter("all")
+                    }}
+                  >
+                    <X className="h-4 w-4 mr-1" />
+                    Clear
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {/* Selection Controls */}
+            <div className="flex flex-wrap gap-2 items-center justify-between border-b pb-4">
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={hasActiveEnrollFilters() ? selectFilteredUsers : selectAllUsers}
+                  disabled={availableUsers.length === 0}
+                >
+                  {hasActiveEnrollFilters()
+                    ? `Select Filtered (${availableUsers.length})`
+                    : `Select All (${availableUsers.length})`
+                  }
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={clearUserSelection}
+                  disabled={selectedUsers.length === 0}
+                >
+                  Clear Selection ({selectedUsers.length})
+                </Button>
+              </div>
+              <Badge variant={selectedUsers.length > 0 ? "default" : "outline"}>
+                {selectedUsers.length} selected
+              </Badge>
+            </div>
+
+            {/* Users List */}
+            <ScrollArea className="h-[50vh] min-h-[300px] border rounded-md p-4">
+              {availableUsers.length > 0 ? (
+                <div className="space-y-2">
+                  {availableUsers.map((user) => (
+                    <div
+                      key={user.id}
+                      className={`flex items-start gap-3 p-4 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer ${
+                        isUserSelected(user.id) ? "bg-muted/80 border-primary" : ""
+                      }`}
+                      onClick={() => toggleUserSelection(user.id)}
+                    >
+                      <Checkbox
+                        checked={isUserSelected(user.id)}
+                        onChange={() => toggleUserSelection(user.id)}
+                        className="mt-0.5"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <p className="font-medium truncate">{user.name || "No name"}</p>
+                          {user.campus && (
+                            <Badge variant="outline" className="text-xs">
+                              {user.campus.shortName}
+                            </Badge>
+                          )}
+                          {user.department && (
+                            <Badge variant="outline" className="text-xs">
+                              {user.department.name}
+                            </Badge>
+                          )}
+                          {user.batch && (
+                            <Badge variant="outline" className="text-xs">
+                              {user.batch.name}
+                            </Badge>
+                          )}
+                          {user.section && (
+                            <Badge variant="outline" className="text-xs">
+                              {user.section}
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-sm text-muted-foreground truncate">
+                          {user.email}
+                        </p>
+                      </div>
+                      {isUserSelected(user.id) && (
+                        <CheckCircle2 className="h-5 w-5 text-primary flex-shrink-0" />
                       )}
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-64 text-center">
+                  <Users className="h-12 w-12 text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground">
+                    {enrollSearchTerm || enrollCampusFilter !== "all"
+                      ? "No users match your search criteria"
+                      : "No available users to enroll"}
+                  </p>
+                </div>
+              )}
+            </ScrollArea>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+            {/* Footer Actions */}
+            <div className="flex items-center justify-between pt-4 border-t">
+              <p className="text-sm text-muted-foreground">
+                {selectedUsers.length} user(s) will be enrolled
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setIsEnrollSheetOpen(false)}
+                  disabled={isEnrolling}
+                >
+                  Cancel
+                </Button>
+                <LoadingButton
+                  onClick={handleEnrollUsers}
+                  isLoading={isEnrolling}
+                  loadingText="Enrolling..."
+                  disabled={selectedUsers.length === 0}
+                >
+                  Enroll Selected Users ({selectedUsers.length})
+                </LoadingButton>
+              </div>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Unenroll User Dialog */}
+      <AlertDialog open={isUnenrollDialogOpen} onOpenChange={setIsUnenrollDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unenroll User</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to unenroll <strong>"{userToUnenroll?.name}"</strong> from this assessment?
+              This action cannot be undone and will remove their assessment data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setUserToUnenroll(null)}>
               Cancel
-            </Button>
+            </AlertDialogCancel>
             <LoadingButton
-              onClick={() => handleEnrollUsers(selectedUsersToEnroll)}
-              disabled={selectedUsersToEnroll.length === 0}
-              isLoading={enrollLoading}
+              onClick={handleUnenrollUser}
+              isLoading={isUnenrolling}
+              loadingText="Unenrolling..."
+              className="bg-red-600 hover:bg-red-700"
             >
-              Enroll {selectedUsersToEnroll.length} User{selectedUsersToEnroll.length !== 1 ? 's' : ''}
+              Unenroll User
             </LoadingButton>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

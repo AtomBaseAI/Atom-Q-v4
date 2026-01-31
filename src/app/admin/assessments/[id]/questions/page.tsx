@@ -170,6 +170,9 @@ function SortableQuestion({
       <TableCell>
         <div>
           <div className="font-medium">{question.title}</div>
+          {/* <div className="text-sm text-muted-foreground">
+            <RichTextDisplay content={question.content} />
+          </div> */}
         </div>
       </TableCell>
       <TableCell>
@@ -283,7 +286,7 @@ export default function AssessmentQuestionsPage() {
 
   const fetchAssessment = async () => {
     try {
-      const response = await fetch(`/api/admin/assessments/${assessmentId}`)
+      const response = await fetch(`/api/admin/assessment/${assessmentId}`)
       if (response.ok) {
         const data = await response.json()
         setAssessmentTitle(data.title)
@@ -295,7 +298,7 @@ export default function AssessmentQuestionsPage() {
 
   const fetchQuestions = async () => {
     try {
-      const response = await fetch(`/api/admin/assessments/${assessmentId}/questions`)
+      const response = await fetch(`/api/admin/assessment/${assessmentId}/questions`)
       if (response.ok) {
         const data = await response.json()
         setQuestions(data)
@@ -314,7 +317,7 @@ export default function AssessmentQuestionsPage() {
       if (searchTerm) params.append("search", searchTerm)
       if (groupFilter !== "all") params.append("groupId", groupFilter)
       
-      const response = await fetch(`/api/admin/assessments/${assessmentId}/available-questions?${params}`)
+      const response = await fetch(`/api/admin/assessment/${assessmentId}/available-questions?${params}`)
       if (response.ok) {
         const data = await response.json()
         setAvailableQuestions(data)
@@ -348,7 +351,7 @@ export default function AssessmentQuestionsPage() {
 
       // Update order in backend
       try {
-        await fetch(`/api/admin/assessments/${assessmentId}/questions/reorder`, {
+        await fetch(`/api/admin/assessment/${assessmentId}/questions/reorder`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -369,7 +372,7 @@ export default function AssessmentQuestionsPage() {
 
   const handleRemoveQuestion = async (questionId: string) => {
     try {
-      const response = await fetch(`/api/admin/assessments/${assessmentId}/questions/${questionId}`, {
+      const response = await fetch(`/api/admin/assessment/${assessmentId}/questions/${questionId}`, {
         method: "DELETE",
       })
 
@@ -389,7 +392,7 @@ export default function AssessmentQuestionsPage() {
     if (questionIds.length === 0) return
     
     try {
-      const response = await fetch(`/api/admin/assessments/${assessmentId}/questions`, {
+      const response = await fetch(`/api/admin/assessment/${assessmentId}/questions`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -408,10 +411,10 @@ export default function AssessmentQuestionsPage() {
         fetchQuestions()
         fetchAvailableQuestions()
       } else {
-        toast.error("Failed to add questions")
+        toast.error("Failed to enroll questions")
       }
     } catch (error) {
-      toast.error("Failed to add questions")
+      toast.error("Failed to enroll questions")
     }
   }
 
@@ -526,6 +529,7 @@ export default function AssessmentQuestionsPage() {
       skipEmptyLines: true,
       complete: async (results) => {
         try {
+
           // Filter out empty rows and validate required fields
           const validQuestions = results.data.filter((row: any) => {
             const hasTitle = row.Title && row.Title.trim() !== ""
@@ -537,6 +541,7 @@ export default function AssessmentQuestionsPage() {
             return hasTitle && hasContent && hasType && hasOptions && hasCorrectAnswer
           })
 
+
           if (validQuestions.length === 0) {
             toast.error("No valid questions found in CSV file. Please ensure all required fields are filled.")
             return
@@ -545,393 +550,876 @@ export default function AssessmentQuestionsPage() {
           // Create questions in the selected group
           const importPromises = validQuestions.map(async (question: any, index: number) => {
             try {
+
               // Normalize question type
-              let normalizedType = question.Type.toUpperCase().replace(' ', '_')
-              if (!Object.values(QuestionType).includes(normalizedType as QuestionType)) {
-                normalizedType = QuestionType.MULTIPLE_CHOICE
+              let questionType = question.Type?.toString().toUpperCase().trim()
+              if (!Object.values(QuestionType).includes(questionType as QuestionType)) {
+                questionType = QuestionType.MULTIPLE_CHOICE
+                console.warn(`Invalid question type "${question.Type}", defaulting to MULTIPLE_CHOICE`)
               }
 
-              // Parse options from CSV format (pipe-separated)
-              let optionsArray: string[] = []
+              // Parse options
+              let options = []
               if (question.Options) {
-                optionsArray = question.Options.split('|').map((opt: string) => opt.trim()).filter((opt: string) => opt)
+                const optionsStr = question.Options.toString().trim()
+                if (optionsStr.startsWith('[') && optionsStr.endsWith(']')) {
+                  try {
+                    const parsed = JSON.parse(optionsStr)
+                    if (Array.isArray(parsed)) {
+                      options = parsed
+                    }
+                  } catch {
+                    options = optionsStr.split('|').map(opt => opt.trim())
+                  }
+                } else {
+                  options = optionsStr.split('|').map(opt => opt.trim())
+                }
               }
 
-              // Parse correct answer (could be index or value)
-              let correctAnswer = question["Correct Answer"].toString().trim()
-
-              return await fetch("/api/admin/questions", {
+              // Create the question
+              const response = await fetch("/api/admin/question-groups", {
                 method: "POST",
                 headers: {
                   "Content-Type": "application/json",
                 },
                 body: JSON.stringify({
-                  title: question.Title.trim(),
-                  content: question.Content.trim(),
-                  type: normalizedType,
-                  options: optionsArray,
-                  correctAnswer: correctAnswer,
+                  title: question.Title?.trim(),
+                  content: question.Content?.trim(),
+                  type: questionType,
+                  options: options,
+                  correctAnswer: question["Correct Answer"]?.toString(),
                   explanation: question.Explanation?.trim() || "",
-                  difficulty: question.Difficulty?.toUpperCase() || DifficultyLevel.MEDIUM,
+                  difficulty: question.Difficulty?.toUpperCase() || "MEDIUM",
                   groupId: selectedQuestionGroup
                 }),
               })
+
+              if (!response.ok) {
+                const error = await response.json()
+                throw new Error(error.message || "Failed to create question")
+              }
+
+              return await response.json()
             } catch (error) {
-              console.error(`Failed to create question "${question.Title}":`, error)
-              return null
+              console.error(`Failed to import question ${index + 1}:`, error)
+              throw error
             }
           })
 
-          const importResults = await Promise.all(importPromises)
-          const successful = importResults.filter(r => r && r.ok).length
-          const failed = importResults.length - successful
+          const importedQuestions = await Promise.all(importPromises)
+          
+          // Add imported questions to the assessment
+          const questionIds = importedQuestions.map(q => q.id)
+          const addResponse = await fetch(`/api/admin/assessment/${assessmentId}/questions`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ questionIds }),
+          })
 
-          if (successful > 0) {
-            toast.success(`Successfully imported ${successful} question${successful !== 1 ? 's' : ''}`)
-            // Refresh available questions
+          if (addResponse.ok) {
+            toast.success(`Successfully imported ${importedQuestions.length} questions and added to assessment`)
+            setIsImportSheetOpen(false)
+            setImportFile(null)
+            setSelectedQuestionGroup("")
+            fetchQuestions()
             fetchAvailableQuestions()
-            fetchQuestionGroups()
-          }
-
-          if (failed > 0) {
-            toast.error(`Failed to import ${failed} question${failed !== 1 ? 's' : ''}`)
-          }
-
-          // Reset import state
-          setIsImportSheetOpen(false)
-          setImportFile(null)
-          setSelectedQuestionGroup("")
-          if (fileInputRef.current) {
-            fileInputRef.current.value = ""
+            setIsImporting(false)
+          } else {
+            toast.error("Questions were imported but failed to enroll to assessment")
+            setIsImporting(false)
           }
 
         } catch (error) {
           console.error("Import error:", error)
-          toast.error("Failed to import questions. Please check your CSV format.")
-        } finally {
+          toast.error(`Failed to import questions: ${error instanceof Error ? error.message : "Unknown error"}`)
           setIsImporting(false)
         }
       },
       error: (error) => {
         console.error("CSV parsing error:", error)
-        toast.error("Failed to parse CSV file. Please check the file format.")
+        toast.error("Failed to parse CSV file")
         setIsImporting(false)
       }
     })
   }
 
-  const filteredAvailableQuestions = availableQuestions.filter(question => {
-    const matchesSearch = !popupSearchTerm || 
-      question.title.toLowerCase().includes(popupSearchTerm.toLowerCase()) ||
-      question.content.toLowerCase().includes(popupSearchTerm.toLowerCase())
-    
-    const matchesDifficulty = popupDifficultyFilter === "all" || question.difficulty === popupDifficultyFilter
-    
-    const matchesGroup = popupGroupFilter === "all" || question.group?.id === popupGroupFilter
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
 
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: async (results) => {
+        try {
+
+          // Filter out empty rows and validate required fields
+          const validQuestions = results.data.filter((row: any) => {
+            const hasTitle = row.Title && row.Title.trim() !== ""
+            const hasContent = row.Content && row.Content.trim() !== ""
+            const hasType = row.Type && row.Type.trim() !== ""
+            const hasOptions = row.Options && row.Options.trim() !== ""
+            const hasCorrectAnswer = row["Correct Answer"] && row["Correct Answer"].trim() !== ""
+
+            return hasTitle && hasContent && hasType && hasOptions && hasCorrectAnswer
+          })
+
+
+          if (validQuestions.length === 0) {
+            toast.error("No valid questions found in CSV file. Please ensure all required fields are filled.")
+            return
+          }
+
+          const importPromises = validQuestions.map(async (question: any, index: number) => {
+            try {
+
+              // Normalize question type
+              let questionType = question.Type?.toString().toUpperCase().trim()
+              if (!Object.values(QuestionType).includes(questionType as QuestionType)) {
+                // Default to MULTIPLE_CHOICE if type is invalid
+                questionType = QuestionType.MULTIPLE_CHOICE
+                console.warn(`Invalid question type "${question.Type}", defaulting to MULTIPLE_CHOICE`)
+              }
+
+              // Parse options with better error handling
+              let options = []
+              if (question.Options) {
+                const optionsStr = question.Options.toString().trim()
+
+                // Try to parse as JSON first (handles ["aa","bb","cc"] format)
+                if (optionsStr.startsWith('[') && optionsStr.endsWith(']')) {
+                  try {
+                    const parsed = JSON.parse(optionsStr)
+                    if (Array.isArray(parsed)) {
+                      options = parsed.map(opt => opt.toString().trim()).filter(opt => opt.length > 0)
+                    }
+                  } catch (e) {
+                    console.warn(`Failed to parse options as JSON for question "${question.Title}":`, e)
+                  }
+                }
+
+                // If JSON parsing failed or not JSON, try different delimiters
+                if (options.length === 0) {
+                  // Try pipe delimiter first
+                  if (optionsStr.includes('|')) {
+                    options = optionsStr.split('|').map(opt => opt.trim()).filter(opt => opt.length > 0)
+                  }
+                  // Try comma delimiter
+                  else if (optionsStr.includes(',')) {
+                    options = optionsStr.split(',').map(opt => opt.trim()).filter(opt => opt.length > 0)
+                  }
+                  // Try semicolon delimiter
+                  else if (optionsStr.includes(';')) {
+                    options = optionsStr.split(';').map(opt => opt.trim()).filter(opt => opt.length > 0)
+                  }
+                  // Single option as string
+                  else if (optionsStr.length > 0) {
+                    options = [optionsStr]
+                  }
+                }
+              }
+
+
+              // Ensure True/False questions have correct options
+              if (questionType === QuestionType.TRUE_FALSE) {
+                if (options.length !== 2 || !options.includes("True") || !options.includes("False")) {
+                  options = ["True", "False"]
+                }
+              }
+
+              // Validate options for multiple choice
+              if (questionType === QuestionType.MULTIPLE_CHOICE && options.length < 2) {
+                throw new Error(`Multiple choice question "${question.Title}" must have at least 2 options`)
+              }
+
+              // Normalize correct answer
+              const correctAnswer = question["Correct Answer"]?.toString().trim()
+              if (!correctAnswer) {
+                throw new Error(`Correct answer is required for question "${question.Title}"`)
+              }
+
+              // Validate that correct answer is in options
+              if (!options.includes(correctAnswer)) {
+                throw new Error(`Correct answer "${correctAnswer}" not found in options for question "${question.Title}"`)
+              }
+
+              // Normalize difficulty
+              let difficulty = question.Difficulty?.toString().toUpperCase().trim() || DifficultyLevel.MEDIUM
+              if (!Object.values(DifficultyLevel).includes(difficulty as DifficultyLevel)) {
+                difficulty = DifficultyLevel.MEDIUM
+                console.warn(`Invalid difficulty "${question.Difficulty}", defaulting to MEDIUM`)
+              }
+
+              // Parse points
+              const points = parseFloat(question.Points) || 1.0
+              if (isNaN(points) || points <= 0) {
+                throw new Error(`Invalid points value for question "${question.Title}"`)
+              }
+
+              const questionData = {
+                title: question.Title?.toString().trim() || "",
+                content: question.Content?.toString().trim() || "",
+                type: questionType,
+                options: options,
+                correctAnswer: correctAnswer,
+                explanation: question.Explanation?.toString().trim() || "",
+                difficulty: difficulty,
+                points: points
+              }
+
+
+              const response = await fetch(`/api/admin/assessment/${assessmentId}/questions`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify(questionData),
+              })
+
+              if (!response.ok) {
+                const errorData = await response.json()
+                console.error(`API error for question "${questionData.title}":`, errorData)
+                throw new Error(errorData.message || `Failed to create question "${questionData.title}"`)
+              }
+
+              const result = await response.json()
+              return result
+            } catch (error) {
+              console.error(`Failed to import question "${question.Title}":`, error)
+              return {
+                error: true,
+                title: question.Title,
+                message: error instanceof Error ? error.message : "Unknown error"
+              }
+            }
+          })
+
+          const importResults = await Promise.all(importPromises)
+          const successfulImports = importResults.filter(result => !result.error)
+          const failedImports = importResults.filter(result => result.error)
+
+
+          if (successfulImports.length > 0) {
+            toast.success(`Successfully imported ${successfulImports.length} question(s)`)
+            fetchQuestions()
+            fetchAvailableQuestions()
+          }
+
+          if (failedImports.length > 0) {
+            const errorMessages = failedImports.map(failure =>
+              `"${failure.title}": ${failure.message}`
+            ).join('\n')
+            console.error("Failed imports:", errorMessages)
+            toast.error(`Failed to import ${failedImports.length} question(s):\n${errorMessages}`)
+          }
+        } catch (error) {
+          console.error("Import error:", error)
+          toast.error(`Failed to import questions: ${error instanceof Error ? error.message : "Unknown error"}`)
+        }
+      },
+      error: (error) => {
+        console.error("CSV parsing error:", error)
+        toast.error(`Failed to parse CSV file: ${error.message}`)
+      }
+    })
+
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ""
+    }
+  }
+
+  const filteredQuestions = questions.filter(question => {
+    const matchesSearch = question.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      question.content.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesDifficulty = difficultyFilter === "all" || question.difficulty === difficultyFilter
+    return matchesSearch && matchesDifficulty
+  })
+
+  const filteredAvailableQuestions = availableQuestions.filter(question => {
+    const matchesSearch = question.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      question.content.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesDifficulty = difficultyFilter === "all" || question.difficulty === difficultyFilter
+    const matchesGroup = groupFilter === "all" || question.group?.id === groupFilter
     return matchesSearch && matchesDifficulty && matchesGroup
   })
 
-  const handleQuestionSelect = (questionId: string, checked: boolean) => {
-    if (checked) {
-      setSelectedQuestionsToAdd(prev => [...prev, questionId])
-    } else {
-      setSelectedQuestionsToAdd(prev => prev.filter(id => id !== questionId))
-    }
+  // Popup-specific filtered questions
+  const popupFilteredQuestions = availableQuestions.filter(question => {
+    const matchesSearch = question.title.toLowerCase().includes(popupSearchTerm.toLowerCase()) ||
+      question.content.toLowerCase().includes(popupSearchTerm.toLowerCase())
+    const matchesDifficulty = popupDifficultyFilter === "all" || question.difficulty === popupDifficultyFilter
+    const matchesGroup = popupGroupFilter === "all" || question.group?.id === popupGroupFilter
+    return matchesSearch && matchesDifficulty && matchesGroup
+  })
+
+  // Helper functions for selection
+  const hasActiveFilters = () => {
+    return popupSearchTerm !== "" || popupDifficultyFilter !== "all" || popupGroupFilter !== "all"
   }
 
-  const handleSelectAll = (checked: boolean) => {
-    if (checked) {
-      setSelectedQuestionsToAdd(filteredAvailableQuestions.map(q => q.id))
-    } else {
-      setSelectedQuestionsToAdd([])
-    }
+  const selectAllQuestions = () => {
+    const allQuestionIds = availableQuestions.map(q => q.id)
+    setSelectedQuestionsToAdd(allQuestionIds)
   }
+
+  const selectFilteredQuestions = () => {
+    const filteredQuestionIds = popupFilteredQuestions.map(q => q.id)
+    setSelectedQuestionsToAdd(filteredQuestionIds)
+  }
+
+  const clearSelection = () => {
+    setSelectedQuestionsToAdd([])
+  }
+
+  // Effect to update selection when filters change
+  // This ensures selected items are only those visible in current filter
+  useEffect(() => {
+    if (selectedQuestionsToAdd.length > 0) {
+      const visibleQuestionIds = popupFilteredQuestions.map(q => q.id)
+      const updatedSelection = selectedQuestionsToAdd.filter(id => 
+        visibleQuestionIds.includes(id)
+      )
+      if (updatedSelection.length !== selectedQuestionsToAdd.length) {
+        setSelectedQuestionsToAdd(updatedSelection)
+      }
+    }
+  }, [popupSearchTerm, popupDifficultyFilter, popupGroupFilter])
 
   if (loading) {
-    return <HexagonLoader />
+    return <div className="flex items-center justify-center h-[80vh] "><HexagonLoader size={80} /></div>
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => router.back()}
-        >
-          <ChevronLeft className="h-4 w-4 mr-2" />
-          Back to Assessments
-        </Button>
-        <div>
-          <h1 className="text-3xl font-bold">Assessment Questions</h1>
-          <p className="text-muted-foreground">
-            Manage questions for "{assessmentTitle}"
-          </p>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-2">
+          <div className="relative">
+            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search questions..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-8 w-[300px]"
+            />
+          </div>
+          <Select value={difficultyFilter} onValueChange={setDifficultyFilter}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Filter by difficulty" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Difficulties</SelectItem>
+              <SelectItem value="EASY">Easy</SelectItem>
+              <SelectItem value="MEDIUM">Medium</SelectItem>
+              <SelectItem value="HARD">Hard</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={groupFilter} onValueChange={setGroupFilter}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Filter by group" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Groups</SelectItem>
+              {questionGroups.map((group) => (
+                <SelectItem key={group.id} value={group.id}>
+                  {group.name} ({group._count.questions})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex items-center space-x-2">
+          <Button onClick={() => setIsAddDialogOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Enroll Questions
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => router.back()}
+            className="h-9"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </Button>
         </div>
       </div>
 
       <Card>
         <CardHeader>
-          <div className="flex justify-between items-center">
+          <div className="flex items-center justify-between">
             <div>
-              <CardTitle>Questions</CardTitle>
+              <CardTitle>Assessment Questions ({filteredQuestions.length})</CardTitle>
               <CardDescription>
-                Add, remove, and reorder questions in this assessment
+                Questions currently assigned to this assessment. Drag to reorder.
               </CardDescription>
             </div>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={handleExportQuestions}>
-                <FileDown className="mr-2 h-4 w-4" />
+            <div className="flex items-center space-x-2">
+              <Button variant="outline" size="sm" onClick={handleExportQuestions}>
+                <FileDown className="h-4 w-4 mr-2" />
                 Export
               </Button>
-              <Button onClick={() => setIsAddDialogOpen(true)}>
-                <Plus className="mr-2 h-4 w-4" />
-                Add Questions
+              <Button variant="outline" size="sm" onClick={() => setIsImportSheetOpen(true)}>
+                <FileUp className="h-4 w-4 mr-2" />
+                Import
               </Button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv"
+                onChange={handleFileChange}
+                className="hidden"
+              />
             </div>
           </div>
         </CardHeader>
         <CardContent>
-          {questions.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-muted-foreground mb-4">
-                No questions added to this assessment yet
-              </p>
-              <Button onClick={() => setIsAddDialogOpen(true)}>
-                <Plus className="mr-2 h-4 w-4" />
-                Add Questions
-              </Button>
-            </div>
-          ) : (
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragEnd={handleDragEnd}
-            >
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-12"></TableHead>
-                    <TableHead className="w-12">#</TableHead>
-                    <TableHead>Question</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Difficulty</TableHead>
-                    <TableHead>Points</TableHead>
-                    <TableHead className="w-24">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  <SortableContext
-                    items={questions.map(q => q.id)}
-                    strategy={verticalListSortingStrategy}
-                  >
-                    {questions.map((question) => (
-                      <SortableQuestion
-                        key={question.id}
-                        question={question}
-                        onEdit={() => {}}
-                        onDelete={handleRemoveQuestion}
-                        onView={(question) => {
-                          setSelectedQuestion(question)
-                          setIsViewDialogOpen(true)
-                        }}
-                      />
-                    ))}
-                  </SortableContext>
-                </TableBody>
-              </Table>
-            </DndContext>
-          )}
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[50px]"></TableHead>
+                  <TableHead className="w-[80px]">Order</TableHead>
+                  <TableHead>Question</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Difficulty</TableHead>
+                  <TableHead className="w-[80px]">Points</TableHead>
+                  <TableHead className="w-[120px]">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                <SortableContext
+                  items={filteredQuestions.map(q => q.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  {filteredQuestions.map((question) => (
+                    <SortableQuestion
+                      key={question.id}
+                      question={question}
+                      onEdit={(question) => {
+                        setSelectedQuestion(question)
+                        setIsViewDialogOpen(true)
+                      }}
+                      onDelete={handleRemoveQuestion}
+                      onView={(question) => {
+                        setSelectedQuestion(question)
+                        setIsViewDialogOpen(true)
+                      }}
+                    />
+                  ))}
+                </SortableContext>
+              </TableBody>
+            </Table>
+          </DndContext>
         </CardContent>
       </Card>
 
-      {/* Add Questions Dialog */}
+      {/* Enroll Questions Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-[600px] min-w-[70vw] max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Add Questions to Assessment</DialogTitle>
-            <DialogDescription>
-              Select questions from the question bank to add to this assessment
-            </DialogDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <DialogTitle>Enroll Questions</DialogTitle>
+                <DialogDescription>
+                  Select questions from the available pool to enroll to this assessment
+                </DialogDescription>
+              </div>
+        </div>
           </DialogHeader>
-
-          {/* Filters */}
-          <div className="flex gap-4 p-4 border-b">
-            <div className="flex-1">
-              <Input
-                placeholder="Search questions..."
-                value={popupSearchTerm}
-                onChange={(e) => setPopupSearchTerm(e.target.value)}
-                className="w-full"
-              />
-            </div>
-            <Select value={popupDifficultyFilter} onValueChange={setPopupDifficultyFilter}>
-              <SelectTrigger className="w-40">
-                <SelectValue placeholder="Difficulty" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Difficulties</SelectItem>
-                <SelectItem value={DifficultyLevel.EASY}>Easy</SelectItem>
-                <SelectItem value={DifficultyLevel.MEDIUM}>Medium</SelectItem>
-                <SelectItem value={DifficultyLevel.HARD}>Hard</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={popupGroupFilter} onValueChange={setPopupGroupFilter}>
-              <SelectTrigger className="w-40">
-                <SelectValue placeholder="Question Group" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Groups</SelectItem>
-                {questionGroups.map((group) => (
-                  <SelectItem key={group.id} value={group.id}>
-                    {group.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Questions List */}
-          <div className="max-h-96 overflow-y-auto">
-            {filteredAvailableQuestions.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-muted-foreground">No questions found</p>
-              </div>
-            ) : (
-              <div className="space-y-2 p-4">
-                <div className="flex items-center space-x-2 pb-2 border-b">
-                  <Checkbox
-                    id="select-all"
-                    checked={selectedQuestionsToAdd.length === filteredAvailableQuestions.length && filteredAvailableQuestions.length > 0}
-                    onCheckedChange={handleSelectAll}
+          <div className="grid flex-1 auto-rows-min gap-6 px-4">
+            {/* Search and Filter Controls */}
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="relative flex-1">
+                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search questions..."
+                    value={popupSearchTerm}
+                    onChange={(e) => setPopupSearchTerm(e.target.value)}
+                    className="pl-8"
                   />
-                  <Label htmlFor="select-all" className="text-sm font-medium">
-                    Select All ({selectedQuestionsToAdd.length} selected)
-                  </Label>
                 </div>
-                {filteredAvailableQuestions.map((question) => (
-                  <div key={question.id} className="flex items-start space-x-3 p-3 border rounded-lg">
-                    <Checkbox
-                      id={question.id}
-                      checked={selectedQuestionsToAdd.includes(question.id)}
-                      onCheckedChange={(checked) => handleQuestionSelect(question.id, checked as boolean)}
-                      className="mt-1"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <Label htmlFor={question.id} className="text-sm font-medium cursor-pointer">
-                        {question.title}
-                      </Label>
-                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                        {question.content}
-                      </p>
-                      <div className="flex gap-2 mt-2">
-                        <Badge variant="outline" className="text-xs">
-                          {question.type.replace('_', ' ')}
-                        </Badge>
-                        <Badge variant="secondary" className="text-xs">
-                          {question.difficulty}
-                        </Badge>
-                        {question.group && (
-                          <Badge variant="outline" className="text-xs">
-                            {question.group.name}
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                <Select value={popupDifficultyFilter} onValueChange={setPopupDifficultyFilter}>
+                  <SelectTrigger className="w-full sm:w-[180px]">
+                    <SelectValue placeholder="Filter by difficulty" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Difficulties</SelectItem>
+                    <SelectItem value="EASY">Easy</SelectItem>
+                    <SelectItem value="MEDIUM">Medium</SelectItem>
+                    <SelectItem value="HARD">Hard</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={popupGroupFilter} onValueChange={setPopupGroupFilter}>
+                  <SelectTrigger className="w-full sm:w-[180px]">
+                    <SelectValue placeholder="Filter by group" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Groups</SelectItem>
+                    {questionGroups.map((group) => (
+                      <SelectItem key={group.id} value={group.id}>
+                        {group.name} ({group._count.questions})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-            )}
+              {/* Active Filters Display */}
+              {(popupSearchTerm || popupDifficultyFilter !== "all" || popupGroupFilter !== "all") && (
+                <div className="flex flex-wrap gap-2">
+                  {popupSearchTerm && (
+                    <Badge variant="secondary" className="gap-1">
+                      Search: "{popupSearchTerm}"
+                      <X 
+                        className="h-3 w-3 cursor-pointer" 
+                        onClick={() => setPopupSearchTerm("")}
+                      />
+                    </Badge>
+                  )}
+                  {popupDifficultyFilter !== "all" && (
+                    <Badge variant="secondary" className="gap-1">
+                      Difficulty: {popupDifficultyFilter}
+                      <X 
+                        className="h-3 w-3 cursor-pointer" 
+                        onClick={() => setPopupDifficultyFilter("all")}
+                      />
+                    </Badge>
+                  )}
+                  {popupGroupFilter !== "all" && (
+                    <Badge variant="secondary" className="gap-1">
+                      Group: {questionGroups.find(g => g.id === popupGroupFilter)?.name || "Unknown"}
+                      <X 
+                        className="h-3 w-3 cursor-pointer" 
+                        onClick={() => setPopupGroupFilter("all")}
+                      />
+                    </Badge>
+                  )}
+                </div>
+              )}
+            </div>
+            
+            {/* Selection Controls */}
+            <div className="flex flex-wrap gap-2 items-center justify-between">
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={hasActiveFilters() ? selectFilteredQuestions : selectAllQuestions}
+                  disabled={popupFilteredQuestions.length === 0}
+                >
+                  {hasActiveFilters() ? `Select Filtered (${popupFilteredQuestions.length})` : `Select All (${availableQuestions.length})`}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={clearSelection}
+                  disabled={selectedQuestionsToAdd.length === 0}
+                >
+                  Clear Selection ({selectedQuestionsToAdd.length})
+                </Button>
+              </div>
+              <div className="text-sm text-muted-foreground">
+                {selectedQuestionsToAdd.length} of {popupFilteredQuestions.length} selected
+              </div>
+            </div>
+            
+            <div className="grid gap-3">
+              <div className="max-h-96 overflow-y-auto border rounded-md">
+                {popupFilteredQuestions.length > 0 ? (
+                  popupFilteredQuestions.map((question) => (
+                    <div key={question.id} className="flex items-center gap-3 p-3 hover:bg-muted/50 border-b last:border-b-0">
+                      <input
+                        type="checkbox"
+                        id={`question-${question.id}`}
+                        checked={selectedQuestionsToAdd.includes(question.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedQuestionsToAdd([...selectedQuestionsToAdd, question.id])
+                          } else {
+                            setSelectedQuestionsToAdd(selectedQuestionsToAdd.filter(id => id !== question.id))
+                          }
+                        }}
+                        className="h-4 w-4"
+                      />
+                      <label htmlFor={`question-${question.id}`} className="flex-1 cursor-pointer">
+                        <div className="font-medium">{question.title}</div>
+                        {/* <div className="text-sm text-muted-foreground">{question.content}</div> */}
+                        <div className="flex gap-2 mt-1">
+                          <Badge variant={
+                            question.type === QuestionType.MULTIPLE_CHOICE ? "default" :
+                              question.type === QuestionType.MULTI_SELECT ? "secondary" :
+                              question.type === QuestionType.TRUE_FALSE ? "outline" : "destructive"
+                          }>
+                            {question.type.replace('_', ' ')}
+                          </Badge>
+                          <Badge variant={
+                            question.difficulty === DifficultyLevel.EASY ? "default" :
+                              question.difficulty === DifficultyLevel.MEDIUM ? "secondary" : "destructive"
+                          }>
+                            {question.difficulty}
+                          </Badge>
+                          {question.group && (
+                            <Badge variant="outline">
+                              {question.group.name}
+                            </Badge>
+                          )}
+                        </div>
+                      </label>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No available questions found
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+          <DialogFooter className="mt-6">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setIsAddDialogOpen(false)
+                // Reset popup filters when cancelling
+                setPopupSearchTerm("")
+                setPopupDifficultyFilter("all")
+                setPopupGroupFilter("all")
+                setSelectedQuestionsToAdd([])
+              }}
+            >
               Cancel
             </Button>
-            <LoadingButton
-              onClick={() => handleAddQuestions(selectedQuestionsToAdd)}
+            <Button 
+              onClick={() => {
+                handleAddQuestions(selectedQuestionsToAdd)
+                setSelectedQuestionsToAdd([])
+              }}
               disabled={selectedQuestionsToAdd.length === 0}
-              isLoading={false}
             >
-              Add {selectedQuestionsToAdd.length} Question{selectedQuestionsToAdd.length !== 1 ? 's' : ''}
-            </LoadingButton>
+              Enroll Selected ({selectedQuestionsToAdd.length})
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* View Question Dialog */}
       <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="sm:max-w-[600px] min-w-[70vw] max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Question Details</DialogTitle>
+            <DialogDescription>
+              View question details
+            </DialogDescription>
           </DialogHeader>
-          {selectedQuestion && (
-            <div className="space-y-4">
-              <div>
-                <Label className="text-sm font-medium">Title</Label>
-                <p className="mt-1">{selectedQuestion.title}</p>
-              </div>
-              <div>
-                <Label className="text-sm font-medium">Content</Label>
-                <div className="mt-1">
-                  <RichTextDisplay content={selectedQuestion.content} />
-                </div>
-              </div>
-              <div>
-                <Label className="text-sm font-medium">Options</Label>
-                <div className="mt-1 space-y-1">
-                  {Array.isArray(selectedQuestion.options) 
-                    ? selectedQuestion.options.map((option, index) => (
-                        <div key={index} className="flex items-center space-x-2">
-                          <span className="text-sm">{option}</span>
-                          {option === selectedQuestion.correctAnswer && (
-                            <Badge variant="default" className="text-xs">Correct</Badge>
-                          )}
-                        </div>
-                      ))
-                    : JSON.parse(selectedQuestion.options || "[]").map((option: string, index: number) => (
-                        <div key={index} className="flex items-center space-x-2">
-                          <span className="text-sm">{option}</span>
-                          {option === selectedQuestion.correctAnswer && (
-                            <Badge variant="default" className="text-xs">Correct</Badge>
-                          )}
-                        </div>
-                      ))
-                  }
-                </div>
-              </div>
-              {selectedQuestion.explanation && (
+          <div className="grid flex-1 auto-rows-min gap-6 px-4">
+            {selectedQuestion && (
+              <div className="space-y-4">
                 <div>
-                  <Label className="text-sm font-medium">Explanation</Label>
-                  <div className="mt-1">
-                    <RichTextDisplay content={selectedQuestion.explanation} />
+                  <Label className="text-sm font-medium text-muted-foreground">Title</Label>
+                  <p className="text-lg font-medium">{selectedQuestion.title}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">Content</Label>
+                  <div className="text-sm">
+                    <RichTextDisplay content={selectedQuestion.content} />
                   </div>
                 </div>
-              )}
-              <div className="flex gap-4">
                 <div>
-                  <Label className="text-sm font-medium">Type</Label>
-                  <p className="mt-1">{selectedQuestion.type.replace('_', ' ')}</p>
+                  <Label className="text-sm font-medium text-muted-foreground">Type</Label>
+                  <Badge variant={
+                    selectedQuestion.type === QuestionType.MULTIPLE_CHOICE ? "default" :
+                      selectedQuestion.type === QuestionType.TRUE_FALSE ? "secondary" : "outline"
+                  }>
+                    {selectedQuestion.type.replace('_', ' ')}
+                  </Badge>
                 </div>
                 <div>
-                  <Label className="text-sm font-medium">Difficulty</Label>
-                  <p className="mt-1">{selectedQuestion.difficulty}</p>
+                  <Label className="text-sm font-medium text-muted-foreground">Options</Label>
+                  <div className="space-y-1">
+                    {Array.isArray(selectedQuestion.options) ? (
+                      selectedQuestion.options.map((option, index) => (
+                        <div key={index} className="text-sm p-2 bg-muted rounded flex items-center gap-2">
+                          {selectedQuestion.type === QuestionType.MULTI_SELECT && (
+                            <Checkbox
+                              checked={selectedQuestion.correctAnswer.split('|').includes(option)}
+                              disabled
+                            />
+                          )}
+                          {selectedQuestion.type === QuestionType.TRUE_FALSE && (
+                            <Checkbox
+                              checked={selectedQuestion.correctAnswer === option}
+                              disabled
+                            />
+                          )}
+                          {selectedQuestion.type === QuestionType.MULTIPLE_CHOICE && (
+                            <Checkbox
+                              checked={selectedQuestion.correctAnswer === option}
+                              disabled
+                            />
+                          )}
+                          {option}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-sm p-2 bg-muted rounded">
+                        {selectedQuestion.options}
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div>
-                  <Label className="text-sm font-medium">Points</Label>
-                  <p className="mt-1">{selectedQuestion.points}</p>
+                  <Label className="text-sm font-medium text-muted-foreground">Correct Answer</Label>
+                  <p className="text-sm font-medium text-green-600">{selectedQuestion.correctAnswer}</p>
+                </div>
+                {selectedQuestion.explanation && (
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">Explanation</Label>
+                    <div className="text-sm">
+                      <RichTextDisplay content={selectedQuestion.explanation} />
+                    </div>
+                  </div>
+                )}
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">Difficulty</Label>
+                  <Badge variant={
+                    selectedQuestion.difficulty === DifficultyLevel.EASY ? "default" :
+                      selectedQuestion.difficulty === DifficultyLevel.MEDIUM ? "secondary" : "destructive"
+                  }>
+                    {selectedQuestion.difficulty}
+                  </Badge>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">Points</Label>
+                  <p className="text-sm">{selectedQuestion.points}</p>
                 </div>
               </div>
-            </div>
-          )}
-          <DialogFooter>
-            <Button onClick={() => setIsViewDialogOpen(false)}>
+            )}
+          </div>
+          <DialogFooter className="mt-6">
+            <Button variant="outline" onClick={() => setIsViewDialogOpen(false)}>
               Close
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Import Questions Sheet */}
+      <Sheet open={isImportSheetOpen} onOpenChange={setIsImportSheetOpen}>
+        <SheetContent className=" sm:w-[90vw] min-h-[100vh]">
+          <SheetHeader>
+            <SheetTitle>Import Questions</SheetTitle>
+            <SheetDescription>
+              Import questions from a CSV file and add & eroll them to a question group
+            </SheetDescription>
+          </SheetHeader>
+          
+          <div className="mt-6 space-y-6 px-4">
+            {/* Question Group Selection */}
+            <div className="space-y-2 w-full">
+              <Label htmlFor="questionGroup">Question Group *</Label>
+              <Select value={selectedQuestionGroup} onValueChange={setSelectedQuestionGroup}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select a question group" />
+                </SelectTrigger>
+                <SelectContent>
+                  {questionGroups.filter(group => group.isActive).map(group => (
+                    <SelectItem key={group.id} value={group.id}>
+                      {group.name} ({group._count.questions} questions)
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* File Upload Area */}
+            <div className="space-y-2">
+              <Label>CSV File *</Label>
+              <div
+                className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+                  isDragOver
+                    ? "border-primary bg-primary/5"
+                    : "border-muted-foreground/25 hover:border-muted-foreground/50"
+                }`}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+              >
+                {importFile ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-center space-x-2">
+                      <FileUp className="h-8 w-8 text-primary" />
+                      <div className="text-left">
+                        <p className="font-medium">{importFile.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {(importFile.size / 1024).toFixed(1)} KB
+                        </p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleRemoveFile}
+                        className="text-red-600 hover:text-red-700"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Drag and drop another file or click to select
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="flex justify-center">
+                      <FileUp className="h-12 w-12 text-muted-foreground" />
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-lg font-medium">Drop your CSV file here</p>
+                      <p className="text-sm text-muted-foreground">
+                        or click to browse files
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="mx-auto"
+                    >
+                      Select File
+                    </Button>
+                  </div>
+                )}
+              </div>
+              
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv"
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+            </div>
+          </div>
+
+          <SheetFooter className="mt-8">
+            <Button variant="outline" onClick={() => setIsImportSheetOpen(false)}>
+              Cancel
+            </Button>
+            <LoadingButton
+              onClick={handleImportWithGroup}
+              disabled={!selectedQuestionGroup || !importFile}
+              isLoading={isImporting}
+              loadingText="Importing..."
+            >
+              Import Questions
+            </LoadingButton>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }
