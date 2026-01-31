@@ -52,6 +52,8 @@ interface DataTableProps<TData, TValue> {
     options: { value: string; label: string }[]
     isArray?: boolean
   }[]
+  rowSelection?: Record<string, boolean>
+  onRowSelectionChange?: (selection: Record<string, boolean>) => void
 }
 
 export function DataTable<TData, TValue>({
@@ -60,6 +62,8 @@ export function DataTable<TData, TValue>({
   searchKey,
   searchPlaceholder = "Search...",
   filters,
+  rowSelection: controlledRowSelection,
+  onRowSelectionChange,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
@@ -67,7 +71,18 @@ export function DataTable<TData, TValue>({
   )
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({})
-  const [rowSelection, setRowSelection] = React.useState({})
+  const [internalRowSelection, setInternalRowSelection] = React.useState({})
+
+  // Use controlled rowSelection if provided, otherwise use internal state
+  const rowSelection = controlledRowSelection !== undefined ? controlledRowSelection : internalRowSelection
+
+  const handleRowSelectionChange = React.useCallback((newSelection: Record<string, boolean>) => {
+    if (controlledRowSelection !== undefined && onRowSelectionChange) {
+      onRowSelectionChange(newSelection)
+    } else {
+      setInternalRowSelection(newSelection)
+    }
+  }, [controlledRowSelection, onRowSelectionChange])
 
   const table = useReactTable({
     data,
@@ -79,7 +94,7 @@ export function DataTable<TData, TValue>({
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     onColumnVisibilityChange: setColumnVisibility,
-    onRowSelectionChange: setRowSelection,
+    onRowSelectionChange: handleRowSelectionChange,
     state: {
       sorting,
       columnFilters,
@@ -102,38 +117,48 @@ export function DataTable<TData, TValue>({
               className="max-w-sm"
             />
           )}
-          {filters?.map((filter) => (
-            <div key={filter.key} className="flex items-center gap-2">
-              <Select
-                value={(table.getColumn(filter.key)?.getFilterValue() as string) ?? ""}
-                onValueChange={(value) =>
-                  table.getColumn(filter.key)?.setFilterValue(value === "all" ? "" : value)
-                }
-              >
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue placeholder={filter.label} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All {filter.label}</SelectItem>
-                  {filter.options.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {(table.getColumn(filter.key)?.getFilterValue() as string) && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => table.getColumn(filter.key)?.setFilterValue("")}
-                  className="h-8 w-8 p-0"
+          {filters?.map((filter) => {
+            const currentValue = table.getColumn(filter.key)?.getFilterValue() as any
+            const displayValue = currentValue === null || currentValue === undefined || currentValue === "" ? "" : String(currentValue)
+
+            return (
+              <div key={filter.key} className="flex items-center gap-2">
+                <Select
+                  value={displayValue}
+                  onValueChange={(value) => {
+                    // Convert back to original type for boolean filters
+                    const originalOption = filter.options.find(opt => String(opt.value) === value)
+                    table.getColumn(filter.key)?.setFilterValue(originalOption ? originalOption.value : "")
+                  }}
                 >
-                  <X className="h-4 w-4" />
-                </Button>
-              )}
-            </div>
-          ))}
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue placeholder={filter.label} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All {filter.label}</SelectItem>
+                    {filter.options.map((option) => (
+                      <SelectItem
+                        key={String(option.value)}
+                        value={String(option.value)}
+                      >
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {currentValue && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => table.getColumn(filter.key)?.setFilterValue("")}
+                    className="h-8 w-8 p-0"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            )
+          })}
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

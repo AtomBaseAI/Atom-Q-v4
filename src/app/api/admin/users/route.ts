@@ -115,6 +115,29 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
+
+    // Handle bulk update (for changing user status)
+    if (body.bulkUpdate && Array.isArray(body.userIds) && typeof body.isActive === 'boolean') {
+      const { userIds, isActive } = body
+
+      // Update users in bulk
+      await db.user.updateMany({
+        where: {
+          id: {
+            in: userIds
+          }
+        },
+        data: {
+          isActive
+        }
+      })
+
+      return NextResponse.json({
+        message: `Successfully updated ${userIds.length} users`,
+        count: userIds.length
+      })
+    }
+
     const { importData, ...userData } = body
 
     // Handle bulk import

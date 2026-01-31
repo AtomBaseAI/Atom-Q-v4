@@ -6,6 +6,7 @@ import { useAdminAuth } from "@/hooks/use-admin-auth"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -53,7 +54,8 @@ import {
   X,
   CheckCircle2 as CheckCircle,
   BookOpen,
-  ChevronDown,
+  UserCheck,
+  UserX,
 } from "lucide-react"
 import { toasts } from "@/lib/toasts"
 import { UserRole, StudentSection } from "@prisma/client"
@@ -98,14 +100,6 @@ interface Campus {
   departments: { id: string; name: string }[]
 }
 
-interface RegistrationCode {
-  id: string
-  code: string
-  campus?: { name: string }
-  department?: { name: string }
-  batch?: { name: string }
-}
-
 interface FormData {
   name: string
   email: string
@@ -125,7 +119,7 @@ export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([])
   const [campuses, setCampuses] = useState<Campus[]>([])
   const [batches, setBatches] = useState<{ id: string; name: string }[]>([])
-  const [registrationCodes, setRegistrationCodes] = useState<RegistrationCode[]>([])
+
   const [loading, setLoading] = useState(true)
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
@@ -135,6 +129,8 @@ export default function UsersPage() {
   const [deleteConfirmation, setDeleteConfirmation] = useState("")
   const [submitLoading, setSubmitLoading] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState<string | null>(null)
+  const [selectedUserIds, setSelectedUserIds] = useState<Record<string, boolean>>({})
+  const [bulkUpdateLoading, setBulkUpdateLoading] = useState(false)
 
   // Student deletion tracking state
   const [deleteInfo, setDeleteInfo] = useState<{
@@ -176,68 +172,70 @@ export default function UsersPage() {
   const [availableBatches, setAvailableBatches] = useState<{ id: string; name: string }[]>([])
   const [availableSections, setAvailableSections] = useState<string[]>([])
 
-  // Additional filter states
-  const [searchQuery, setSearchQuery] = useState<string>('')
-  const [registrationCodeFilter, setRegistrationCodeFilter] = useState<string>('all')
-  const [roleFilter, setRoleFilter] = useState<string>('all')
-  const [statusFilter, setStatusFilter] = useState<string>('all')
+
 
   // Get unique campuses for filters
   const uniqueCampuses = useMemo(() => {
     return campuses.map(c => ({ id: c.id, name: c.name }))
   }, [campuses])
 
-  // Filter users based on all filters
-  const filteredUsers = useMemo(() => {
-    return users.filter(user => {
-      // Search query filter
-      if (searchQuery && !user.name?.toLowerCase().includes(searchQuery.toLowerCase())) {
-        return false
-      }
+  // Get unique roles for DataTable filter
+  const uniqueRoles = useMemo(() => {
+    const roles = Array.from(new Set(users.map(u => u.role)))
+    return roles.map(role => ({ value: role, label: role }))
+  }, [users])
 
-      // Role filter
-      if (roleFilter !== 'all' && user.role !== roleFilter) {
-        return false
-      }
+  // Get unique registration codes for DataTable filter
+  const uniqueCodes = useMemo(() => {
+    const codes = Array.from(new Set(users.map(u => u.registrationCode).filter(Boolean)))
+    return codes.map(code => ({ value: code!, label: code! }))
+  }, [users])
 
-      // Status filter
-      if (statusFilter !== 'all') {
-        const isActive = statusFilter === 'true'
-        if (user.isActive !== isActive) {
-          return false
-        }
-      }
-
-      // Registration code filter
-      if (registrationCodeFilter !== 'all' && user.registrationCode !== registrationCodeFilter) {
-        return false
-      }
-
-      // Campus filter
-      if (filterCampusId !== 'all' && user.campusId !== filterCampusId) {
-        return false
-      }
-
-      // Department filter
-      if (filterDepartmentId !== 'all' && user.departmentId !== filterDepartmentId) {
-        return false
-      }
-
-      // Batch filter
-      if (filterBatchId !== 'all' && user.batchId !== filterBatchId) {
-        return false
-      }
-
-      // Section filter
-      if (filterSection !== 'all' && user.section !== filterSection) {
-        return false
-      }
-
-      return true
-    })
-  }, [users, searchQuery, roleFilter, statusFilter, registrationCodeFilter, filterCampusId, filterDepartmentId, filterBatchId, filterSection])
+  // Define DataTable filters
+  const dataTableFilters = [
+    {
+      key: "role",
+      label: "Roles",
+      options: uniqueRoles,
+    },
+    {
+      key: "isActive",
+      label: "Status",
+      options: [
+        { value: true, label: "Active" },
+        { value: false, label: "Inactive" },
+      ],
+    },
+    {
+      key: "registrationCode",
+      label: "Codes",
+      options: uniqueCodes,
+    },
+  ]
 
   const columns: ColumnDef<User>[] = [
+    {
+      id: "select",
+      header: ({ table }) => (
+        <Checkbox
+          checked={
+            table.getIsAllPageRowsSelected() ||
+            (table.getIsSomePageRowsSelected() && "indeterminate")
+          }
+          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+          aria-label="Select all"
+        />
+      ),
+      cell: ({ row }) => (
+        <Checkbox
+          checked={row.getIsSelected()}
+          onCheckedChange={(value) => row.toggleSelected(!!value)}
+          aria-label="Select row"
+        />
+      ),
+      enableSorting: false,
+      enableHiding: false,
+    },
     {
       accessorKey: "name",
       header: ({ column }) => {
@@ -458,27 +456,6 @@ export default function UsersPage() {
     }
   }
 
-  const fetchRegistrationCodes = async () => {
-    if (!isAuthenticated || !isAdmin) {
-      return
-    }
-
-    try {
-      const response = await fetch("/api/admin/registration-codes")
-      if (response.ok) {
-        const data = await response.json()
-        setRegistrationCodes(data)
-      } else if (response.status === 401) {
-        toasts.error("Session expired. Please log in again.")
-        router.push('/')
-      } else {
-        toasts.error("Failed to fetch registration codes")
-      }
-    } catch (error) {
-      console.error("Error fetching registration codes:", error)
-    }
-  }
-
   const fetchUsers = async () => {
     if (!isAuthenticated || !isAdmin) {
       return
@@ -549,6 +526,53 @@ export default function UsersPage() {
       toasts.actionFailed(isEditing ? "User update" : "User creation")
     } finally {
       setSubmitLoading(false)
+    }
+  }
+
+  const handleBulkUpdateStatus = async (isActive: boolean) => {
+    const userIds = Object.keys(selectedUserIds)
+    if (userIds.length === 0) {
+      toasts.error("Please select at least one user")
+      return
+    }
+
+    setBulkUpdateLoading(true)
+    try {
+      const response = await fetch("/api/admin/users", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          bulkUpdate: true,
+          userIds,
+          isActive
+        }),
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        toasts.success(result.message || `Successfully updated ${userIds.length} users`)
+
+        // Optimistically update the local state
+        setUsers(prevUsers =>
+          prevUsers.map(user =>
+            userIds.includes(user.id) ? { ...user, isActive: !!isActive } : user
+          )
+        )
+
+        setSelectedUserIds({})
+
+        // Then refresh from server to ensure data is in sync
+        setTimeout(() => fetchUsers(), 100)
+      } else {
+        const error = await response.json()
+        toasts.error(error.message || "Failed to update users")
+      }
+    } catch (error) {
+      toasts.actionFailed("Bulk update")
+    } finally {
+      setBulkUpdateLoading(false)
     }
   }
 
@@ -642,8 +666,6 @@ export default function UsersPage() {
       phone: user.phone || "",
       campus: user.campus || "",
       department: user.department || "",
-      batch: user.batch || "",
-      section: (user.section || "A") as StudentSection,
       isActive: user.isActive,
     })
     setIsEditDialogOpen(true)
@@ -753,7 +775,6 @@ export default function UsersPage() {
         await Promise.all([
           fetchUsers(),
           fetchCampuses(),
-          fetchRegistrationCodes(),
           fetchFilterOptions()
         ])
         setLoading(false)
@@ -799,167 +820,142 @@ export default function UsersPage() {
         </div>
       </div>
 
+      {/* Bulk Actions Bar */}
+      {Object.keys(selectedUserIds).length > 0 && (
+        <div className="flex items-center justify-between p-4 bg-primary/10 rounded-lg border border-primary/20">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium">
+              {Object.keys(selectedUserIds).length} user{Object.keys(selectedUserIds).length !== 1 ? 's' : ''} selected
+            </span>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => handleBulkUpdateStatus(true)}
+              disabled={bulkUpdateLoading}
+            >
+              {bulkUpdateLoading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <UserCheck className="mr-2 h-4 w-4" />
+              )}
+              Make Active
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleBulkUpdateStatus(false)}
+              disabled={bulkUpdateLoading}
+            >
+              {bulkUpdateLoading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <UserX className="mr-2 h-4 w-4" />
+              )}
+              Make Inactive
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSelectedUserIds({})}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
+
       <Card>
         <CardContent className="pt-6">
-          {/* Custom Filter Bar - All filters in one row */}
+          {/* Cascading Filters: Campus, Department, Batch, Section */}
           <div className="mb-6">
-            <div className="flex flex-col xl:flex-row gap-3 items-start xl:items-center">
-              {/* Search Input */}
-              <div className="flex-1 min-w-[200px] max-w-[300px]">
-                <Input
-                  placeholder="Search users..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="h-9"
-                />
-              </div>
+            <div className="flex flex-wrap gap-2 items-start xl:items-center">
+              <Select
+                value={filterCampusId}
+                onValueChange={(value) => {
+                  setFilterCampusId(value)
+                  setFilterDepartmentId('all')
+                  setFilterBatchId('all')
+                  setFilterSection('all')
+                }}
+              >
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="Campuses" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Campuses</SelectItem>
+                  {uniqueCampuses.map((campus) => (
+                    <SelectItem key={campus.id} value={campus.id}>
+                      {campus.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
-              {/* Registration Code Filter */}
-              <div className="w-full xl:w-[85px]">
-                <Select
-                  value={registrationCodeFilter}
-                  onValueChange={setRegistrationCodeFilter}
-                >
-                  <SelectTrigger className="h-9">
-                    <SelectValue placeholder="All Codes" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Codes</SelectItem>
-                    {registrationCodes.map((code) => (
-                      <SelectItem key={code.code} value={code.code}>
-                        {code.code}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              <Select
+                value={filterDepartmentId}
+                onValueChange={(value) => {
+                  setFilterDepartmentId(value)
+                  setFilterBatchId('all')
+                  setFilterSection('all')
+                }}
+                disabled={filterCampusId === 'all'}
+              >
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder={filterCampusId === 'all' ? 'All Departments' : 'Department'} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Departments</SelectItem>
+                  {availableDepartments.map((dept) => (
+                    <SelectItem key={dept.id} value={dept.id}>
+                      {dept.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
-              {/* Role Filter */}
-              <div className="w-full xl:w-[80px]">
-                <Select
-                  value={roleFilter}
-                  onValueChange={setRoleFilter}
-                >
-                  <SelectTrigger className="h-9">
-                    <SelectValue placeholder="All Roles" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Roles</SelectItem>
-                    <SelectItem value="ADMIN">Admin</SelectItem>
-                    <SelectItem value="USER">User</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              <Select
+                value={filterBatchId}
+                onValueChange={(value) => {
+                  setFilterBatchId(value)
+                  setFilterSection('all')
+                }}
+                disabled={filterCampusId === 'all'}
+              >
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder={filterCampusId === 'all' ? 'All Batches' : 'Batch'} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Batches</SelectItem>
+                  {availableBatches.map((batch) => (
+                    <SelectItem key={batch.id} value={batch.id}>
+                      {batch.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
-              {/* Status Filter */}
-              <div className="w-full xl:w-[100px]">
-                <Select
-                  value={statusFilter}
-                  onValueChange={setStatusFilter}
-                >
-                  <SelectTrigger className="h-9">
-                    <SelectValue placeholder="All Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="true">Active</SelectItem>
-                    <SelectItem value="false">Inactive</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              <Select
+                value={filterSection}
+                onValueChange={setFilterSection}
+                disabled={filterCampusId === 'all' || (filterDepartmentId === 'all' && filterBatchId === 'all')}
+              >
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder={filterCampusId === 'all' || (filterDepartmentId === 'all' && filterBatchId === 'all') ? 'All Sections' : 'Section'} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Sections</SelectItem>
+                  {availableSections.map((section) => (
+                    <SelectItem key={section} value={section}>
+                      Section {section}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
-              {/* Cascading Filters: Campus, Department, Batch, Section */}
-              <div className="flex flex-wrap gap-2 w-full xl:w-auto">
-                <Select
-                  value={filterCampusId}
-                  onValueChange={(value) => {
-                    setFilterCampusId(value)
-                    setFilterDepartmentId('all')
-                    setFilterBatchId('all')
-                    setFilterSection('all')
-                  }}
-                // className="w-full xl:w-[180px]"
-                >
-                  <SelectTrigger className="h-9">
-                    <SelectValue placeholder="Campuses" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Campuses</SelectItem>
-                    {uniqueCampuses.map((campus) => (
-                      <SelectItem key={campus.id} value={campus.id}>
-                        {campus.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                <Select
-                  value={filterDepartmentId}
-                  onValueChange={(value) => {
-                    setFilterDepartmentId(value)
-                    setFilterBatchId('all')
-                    setFilterSection('all')
-                  }}
-                  disabled={filterCampusId === 'all'}
-                // className="w-full xl:w-[160px]"
-                >
-                  <SelectTrigger className="h-9">
-                    <SelectValue placeholder={filterCampusId === 'all' ? 'All Departments' : 'Department'} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Departments</SelectItem>
-                    {availableDepartments.map((dept) => (
-                      <SelectItem key={dept.id} value={dept.id}>
-                        {dept.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                <Select
-                  value={filterBatchId}
-                  onValueChange={(value) => {
-                    setFilterBatchId(value)
-                    setFilterSection('all')
-                  }}
-                  disabled={filterCampusId === 'all'}
-                // className="w-full xl:w-[140px]"
-                >
-                  <SelectTrigger className="h-9">
-                    <SelectValue placeholder={filterCampusId === 'all' ? 'All Batches' : 'Batch'} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Batches</SelectItem>
-                    {availableBatches.map((batch) => (
-                      <SelectItem key={batch.id} value={batch.id}>
-                        {batch.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                <Select
-                  // className="w-full xl:w-[120px]"
-                  value={filterSection}
-                  onValueChange={setFilterSection}
-                  disabled={filterCampusId === 'all' || (filterDepartmentId === 'all' && filterBatchId === 'all')}
-                >
-                  <SelectTrigger className="h-9">
-                    <SelectValue placeholder={filterCampusId === 'all' || (filterDepartmentId === 'all' && filterBatchId === 'all') ? 'All Sections' : 'Section'} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Sections</SelectItem>
-                    {availableSections.map((section) => (
-                      <SelectItem key={section} value={section}>
-                        Section {section}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Clear Filters Button */}
-              {(filterCampusId !== 'all' || filterDepartmentId !== 'all' || filterBatchId !== 'all' || filterSection !== 'all' || registrationCodeFilter !== 'all' || roleFilter !== 'all' || statusFilter !== 'all' || searchQuery) && (
+              {/* Clear Cascading Filters Button */}
+              {(filterCampusId !== 'all' || filterDepartmentId !== 'all' || filterBatchId !== 'all' || filterSection !== 'all') && (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -968,27 +964,23 @@ export default function UsersPage() {
                     setFilterDepartmentId('all')
                     setFilterBatchId('all')
                     setFilterSection('all')
-                    setRegistrationCodeFilter('all')
-                    setRoleFilter('all')
-                    setStatusFilter('all')
-                    setSearchQuery('')
                   }}
                   className="h-9 whitespace-nowrap"
                 >
-                  Clear
+                  Clear Filters
                 </Button>
               )}
-
             </div>
           </div>
 
           <DataTable
             columns={columns}
-
-            data={filteredUsers}
-
+            data={users}
             searchKey="name"
-            searchPlaceholder="Search enrolled users..."
+            searchPlaceholder="Search users..."
+            filters={dataTableFilters}
+            rowSelection={selectedUserIds}
+            onRowSelectionChange={setSelectedUserIds}
           />
         </CardContent>
       </Card>

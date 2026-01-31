@@ -117,13 +117,19 @@ export function LoginForm({ onSuccess, onError }: LoginFormProps) {
 
       if (result?.error) {
         let errorMessage = "Invalid email or password"
-        
+
         if (result.error.includes('maintenance')) {
           errorMessage = "Site is under maintenance. Only administrators can login."
         } else if (result.error.includes('locked')) {
           errorMessage = result.error
+        } else if (result.error.includes('disabled')) {
+          errorMessage = "Your account has been disabled. Please contact an administrator."
+        } else if (result.error.includes('Your account has been disabled')) {
+          errorMessage = "Your account has been disabled. Please contact an administrator."
+        } else if (result.error.includes('Too many login attempts')) {
+          errorMessage = result.error
         }
-        
+
         setError(errorMessage)
         onError?.(errorMessage)
         toasts.loginFailed(errorMessage)

@@ -101,7 +101,11 @@ export const authOptions: NextAuthOptions = {
           })
 
           if (!user || !user.isActive) {
-            return null
+            if (!user) {
+              throw new Error('Invalid email or password')
+            } else if (!user.isActive) {
+              throw new Error('Your account has been disabled. Please contact an administrator.')
+            }
           }
 
           const isPasswordValid = await bcrypt.compare(

@@ -20,28 +20,59 @@ export async function PUT(
     }
 
     const { id } = await params
-    const { name, email, password, phone, campus, department, role, isActive } = await request.json()
+    const { name, email, password, phone, campus, department, role, isActive, batch, section } = await request.json()
+
+    // Convert isActive to boolean if it's a string or keep it as is if already boolean
+    let isActiveBoolean: boolean
+    if (typeof isActive === 'boolean') {
+      isActiveBoolean = isActive
+    } else if (isActive === 'true' || isActive === true) {
+      isActiveBoolean = true
+    } else if (isActive === 'false' || isActive === false) {
+      isActiveBoolean = false
+    } else {
+      // Default to true if not provided or invalid
+      isActiveBoolean = true
+    }
 
     const updateData: any = {
       name,
       email,
       phone: phone || null,
       role,
-      isActive
+      isActive: isActiveBoolean
     }
 
     // Handle campus assignment
-    if (campus && campus !== "general") {
-      updateData.campusId = campus
-    } else {
-      updateData.campusId = null
+    if (campus !== undefined) {
+      if (campus && campus !== "general") {
+        updateData.campusId = campus
+      } else {
+        updateData.campusId = null
+      }
     }
 
     // Handle department assignment
-    if (department && department !== "general") {
-      updateData.departmentId = department
-    } else {
-      updateData.departmentId = null
+    if (department !== undefined) {
+      if (department && department !== "general") {
+        updateData.departmentId = department
+      } else {
+        updateData.departmentId = null
+      }
+    }
+
+    // Handle batch assignment (only if explicitly provided)
+    if (batch !== undefined) {
+      if (batch && batch !== "general") {
+        updateData.batchId = batch
+      } else {
+        updateData.batchId = null
+      }
+    }
+
+    // Handle section assignment (only if explicitly provided)
+    if (section !== undefined) {
+      updateData.section = section
     }
 
     // Only hash and update password if provided
@@ -73,7 +104,7 @@ export async function PUT(
       }
     })
 
-    // Transform the user data
+    // Transform user data
     const transformedUser = {
       ...user,
       campus: user.campus?.name || null,
