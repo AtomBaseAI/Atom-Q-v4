@@ -6,7 +6,7 @@ import { UserRole } from "@prisma/client";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -14,28 +14,59 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const { id } = await params;
+
+    // Fetch enrollments
     const enrollments = await db.assessmentUser.findMany({
-      where: { assessmentId: params.id },
-      include: {
-        user: {
+      where: { assessmentId: id },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+
+    // Fetch user details separately for each enrollment
+    const enrollmentResults = await Promise.all(
+      enrollments.map(async (enrollment) => {
+        const user = await db.user.findUnique({
+          where: { id: enrollment.userId },
           select: {
             id: true,
             name: true,
             email: true,
             campus: {
               select: {
+                id: true,
+                name: true,
+                shortName: true,
+              },
+            },
+            department: {
+              select: {
+                id: true,
                 name: true,
               },
             },
+            batch: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+            section: true,
           },
-        },
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
+        });
 
-    return NextResponse.json(enrollments);
+        return {
+          id: enrollment.id,
+          assessmentId: enrollment.assessmentId,
+          userId: enrollment.userId,
+          createdAt: enrollment.createdAt,
+          user,
+        };
+      })
+    );
+
+    return NextResponse.json(enrollmentResults);
   } catch (error) {
     console.error("Error fetching assessment enrollments:", error);
     return NextResponse.json(
@@ -47,7 +78,7 @@ export async function GET(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -65,9 +96,11 @@ export async function POST(
       );
     }
 
+    const { id } = await params;
+
     // Check if assessment exists
     const assessment = await db.assessment.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!assessment) {
@@ -78,48 +111,31 @@ export async function POST(
     }
 
     // Enroll users
-    const enrollments = await Promise.all(
+    const results = await Promise.all(
       userIds.map(async (userId) => {
         try {
-          const enrollment = await db.assessmentUser.create({
+          await db.assessmentUser.create({
             data: {
-              assessmentId: params.id,
+              assessmentId: id,
               userId,
             },
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  name: true,
-                  email: true,
-                },
-              },
-            },
           });
-          return { success: true, enrollment };
+          return { success: true, userId };
         } catch (error) {
-          // Handle duplicate enrollment
-          const existingEnrollment = await db.assessmentUser.findFirst({
-            where: {
-              assessmentId: params.id,
-              userId,
-            },
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  name: true,
-                  email: true,
-                },
-              },
-            },
-          });
-          return { success: false, error: "Already enrolled", enrollment: existingEnrollment };
+          return { success: false, error: "Already enrolled", userId };
         }
       })
     );
 
-    return NextResponse.json(enrollments);
+    const successfulEnrollments = results.filter((r: any) => r.success);
+    const duplicateCount = results.length - successfulEnrollments.length;
+
+    return NextResponse.json({
+      message: `${successfulEnrollments.length} user(s) enrolled successfully${duplicateCount > 0 ? ` (${duplicateCount} already enrolled)` : ''}`,
+      results,
+      successfulCount: successfulEnrollments.length,
+      duplicateCount
+    });
   } catch (error) {
     console.error("Error enrolling users:", error);
     return NextResponse.json(

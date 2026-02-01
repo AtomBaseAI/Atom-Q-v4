@@ -132,9 +132,32 @@ export default function AssessmentEnrollmentsPage() {
     setLoading(true)
     try {
       const response = await fetch(`/api/admin/assessments/${assessmentId}/enrollments`)
+      console.log("Fetch enrolled users response status:", response.status)
       if (response.ok) {
         const data = await response.json()
-        setUsers(data)
+        console.log("Enrolled users data from API:", data)
+        console.log("Number of enrollments:", data?.length)
+        // Map enrollment data to user data format expected by table
+        const usersData = data.map((enrollment: any) => ({
+          id: enrollment.user.id,
+          name: enrollment.user.name,
+          email: enrollment.user.email,
+          campus: enrollment.user.campus,
+          department: enrollment.user.department,
+          batch: enrollment.user.batch,
+          section: enrollment.user.section || "",
+        }))
+        console.log("Mapped users data:", usersData)
+        console.log("Setting users state with length:", usersData.length)
+        setUsers(usersData)
+      } else {
+        console.error("Failed to fetch enrolled users. Status:", response.status)
+        try {
+          const error = await response.json()
+          console.error("Error:", error)
+        } catch (e) {
+          console.error("Could not parse error JSON")
+        }
       }
     } catch (error) {
       console.error("Error fetching enrolled users:", error)
@@ -214,7 +237,8 @@ export default function AssessmentEnrollmentsPage() {
       })
 
       if (response.ok) {
-        toast.success('User unenrolled successfully')
+        const result = await response.json()
+        toast.success(result.message || 'User unenrolled successfully')
         setIsUnenrollDialogOpen(false)
         setUserToUnenroll(null)
         fetchEnrolledUsers()
@@ -223,6 +247,7 @@ export default function AssessmentEnrollmentsPage() {
         toast.error(error.message || 'Failed to unenroll user')
       }
     } catch (error) {
+      console.error("Error unenrolling user:", error)
       toast.error('Failed to unenroll user')
     } finally {
       setIsUnenrolling(false)
@@ -347,26 +372,29 @@ export default function AssessmentEnrollmentsPage() {
       header: "Email",
     },
     {
-      accessorKey: "campus",
+      id: "campus",
+      accessorFn: (row) => row.campus?.shortName || "",
       header: "Campus",
       cell: ({ row }) => {
-        const campus = row.getValue("campus") as User["campus"]
-        return campus?.name || campus?.shortName || "-"
+        const campus = row.original.campus
+        return campus?.shortName || campus?.name || "-"
       },
     },
     {
-      accessorKey: "department",
+      id: "department",
+      accessorFn: (row) => row.department?.name || "",
       header: "Department",
       cell: ({ row }) => {
-        const department = row.getValue("department") as User["department"]
+        const department = row.original.department
         return department?.name || "-"
       },
     },
     {
-      accessorKey: "batch",
+      id: "batch",
+      accessorFn: (row) => row.batch?.name || "",
       header: "Batch",
       cell: ({ row }) => {
-        const batch = row.getValue("batch") as User["batch"]
+        const batch = row.original.batch
         return batch?.name || "-"
       },
     },

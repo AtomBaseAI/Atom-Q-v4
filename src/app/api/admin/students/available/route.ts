@@ -17,6 +17,7 @@ export async function GET(request: NextRequest) {
 
     const searchParams = request.nextUrl.searchParams
     const quizId = searchParams.get("quizId")
+    const assessmentId = searchParams.get("assessmentId")
     const search = searchParams.get("search") || ""
     const campus = searchParams.get("campus") || ""
     const department = searchParams.get("department") || ""
@@ -34,6 +35,15 @@ export async function GET(request: NextRequest) {
       where.quizUsers = {
         none: {
           quizId: quizId
+        }
+      }
+    }
+
+    // Exclude users already enrolled in this assessment
+    if (assessmentId) {
+      where.assessmentUsers = {
+        none: {
+          assessmentId: assessmentId
         }
       }
     }

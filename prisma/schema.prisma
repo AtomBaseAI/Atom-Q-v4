@@ -75,6 +75,7 @@ model User {
   quizUsers            QuizUser[]
   assessmentAttempts   AssessmentAttempt[]
   assessmentUsers      AssessmentUser[]
+  tabSwitches         AssessmentTabSwitch[]
   createdQuizzes       Quiz[]             @relation("QuizCreator")
   createdAssessments   Assessment[]       @relation("AssessmentCreator")
   questionGroups       QuestionGroup[]
@@ -227,6 +228,7 @@ model Assessment {
   assessmentAttempts AssessmentAttempt[]
   assessmentQuestions AssessmentQuestion[]
   assessmentUsers    AssessmentUser[]
+  tabSwitches       AssessmentTabSwitch[]
   creator            User            @relation("AssessmentCreator", fields: [creatorId], references: [id])
 
   @@map("assessments")
@@ -271,6 +273,7 @@ model AssessmentAttempt {
   updatedAt     DateTime         @updatedAt
   answers       AssessmentAnswer[]
   assessment    Assessment      @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  tabSwitches     AssessmentTabSwitch[]
   user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("assessment_attempts")
@@ -385,4 +388,16 @@ enum StudentSection {
   D
   E
   F
+}
+
+model AssessmentTabSwitch {
+  id            String   @id @default(cuid())
+  attemptId     String
+  userId        String
+  assessmentId   String
+  createdAt      DateTime @default(now())
+  attempt        AssessmentAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  user          User       @relation(fields: [userId], references: [id])
+  assessment    Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  @@map("assessment_tab_switches")
 }

@@ -301,7 +301,21 @@ export default function AssessmentQuestionsPage() {
       const response = await fetch(`/api/admin/assessment/${assessmentId}/questions`)
       if (response.ok) {
         const data = await response.json()
-        setQuestions(data)
+        // Map assessment question data to question format expected by the table
+        const questionsData = data.map((aq: any) => ({
+          id: aq.question.id,
+          title: aq.question.title,
+          content: aq.question.content,
+          type: aq.question.type,
+          options: aq.question.options,
+          correctAnswer: aq.question.correctAnswer,
+          explanation: aq.question.explanation,
+          difficulty: aq.question.difficulty,
+          isActive: aq.question.isActive,
+          order: aq.order,
+          points: aq.points,
+        }))
+        setQuestions(questionsData)
       }
     } catch (error) {
       toast.error("Failed to fetch questions")
