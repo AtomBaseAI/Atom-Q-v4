@@ -136,13 +136,13 @@ export default function UserQuizPage() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "completed":
-        return <Badge variant="secondary" className="bg-green-100 text-green-800"><CheckCircle2 className="w-3 h-3 mr-1" />Completed</Badge>
+        return <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs py-1 px-2"><CheckCircle2 className="w-3 h-3 mr-1" />Completed</Badge>
       case "in_progress":
-        return <Badge variant="default" className="bg-blue-100 text-blue-800"><Play className="w-3 h-3 mr-1" />In Progress</Badge>
+        return <Badge variant="default" className="bg-blue-100 text-blue-800 text-xs py-1 px-2"><Play className="w-3 h-3 mr-1" />In Progress</Badge>
       case "expired":
-        return <Badge variant="destructive"><AlertCircle className="w-3 h-3 mr-1" />Expired</Badge>
+        return <Badge variant="destructive" className="text-xs py-1 px-2"><AlertCircle className="w-3 h-3 mr-1" />Expired</Badge>
       default:
-        return <Badge variant="outline">Not Started</Badge>
+        return <Badge variant="outline" className="text-xs py-1 px-2">Not Started</Badge>
     }
   }
 
@@ -169,23 +169,25 @@ export default function UserQuizPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto py-6">
+      <div className="container mx-auto py-6 px-4">
         <div className="mb-6">
           <Skeleton className="h-8 w-48 mb-2" />
           <Skeleton className="h-4 w-96" />
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6">
           {[1, 2, 3].map((i) => (
-            <Card key={i}>
-              <CardHeader>
-                <Skeleton className="h-6 w-3/4" />
-                <Skeleton className="h-4 w-full" />
+            <Card key={i} className="flex flex-col min-h-[280px]">
+              <CardHeader className="flex-shrink-0 pb-3 px-4">
+                <Skeleton className="h-5 w-3/4 mb-1.5" />
+                <Skeleton className="h-3.5 w-full" />
               </CardHeader>
-              <CardContent>
-                <Skeleton className="h-20 w-full" />
+              <CardContent className="flex-grow flex flex-col space-y-2 px-4 pb-3">
+                <Skeleton className="h-3.5 w-full" />
+                <Skeleton className="h-3.5 w-2/3" />
+                <Skeleton className="h-8 w-full" />
               </CardContent>
-              <CardFooter>
-                <Skeleton className="h-10 w-full" />
+              <CardFooter className="flex-shrink-0 pt-3 px-4">
+                <Skeleton className="h-9 w-full" />
               </CardFooter>
             </Card>
           ))}
@@ -196,7 +198,7 @@ export default function UserQuizPage() {
 
   if (error) {
     return (
-      <div className="container mx-auto py-6">
+      <div className="container mx-auto py-6 px-4">
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
@@ -217,8 +219,8 @@ export default function UserQuizPage() {
   }
 
   return (
-    <div className="container mx-auto py-6">
-      <div className="mb-6 flex justify-between items-center">
+    <div className="container mx-auto py-6 px-4">
+      <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold">Available Quizzes</h1>
           <p className="text-muted-foreground">
@@ -256,118 +258,115 @@ export default function UserQuizPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6">
           {quizzes.map((quiz) => (
-            <Card key={quiz.id} className="hover:shadow-lg transition-shadow flex flex-col h-[250px]">
-              <CardHeader className="flex-shrink-0">
-                <div className="flex justify-between items-start mb-2">
-                  <CardTitle className="text-lg line-clamp-2">{quiz.title}</CardTitle>
+            <Card key={quiz.id} className="hover:shadow-lg transition-shadow flex flex-col min-h-[280px]">
+              <CardHeader className="flex-shrink-0 pb-3 px-4">
+                <div className="flex justify-between items-start gap-2 mb-2">
+                  <CardTitle className="text-base font-semibold line-clamp-2 flex-1">{quiz.title}</CardTitle>
                   {getStatusBadge(quiz.attemptStatus)}
                 </div>
-                <CardDescription className="line-clamp-2">{quiz.description}</CardDescription>
+                <CardDescription className="text-sm line-clamp-2">{quiz.description}</CardDescription>
               </CardHeader>
 
-              <CardContent className="flex-grow space-y-4">
-                <div className="flex items-center justify-between text-sm">
+              <CardContent className="flex-grow flex flex-col space-y-2 px-4 pb-3 overflow-y-auto">
+                <div className="flex items-center justify-between text-xs">
                   <div className="flex items-center">
-                    <FileText className="w-4 h-4 mr-1" />
+                    <FileText className="w-3.5 h-3.5 mr-1" />
                     {quiz.questionCount} questions
                   </div>
-                  <Badge variant="outline" className={getDifficultyColor(quiz.difficulty)}>
+                  <Badge variant="outline" className={`text-xs ${getDifficultyColor(quiz.difficulty)}`}>
                     {quiz.difficulty}
                   </Badge>
                 </div>
 
                 {quiz.timeLimit && (
-                  <div className="flex items-center text-sm text-muted-foreground">
-                    <Clock className="w-4 h-4 mr-1" />
+                  <div className="flex items-center text-xs text-muted-foreground">
+                    <Clock className="w-3.5 h-3.5 mr-1" />
                     {formatTimeLimit(quiz.timeLimit)}
                   </div>
                 )}
 
                 {quiz.maxAttempts !== null && (
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-xs">
                       <span>Attempts</span>
                       <span>{quiz.attempts}/{quiz.maxAttempts}</span>
                     </div>
                     <Progress
                       value={(quiz.attempts / quiz.maxAttempts) * 100}
-                      className="h-2"
+                      className="h-1.5"
                     />
                   </div>
                 )}
 
                 {quiz.bestScore !== null && (
-                  <div className="flex items-center text-sm">
-                    <Trophy className="w-4 h-4 mr-1 text-yellow-500" />
+                  <div className="flex items-center text-xs">
+                    <Trophy className="w-3.5 h-3.5 mr-1 text-yellow-500" />
                     Best Score: {Math.round(quiz.bestScore)}%
                   </div>
                 )}
 
                 {quiz.startTime && new Date(quiz.startTime) > new Date() && (
-                  <Alert className="border-yellow-200 bg-yellow-50">
-                    <AlertCircle className="h-4 w-4 text-yellow-600" />
-                    <AlertDescription className="text-yellow-800">
-                      <strong>Quiz not available yet</strong><br />
-                      Available from: {formatDateDDMMYYYYTime(quiz.startTime)}
+                  <Alert className="border-yellow-200 bg-yellow-50 py-2 px-3">
+                    <AlertCircle className="h-3.5 w-3.5 text-yellow-600" />
+                    <AlertDescription className="text-yellow-800 text-xs leading-tight">
+                      <span className="font-semibold">Not available</span> from {formatDateDDMMYYYY(quiz.startTime)}
                     </AlertDescription>
                   </Alert>
                 )}
 
                 {quiz.endTime && new Date(quiz.endTime) < new Date() && (
-                  <Alert className="border-red-200 bg-red-50">
-                    <AlertCircle className="h-4 w-4 text-red-600" />
-                    <AlertDescription className="text-red-800">
-                      <strong>Quiz expired</strong><br />
-                      Deadline was: {formatDateDDMMYYYYTime(quiz.endTime)}
+                  <Alert className="border-red-200 bg-red-50 py-2 px-3">
+                    <AlertCircle className="h-3.5 w-3.5 text-red-600" />
+                    <AlertDescription className="text-red-800 text-xs leading-tight">
+                      <span className="font-semibold">Expired</span> on {formatDateDDMMYYYY(quiz.endTime)}
                     </AlertDescription>
                   </Alert>
                 )}
 
                 {quiz.startTime && quiz.endTime && new Date(quiz.startTime) <= new Date() && new Date(quiz.endTime) >= new Date() && (
-                  <Alert className="border-green-200 bg-green-50">
-                    <AlertCircle className="h-4 w-4 text-green-600" />
-                    <AlertDescription className="text-green-800">
-                      <strong>Quiz available now</strong><br />
-                      Available until: {formatDateDDMMYYYYTime(quiz.endTime)}
+                  <Alert className="border-green-200 bg-green-50 py-2 px-3">
+                    <AlertCircle className="h-3.5 w-3.5 text-green-600" />
+                    <AlertDescription className="text-green-800 text-xs leading-tight">
+                      <span className="font-semibold">Available</span> until {formatDateDDMMYYYY(quiz.endTime)}
                     </AlertDescription>
                   </Alert>
                 )}
               </CardContent>
 
-              <CardFooter className="flex-shrink-0">
+              <CardFooter className="flex-shrink-0 pt-3 px-4">
                 <LoadingButton
                   onClick={() => handleStartQuiz(quiz.id)}
                   disabled={!quiz.canAttempt}
                   isLoading={startingQuizId === quiz.id}
                   loadingText={quiz.hasInProgress ? "Continuing..." : quiz.attemptStatus === "completed" ? "Retaking..." : "Starting..."}
-                  className="w-full"
+                  className="w-full h-9 text-sm"
                   variant={quiz.hasInProgress ? "default" : "default"}
                 >
                   {quiz.hasInProgress ? (
                     <>
-                      <RotateCcw className="w-4 h-4 mr-2" />
-                      Continue Quiz
+                      <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
+                      Continue
                     </>
                   ) : quiz.attemptStatus === "completed" ? (
                     <>
-                      <RotateCcw className="w-4 h-4 mr-2" />
-                      Retake Quiz
+                      <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
+                      Retake
                     </>
                   ) : quiz.attemptStatus === "expired" ? (
                     <>
-                      <AlertCircle className="w-4 h-4 mr-2" />
-                      Quiz Expired
+                      <AlertCircle className="w-3.5 h-3.5 mr-1.5" />
+                      Expired
                     </>
                   ) : quiz.startTime && new Date(quiz.startTime) > new Date() ? (
                     <>
-                      <Clock className="w-4 h-4 mr-2" />
-                      Not Available Yet
+                      <Clock className="w-3.5 h-3.5 mr-1.5" />
+                      Not Available
                     </>
                   ) : (
                     <>
-                      <Play className="w-4 h-4 mr-2" />
+                      <Play className="w-3.5 h-3.5 mr-1.5" />
                       Start Quiz
                     </>
                   )}

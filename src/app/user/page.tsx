@@ -13,7 +13,9 @@ import {
   TrendingUp,
   Target,
   Calendar,
-  BarChart3
+  BarChart3,
+  Building2,
+  Menu
 } from "lucide-react"
 import { QuizAttemptActivity } from "@/types/api"
 import { toasts } from "@/lib/toasts"
@@ -22,12 +24,22 @@ import { useQuizCacheStore } from "@/stores/quiz-cache"
 import HexagonLoader from "@/components/Loader/Loading"
 
 // Helper function to format dates in dd/mm/yyyy format
-const formatDateDDMMYYYY = (dateString: string) => {
-  const date = new Date(dateString)
-  const day = String(date.getDate()).padStart(2, '0')
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const year = date.getFullYear()
-  return `${day}/${month}/${year}`
+const formatDateDDMMYYYY = (dateString: string | Date | null | undefined) => {
+  if (!dateString) return "N/A"
+  
+  try {
+    const date = new Date(dateString)
+    // Check if date is valid
+    if (isNaN(date.getTime())) return "N/A"
+    
+    const day = String(date.getDate()).padStart(2, '0')
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const year = date.getFullYear()
+    return `${day}/${month}/${year}`
+  } catch (error) {
+    console.error('Error formatting date:', error)
+    return "N/A"
+  }
 }
 
 interface UserStats {
@@ -35,8 +47,8 @@ interface UserStats {
   completedQuizzes: number
   averageScore: number
   totalTimeSpent: number
-  streakCount: number
-  rank: number
+  bestScore: number
+  assessmentsTaken: number
 }
 
 interface RecentActivity {
@@ -58,6 +70,28 @@ export default function UserDashboard() {
   } = useQuizCacheStore()
 
   const [loading, setLoading] = useState(false)
+  const [campusName, setCampusName] = useState<string>("")
+
+  // Fetch campus name
+  useEffect(() => {
+    const fetchCampusData = async () => {
+      if (!session) return
+
+      try {
+        const response = await fetch("/api/user/campus-data")
+        if (response.ok) {
+          const data = await response.json()
+          if (data.campus) {
+            setCampusName(data.campus.name)
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching campus data:", error)
+      }
+    }
+
+    fetchCampusData()
+  }, [session])
 
   useEffect(() => {
     const fetchData = async () => {
@@ -143,8 +177,8 @@ export default function UserDashboard() {
       const activityDate = new Date(activity.submittedAt).toDateString()
       const dayData = last7Days.find(day => day.date === activityDate)
       if (dayData) {
-        const percentage = Math.round(activity.score * 100) // Assuming score is already a percentage
-        dayData.score = (dayData.score * dayData.count + percentage) / (dayData.count + 1)
+        const score = activity.score // Score is already a percentage (0-100)
+        dayData.score = (dayData.score * dayData.count + score) / (dayData.count + 1)
         dayData.count += 1
       }
     })
@@ -163,10 +197,31 @@ export default function UserDashboard() {
 
   return (
     <div className="space-y-6">
+      {/* Custom Header with Campus Name */}
+      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 -mx-6 px-6 py-4 mb-4">
+        <div className="flex h-10 items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-2">
+              <Building2 className="h-5 w-5 text-primary" />
+              <h1 className="text-lg font-semibold">
+                {campusName || "Dashboard"}
+              </h1>
+            </div>
+            {campusName && (
+              <Badge variant="secondary" className="text-xs">
+                Campus
+              </Badge>
+            )}
+          </div>
+          <div className="flex items-center space-x-2">
+            <p className="text-sm text-muted-foreground hidden md:block">
+              Welcome back, {session?.user.name || "User"}!
+            </p>
+          </div>
+        </div>
+      </header>
+
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">
-          Welcome back, {session?.user.name || "User"}!
-        </h1>
         <p className="text-muted-foreground">
           Here's your learning progress and recent activity
         </p>
@@ -205,6 +260,19 @@ export default function UserDashboard() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Assessments Taken</CardTitle>
+              <BarChart3 className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{userStats.assessmentsTaken}</div>
+              <p className="text-xs text-muted-foreground">
+                Total assessments completed
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Average Score</CardTitle>
               <Target className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
@@ -225,19 +293,6 @@ export default function UserDashboard() {
               <div className="text-2xl font-bold">{formatTime(userStats.totalTimeSpent)}</div>
               <p className="text-xs text-muted-foreground">
                 Total learning time
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Current Streak</CardTitle>
-              <Trophy className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{userStats.streakCount}</div>
-              <p className="text-xs text-muted-foreground">
-                Days in a row
               </p>
             </CardContent>
           </Card>

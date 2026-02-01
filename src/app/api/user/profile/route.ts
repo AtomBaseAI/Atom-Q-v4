@@ -7,7 +7,7 @@ import { UserRole } from "@prisma/client"
 export async function PUT(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session || session.user.role !== UserRole.USER) {
       return NextResponse.json(
         { message: "Unauthorized" },
@@ -15,7 +15,7 @@ export async function PUT(request: NextRequest) {
       )
     }
 
-    const { name, phone, avatar } = await request.json()
+    const { name, phone, avatar, departmentId, batchId, section } = await request.json()
 
     // Update user profile
     const updatedUser = await db.user.update({
@@ -24,6 +24,9 @@ export async function PUT(request: NextRequest) {
         ...(name !== undefined && { name }),
         ...(phone !== undefined && { phone }),
         ...(avatar !== undefined && { avatar }),
+        ...(departmentId !== undefined && { departmentId }),
+        ...(batchId !== undefined && { batchId }),
+        ...(section !== undefined && { section }),
       },
       select: {
         id: true,
@@ -32,6 +35,9 @@ export async function PUT(request: NextRequest) {
         phone: true,
         avatar: true,
         role: true,
+        departmentId: true,
+        batchId: true,
+        section: true,
       }
     })
 
@@ -48,7 +54,7 @@ export async function PUT(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session || session.user.role !== UserRole.USER) {
       return NextResponse.json(
         { message: "Unauthorized" },
@@ -66,6 +72,9 @@ export async function GET(request: NextRequest) {
         phone: true,
         avatar: true,
         role: true,
+        departmentId: true,
+        batchId: true,
+        section: true,
         createdAt: true,
       }
     })

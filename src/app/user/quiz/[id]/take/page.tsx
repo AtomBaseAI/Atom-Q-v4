@@ -83,6 +83,17 @@ export default function QuizTakingPage() {
   const [reportSuggestion, setReportSuggestion] = useState("")
   const [isSubmittingReport, setIsSubmittingReport] = useState(false)
   const paginationContainerRef = useRef<HTMLDivElement>(null)
+  const answersRef = useRef<Record<string, string>>(answers)
+  const multiSelectAnswersRef = useRef<Record<string, string[]>>(multiSelectAnswers)
+
+  // Update refs when state changes
+  useEffect(() => {
+    answersRef.current = answers
+  }, [answers])
+
+  useEffect(() => {
+    multiSelectAnswersRef.current = multiSelectAnswers
+  }, [multiSelectAnswers])
 
   // Quiz progress store
   const {
@@ -234,64 +245,63 @@ export default function QuizTakingPage() {
   useEffect(() => {
     if (timeRemaining > 0 && !submitting) {
       const timer = setInterval(() => {
-        setTimeRemaining((prev) => {
-          const newTime = prev - 1
-          // Update persistence store with new time
-          updateTimeRemaining(newTime)
-          
-          if (newTime <= 0) {
-            // Auto-submit when time runs out
-            ;(async () => {
-              try {
-                setSubmitting(true)
-                
-                // Prepare answers for submission
-                const finalAnswers: Record<string, string> = { ...answers }
-                
-                // Convert multi-select answers to pipe-separated string
-                Object.keys(multiSelectAnswers).forEach(questionId => {
-                  const selectedOptions = multiSelectAnswers[questionId]
-                  if (selectedOptions.length > 0) {
-                    finalAnswers[questionId] = selectedOptions.join('|')
-                  }
-                })
-                
-                const response = await fetch(`/api/user/quiz/${params.id}/submit`, {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                  },
-                  body: JSON.stringify({
-                    attemptId,
-                    answers: finalAnswers,
-                  }),
-                })
+        const newTime = timeRemaining - 1
+        // Update local state first
+        setTimeRemaining(newTime)
 
-                if (response.ok) {
-                  const result = await response.json()
-                  toasts.success("Time's up! Quiz submitted automatically.")
-                  // Clear persisted data after successful submission
-                  endQuiz()
-                  router.push(`/user/quiz/${params.id}/result?attemptId=${attemptId}`)
-                } else {
-                  const error = await response.json()
-                  toasts.error(error.message || "Failed to submit quiz")
+        // Then update persistence store (outside of setState callback)
+        updateTimeRemaining(newTime)
+
+        if (newTime <= 0) {
+          // Auto-submit when time runs out
+          ;(async () => {
+            try {
+              setSubmitting(true)
+
+              // Prepare answers for submission using refs to get latest values
+              const finalAnswers: Record<string, string> = { ...answersRef.current }
+
+              // Convert multi-select answers to pipe-separated string
+              Object.keys(multiSelectAnswersRef.current).forEach(questionId => {
+                const selectedOptions = multiSelectAnswersRef.current[questionId]
+                if (selectedOptions.length > 0) {
+                  finalAnswers[questionId] = selectedOptions.join('|')
                 }
-              } catch (error) {
-                toasts.error("Failed to submit quiz")
-              } finally {
-                setSubmitting(false)
+              })
+
+              const response = await fetch(`/api/user/quiz/${params.id}/submit`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  attemptId,
+                  answers: finalAnswers,
+                }),
+              })
+
+              if (response.ok) {
+                const result = await response.json()
+                toasts.success("Time's up! Quiz submitted automatically.")
+                // Clear persisted data after successful submission
+                endQuiz()
+                router.push(`/user/quiz/${params.id}/result?attemptId=${attemptId}`)
+              } else {
+                const error = await response.json()
+                toasts.error(error.message || "Failed to submit quiz")
               }
-            })()
-            return 0
-          }
-          return newTime
-        })
+            } catch (error) {
+              toasts.error("Failed to submit quiz")
+            } finally {
+              setSubmitting(false)
+            }
+          })()
+        }
       }, 1000)
 
       return () => clearInterval(timer)
     }
-  }, [timeRemaining, submitting, attemptId, answers, multiSelectAnswers, params.id, router, updateTimeRemaining, endQuiz])
+  }, [timeRemaining, submitting, attemptId, params.id, router, updateTimeRemaining, endQuiz])
 
   // Auto-scroll pagination to active question
   useEffect(() => {
@@ -356,25 +366,25 @@ export default function QuizTakingPage() {
     if (checkedAnswers.has(questionId)) {
       return
     }
-    
-    setMultiSelectAnswers(prev => {
-      const currentAnswers = prev[questionId] || []
-      let newAnswers: string[]
-      
-      if (checked) {
-        newAnswers = [...currentAnswers, option]
-      } else {
-        newAnswers = currentAnswers.filter(ans => ans !== option)
-      }
-      
-      // Save to persistence store
-      saveMultiSelectAnswer(questionId, newAnswers)
-      
-      return {
-        ...prev,
-        [questionId]: newAnswers
-      }
-    })
+
+    // Calculate new answers first
+    const currentAnswers = multiSelectAnswers[questionId] || []
+    let newAnswers: string[]
+
+    if (checked) {
+      newAnswers = [...currentAnswers, option]
+    } else {
+      newAnswers = currentAnswers.filter(ans => ans !== option)
+    }
+
+    // Update local state
+    setMultiSelectAnswers(prev => ({
+      ...prev,
+      [questionId]: newAnswers
+    }))
+
+    // Save to persistence store (outside of setState callback)
+    saveMultiSelectAnswer(questionId, newAnswers)
   }
 
   const handleCheckAnswer = (questionId: string) => {

@@ -149,7 +149,7 @@ export default function CampusUsersPage({ params }: { params: { id: string } }) 
   if (status === "loading" || isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
-        <HexagonLoader size="lg" />
+        <HexagonLoader size={80} />
       </div>
     )
   }

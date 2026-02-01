@@ -35,14 +35,20 @@ export async function GET(request: NextRequest) {
       take: 10
     })
 
-    const formattedActivity = recentActivity.map(attempt => ({
-      id: attempt.id,
-      quizTitle: attempt.quiz.title,
-      score: attempt.score || 0,
-      totalPoints: attempt.totalPoints || 0,
-      timeTaken: attempt.timeTaken || 0,
-      completedAt: attempt.submittedAt || attempt.createdAt
-    }))
+    const formattedActivity = recentActivity.map(attempt => {
+      const score = attempt.score || 0
+      const totalPoints = attempt.totalPoints || 0
+      const percentage = totalPoints > 0 ? (score / totalPoints) * 100 : 0
+
+      return {
+        id: attempt.id,
+        quizTitle: attempt.quiz.title,
+        score: Math.round(percentage),
+        totalPoints: totalPoints,
+        timeTaken: attempt.timeTaken || 0,
+        submittedAt: attempt.submittedAt || attempt.createdAt
+      }
+    })
 
     return NextResponse.json(formattedActivity)
   } catch (error) {

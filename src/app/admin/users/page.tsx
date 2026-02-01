@@ -203,8 +203,8 @@ export default function UsersPage() {
       key: "isActive",
       label: "Status",
       options: [
-        { value: true, label: "Active" },
-        { value: false, label: "Inactive" },
+        { value: "true", label: "Active" },
+        { value: "false", label: "Inactive" },
       ],
     },
     {
@@ -220,8 +220,11 @@ export default function UsersPage() {
       header: ({ table }) => (
         <Checkbox
           checked={
-            table.getIsAllPageRowsSelected() ||
-            (table.getIsSomePageRowsSelected() && "indeterminate")
+            table.getIsAllPageRowsSelected()
+              ? true
+              : table.getIsSomePageRowsSelected()
+              ? "indeterminate"
+              : false
           }
           onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
           aria-label="Select all"

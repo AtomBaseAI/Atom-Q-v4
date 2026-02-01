@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toasts } from "@/lib/toasts"
 import { Loader2, Save, Upload, Camera } from "lucide-react"
 import { useRouter } from "next/navigation"
@@ -39,6 +40,9 @@ interface UserProfile {
   email: string
   phone?: string
   avatar?: string
+  departmentId?: string | null
+  batchId?: string | null
+  section?: string
 }
 
 interface PasswordData {
@@ -60,12 +64,33 @@ export default function UserSettingsPage() {
     email: "",
     phone: "",
     avatar: "",
+    departmentId: null,
+    batchId: null,
+    section: "A",
   })
   const [passwordData, setPasswordData] = useState<PasswordData>({
     currentPassword: "",
     newPassword: "",
     confirmPassword: "",
   })
+
+  // Campus data state
+  const [campusData, setCampusData] = useState<{
+    campus: { name: string } | null
+    departments: Array<{ id: string; name: string }>
+    batches: Array<{ id: string; name: string }>
+    department: { id: string; name: string } | null
+    batch: { id: string; name: string } | null
+    section: string
+  }>({
+    campus: null,
+    departments: [],
+    batches: [],
+    department: null,
+    batch: null,
+    section: "A",
+  })
+  const [loadingCampusData, setLoadingCampusData] = useState(false)
 
   // Handle authentication check first
   useEffect(() => {
@@ -74,6 +99,35 @@ export default function UserSettingsPage() {
     }
   }, [session, router])
 
+  // Fetch campus data
+  useEffect(() => {
+    const fetchCampusData = async () => {
+      if (!session) return
+
+      setLoadingCampusData(true)
+      try {
+        const response = await fetch("/api/user/campus-data")
+        if (response.ok) {
+          const data = await response.json()
+          setCampusData({
+            campus: data.campus,
+            departments: data.departments || [],
+            batches: data.batches || [],
+            department: data.department,
+            batch: data.batch,
+            section: data.section || "A",
+          })
+        }
+      } catch (error) {
+        console.error("Error fetching campus data:", error)
+      } finally {
+        setLoadingCampusData(false)
+      }
+    }
+
+    fetchCampusData()
+  }, [session])
+
   useEffect(() => {
     if (session) {
       setProfile({
@@ -81,10 +135,13 @@ export default function UserSettingsPage() {
         email: session.user.email,
         phone: session.user.phone || "",
         avatar: session.user.avatar || "",
+        departmentId: campusData.department?.id || null,
+        batchId: campusData.batch?.id || null,
+        section: campusData.section || "A",
       })
       setLoading(false)
     }
-  }, [session])
+  }, [session, campusData.department, campusData.batch, campusData.section])
 
   const handleInputChange = (field: keyof UserProfile, value: string) => {
     setProfile(prev => ({
@@ -107,6 +164,9 @@ export default function UserSettingsPage() {
           name: profile.name,
           phone: profile.phone,
           avatar: profile.avatar,
+          departmentId: profile.departmentId,
+          batchId: profile.batchId,
+          section: profile.section,
         }),
       })
 
@@ -123,6 +183,9 @@ export default function UserSettingsPage() {
         name: updatedUserData.name,
         phone: updatedUserData.phone,
         avatar: updatedUserData.avatar,
+        departmentId: updatedUserData.departmentId,
+        batchId: updatedUserData.batchId,
+        section: updatedUserData.section,
       }));
 
       // Update user store
@@ -354,6 +417,111 @@ export default function UserSettingsPage() {
               />
             </div>
 
+            {/* Campus Information */}
+            {campusData.campus && (
+              <>
+                <Separator />
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-sm font-medium text-muted-foreground mb-3">Campus Information</h3>
+                    <p className="text-xs text-muted-foreground mb-4">Update your department, batch, and section based on your campus</p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {campusData.departments.length > 0 ? (
+                      <div className="space-y-2">
+                        <Label htmlFor="department">Department</Label>
+                        <Select
+                          value={profile.departmentId || "none"}
+                          onValueChange={(value) => handleInputChange("departmentId", value === "none" ? "" : value)}
+                        >
+                          <SelectTrigger id="department">
+                            <SelectValue placeholder="Select department" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">None</SelectItem>
+                            {campusData.departments.map((dept) => (
+                              <SelectItem key={dept.id} value={dept.id}>
+                                {dept.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <Label htmlFor="department">Department</Label>
+                        <Input
+                          id="department"
+                          value="No departments available"
+                          disabled
+                          className="bg-muted"
+                        />
+                      </div>
+                    )}
+
+                    {campusData.batches.length > 0 ? (
+                      <div className="space-y-2">
+                        <Label htmlFor="batch">Batch</Label>
+                        <Select
+                          value={profile.batchId || "none"}
+                          onValueChange={(value) => handleInputChange("batchId", value === "none" ? "" : value)}
+                        >
+                          <SelectTrigger id="batch">
+                            <SelectValue placeholder="Select batch" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">None</SelectItem>
+                            {campusData.batches.map((batch) => (
+                              <SelectItem key={batch.id} value={batch.id}>
+                                {batch.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <Label htmlFor="batch">Batch</Label>
+                        <Input
+                          id="batch"
+                          value="No batches available"
+                          disabled
+                          className="bg-muted"
+                        />
+                      </div>
+                    )}
+
+                    <div className="space-y-2">
+                      <Label htmlFor="section">Section</Label>
+                      <Select
+                        value={profile.section}
+                        onValueChange={(value) => handleInputChange("section", value)}
+                      >
+                        <SelectTrigger id="section">
+                          <SelectValue placeholder="Select section" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="A">Section A</SelectItem>
+                          <SelectItem value="B">Section B</SelectItem>
+                          <SelectItem value="C">Section C</SelectItem>
+                          <SelectItem value="D">Section D</SelectItem>
+                          <SelectItem value="E">Section E</SelectItem>
+                          <SelectItem value="F">Section F</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  {loadingCampusData && (
+                    <div className="flex items-center justify-center py-4">
+                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+
             <div className="flex justify-end">
               <LoadingButton 
                 type="submit" 
@@ -454,23 +622,6 @@ export default function UserSettingsPage() {
               </LoadingButton>
             </div>
           </form>
-        </CardContent>
-      </Card>
-
-      {/* Preferences */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Preferences</CardTitle>
-          <CardDescription>
-            Customize your experience and notification settings
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-4">
-            <div className="text-sm text-muted-foreground">
-              Additional preferences and notification settings will be available in future updates.
-            </div>
-          </div>
         </CardContent>
       </Card>
     </div>

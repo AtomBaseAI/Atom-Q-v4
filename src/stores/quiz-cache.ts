@@ -26,6 +26,7 @@ interface UserStats {
   totalTimeSpent: number
   streakCount: number
   rank: number
+  assessmentsTaken: number
 }
 
 interface RecentActivity {

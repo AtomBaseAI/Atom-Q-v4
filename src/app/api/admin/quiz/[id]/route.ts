@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { db } from "@/lib/db"
-import { UserRole } from "@prisma/client"
+import { UserRole, DifficultyLevel, QuizStatus } from "@prisma/client"
 
 export async function GET(
   request: NextRequest,
@@ -78,13 +78,13 @@ export async function PUT(
       data: {
         title,
         description,
-        timeLimit: timeLimit && timeLimit.trim() !== "" ? parseInt(timeLimit) : null,
+        timeLimit: timeLimit != null && timeLimit !== "" ? parseInt(String(timeLimit)) : null,
         difficulty: difficulty || DifficultyLevel.MEDIUM,
         status: status || QuizStatus.ACTIVE,
         negativeMarking: negativeMarking === true || negativeMarking === "true",
-        negativePoints: negativePoints && negativePoints.trim() !== "" ? parseFloat(negativePoints) : 0.5,
+        negativePoints: negativePoints != null && negativePoints !== "" ? parseFloat(String(negativePoints)) : 0.5,
         randomOrder: randomOrder === true || randomOrder === "true",
-        maxAttempts: maxAttempts && maxAttempts.trim() !== "" ? parseInt(maxAttempts) : null,
+        maxAttempts: maxAttempts != null && maxAttempts !== "" ? parseInt(String(maxAttempts)) : null,
         showAnswers,
         checkAnswerEnabled,
         startTime: startTime ? new Date(startTime) : null,

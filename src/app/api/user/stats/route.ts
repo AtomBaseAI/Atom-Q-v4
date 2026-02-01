@@ -37,36 +37,44 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    const totalQuizzesTaken = attempts.length
+    const completedQuizzes = attempts.length
     const totalTimeSpent = attempts.reduce((sum, attempt) => sum + (attempt.timeTaken || 0), 0)
-    const quizzesCompleted = attempts.filter(attempt => attempt.status === "SUBMITTED").length
 
-    // Calculate average score
-    let totalScore = 0
-    let totalPossible = 0
+    // Calculate average score (as percentage)
+    let totalScorePercentage = 0
     let bestScore = 0
 
     attempts.forEach(attempt => {
       const score = attempt.score || 0
       const totalPoints = attempt.totalPoints || 0
 
-      totalScore += score
-      totalPossible += totalPoints
-
       const percentage = totalPoints > 0 ? (score / totalPoints) * 100 : 0
+      totalScorePercentage += percentage
+
       if (percentage > bestScore) {
         bestScore = percentage
       }
     })
 
-    const averageScore = totalPossible > 0 ? Math.round((totalScore / totalPossible) * 100) : 0
+    const averageScore = completedQuizzes > 0 ? totalScorePercentage / completedQuizzes : 0
+
+    // Get user's assessment attempts
+    const assessmentAttempts = await db.assessmentAttempt.findMany({
+      where: {
+        userId,
+        status: "SUBMITTED"
+      }
+    })
+
+    const assessmentsTaken = assessmentAttempts.length
 
     return NextResponse.json({
-      totalQuizzesTaken,
-      averageScore,
+      totalQuizzes: completedQuizzes,
+      completedQuizzes,
+      averageScore: Math.round(averageScore),
       totalTimeSpent,
-      quizzesCompleted,
-      bestScore: Math.round(bestScore)
+      bestScore: Math.round(bestScore),
+      assessmentsTaken
     })
   } catch (error) {
     console.error("Error fetching user stats:", error)

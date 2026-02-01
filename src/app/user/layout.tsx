@@ -5,7 +5,6 @@ import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { AppSidebar } from "@/components/user/sidebar"
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar"
-import { Header } from "@/components/user/header"
 import { Loader2 } from "lucide-react"
 import { UserRole } from "@prisma/client"
 import { usePersistentSidebar } from "@/hooks/use-persistent-sidebar"
@@ -58,7 +57,6 @@ export default function UserLayout({
       <div className="flex h-screen w-full">
         <AppSidebar open={open} onOpenChange={setOpen} />
         <SidebarInset className="flex-1">
-          <Header onMenuClick={() => setOpen(!open)} />
           <main className="flex-1 overflow-y-auto p-6">
             {children}
           </main>
