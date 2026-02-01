@@ -18,6 +18,8 @@
     "db:migrate:deploy": "prisma migrate deploy",
     "db:reset": "prisma migrate reset",
     "db:seed": "tsx prisma/seed.ts",
+    "db:sample-seed-data": "tsx prisma/seeds/seed-sample-data.ts",
+    "db:remove-sample-data": "tsx prisma/seeds/remove-sample-data.ts",
     "postinstall": "prisma generate",
     "vercel-build": "prisma migrate deploy && prisma generate && next build"
   },
