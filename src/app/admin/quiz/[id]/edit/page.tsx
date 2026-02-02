@@ -32,6 +32,7 @@ import {
 } from "lucide-react"
 import { toasts } from "@/lib/toasts"
 import { DifficultyLevel, QuizStatus } from "@prisma/client"
+import { DateTimePicker } from "@/components/ui/datetime-picker"
 
 interface Quiz {
   id: string
@@ -357,21 +358,19 @@ export default function EditQuizPage() {
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="startTime">Start Time</Label>
-                <Input
+                <DateTimePicker
                   id="startTime"
-                  type="datetime-local"
-                  value={quiz.startTime ? new Date(quiz.startTime).toISOString().slice(0, 16) : ""}
-                  onChange={(e) => updateQuiz("startTime", e.target.value ? new Date(e.target.value).toISOString() : null)}
+                  value={quiz.startTime || ""}
+                  onChange={(value) => updateQuiz("startTime", value || null)}
+                  label="Start Time"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="endTime">End Time</Label>
-                <Input
+                <DateTimePicker
                   id="endTime"
-                  type="datetime-local"
-                  value={quiz.endTime ? new Date(quiz.endTime).toISOString().slice(0, 16) : ""}
-                  onChange={(e) => updateQuiz("endTime", e.target.value ? new Date(e.target.value).toISOString() : null)}
+                  value={quiz.endTime || ""}
+                  onChange={(value) => updateQuiz("endTime", value || null)}
+                  label="End Time"
                 />
               </div>
             </div>

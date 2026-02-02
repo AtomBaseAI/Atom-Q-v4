@@ -28,6 +28,7 @@ import {
   SunDim,
   Maximize,
   Minimize,
+  FileText,
 } from "lucide-react"
 import { useSidebar } from "@/components/ui/sidebar"
 import { flushSync } from "react-dom"
@@ -43,6 +44,11 @@ const userNavItems = [
     title: "Quiz",
     href: "/user/quiz",
     icon: BookOpen,
+  },
+  {
+    title: "Assessments",
+    href: "/user/assessment",
+    icon: FileText,
   },
 ]
 

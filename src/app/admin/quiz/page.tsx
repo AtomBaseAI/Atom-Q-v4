@@ -60,6 +60,7 @@ import { DataTable } from "@/components/ui/data-table"
 import { ColumnDef } from "@tanstack/react-table"
 import HexagonLoader from "@/components/Loader/Loading"
 import { LoadingButton } from "@/components/ui/laodaing-button"
+import { DateTimePicker } from "@/components/ui/datetime-picker"
 
 // Helper function to format dates in dd/mm/yyyy format
 const formatDateDDMMYYYY = (dateString: string) => {
@@ -794,21 +795,19 @@ export default function QuizzesPage() {
                 )}
               </div>
               <div className="grid gap-3">
-                <Label htmlFor="create-start-time">Start Date & Time (Optional)</Label>
-                <Input
+                <DateTimePicker
                   id="create-start-time"
-                  type="datetime-local"
                   value={createFormData.startTime}
-                  onChange={(e) => setCreateFormData({ ...createFormData, startTime: e.target.value })}
+                  onChange={(value) => setCreateFormData({ ...createFormData, startTime: value })}
+                  label="Start Date & Time (Optional)"
                 />
               </div>
               <div className="grid gap-3">
-                <Label htmlFor="create-end-time">End Date & Time (Optional)</Label>
-                <Input
+                <DateTimePicker
                   id="create-end-time"
-                  type="datetime-local"
                   value={createFormData.endTime}
-                  onChange={(e) => setCreateFormData({ ...createFormData, endTime: e.target.value })}
+                  onChange={(value) => setCreateFormData({ ...createFormData, endTime: value })}
+                  label="End Date & Time (Optional)"
                 />
               </div>
               <div className="grid gap-3">
@@ -970,21 +969,19 @@ export default function QuizzesPage() {
                 )}
               </div>
               <div className="grid gap-3">
-                <Label htmlFor="edit-start-time">Start Date & Time (Optional)</Label>
-                <Input
+                <DateTimePicker
                   id="edit-start-time"
-                  type="datetime-local"
                   value={editFormData.startTime}
-                  onChange={(e) => setEditFormData({ ...editFormData, startTime: e.target.value })}
+                  onChange={(value) => setEditFormData({ ...editFormData, startTime: value })}
+                  label="Start Date & Time (Optional)"
                 />
               </div>
               <div className="grid gap-3">
-                <Label htmlFor="edit-end-time">End Date & Time (Optional)</Label>
-                <Input
+                <DateTimePicker
                   id="edit-end-time"
-                  type="datetime-local"
                   value={editFormData.endTime}
-                  onChange={(e) => setEditFormData({ ...editFormData, endTime: e.target.value })}
+                  onChange={(value) => setEditFormData({ ...editFormData, endTime: value })}
+                  label="End Date & Time (Optional)"
                 />
               </div>
               <div className="grid gap-3">

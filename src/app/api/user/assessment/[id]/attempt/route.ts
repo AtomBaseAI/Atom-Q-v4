@@ -18,51 +18,23 @@ export async function POST(
       )
     }
 
-    const { id: assessmentId } = await params
-    const body = await request.json()
-    const { accessKey } = body
+    const { id } = await params
+    const userId = session.user.id
 
-    if (!accessKey) {
-      return NextResponse.json(
-        { message: "Access key is required" },
-        { status: 400 }
-      )
+    // Parse request body
+    let body: { accessKey?: string } = {}
+    try {
+      body = await request.json()
+    } catch {
+      body = {}
     }
 
-    // Check if assessment exists and is active
-    const assessment = await db.assessment.findUnique({
-      where: { id: assessmentId },
-      include: {
-        campus: {
-          select: {
-            id: true,
-            name: true,
-            shortName: true,
-          },
-        },
-      },
-    })
-
-    if (!assessment) {
-      return NextResponse.json(
-        { message: "Assessment not found" },
-        { status: 404 }
-      )
-    }
-
-    if (assessment.status !== 'ACTIVE') {
-      return NextResponse.json(
-        { message: "Assessment is not active" },
-        { status: 400 }
-      )
-    }
-
-    // Check if user is enrolled
+    // Verify user is enrolled in this assessment
     const enrollment = await db.assessmentUser.findFirst({
       where: {
-        assessmentId: assessmentId,
-        userId: session.user.id,
-      },
+        assessmentId: id,
+        userId
+      }
     })
 
     if (!enrollment) {
@@ -72,136 +44,240 @@ export async function POST(
       )
     }
 
-    // Validate access key
-    if (assessment.accessKey !== accessKey) {
+    // Get assessment data to check access key requirement
+    const assessment = await db.assessment.findUnique({
+      where: { id },
+      include: {
+        assessmentQuestions: {
+          include: {
+            question: true
+          },
+          orderBy: {
+            order: 'asc'
+          }
+        }
+      }
+    })
+
+    if (!assessment) {
       return NextResponse.json(
-        { message: "Invalid access key" },
-        { status: 400 }
+        { message: "Assessment not found" },
+        { status: 404 }
       )
     }
 
-    // Validate start time window
-    const now = new Date()
-    let startTime: Date | null = assessment.startTime ? new Date(assessment.startTime) : null
+    // Verify access key if assessment requires one
+    if (assessment.accessKey && assessment.accessKey !== body.accessKey) {
+      return NextResponse.json(
+        { message: "Invalid access key" },
+        { status: 403 }
+      )
+    }
 
-    if (startTime) {
-      // Allow start from 15 minutes before start time
-      const windowStart = new Date(startTime.getTime() - 15 * 60 * 1000)
-      
-      if (now < windowStart) {
+    // Check if there's already an in-progress attempt
+    const existingAttempt = await db.assessmentAttempt.findFirst({
+      where: {
+        assessmentId: id,
+        userId,
+        status: AttemptStatus.IN_PROGRESS
+      }
+    })
+
+    if (existingAttempt) {
+      // Return existing attempt with questions (don't increment tab switches, just return data)
+      // Format questions for frontend (similar to new attempt logic)
+      const questions = assessment.assessmentQuestions
+        .filter(aq => aq.question) // Filter out null questions
+        .map((aq, index) => {
+          try {
+            if (!aq.question.id || !aq.question.content || !aq.question.type) {
+              console.error(`Question at index ${index} missing required fields:`, aq.question)
+              return null
+            }
+
+            let options = []
+            if (aq.question.options) {
+              if (typeof aq.question.options === 'string') {
+                try {
+                  options = JSON.parse(aq.question.options)
+                } catch (parseError) {
+                  console.error(`Failed to parse options for question ${aq.question.id}:`, parseError)
+                  options = []
+                }
+              } else if (Array.isArray(aq.question.options)) {
+                options = aq.question.options
+              }
+            }
+
+            if (!Array.isArray(options)) {
+              console.error(`Options is not an array for question ${aq.question.id}:`, options)
+              options = []
+            }
+
+            return {
+              id: aq.question.id,
+              title: aq.question.title || `Question ${index + 1}`,
+              content: aq.question.content,
+              type: aq.question.type,
+              options: options,
+              correctAnswer: aq.question.correctAnswer || '0',
+              explanation: aq.question.explanation || '',
+              difficulty: aq.question.difficulty,
+              order: aq.order,
+              points: aq.points
+            }
+          } catch (error) {
+            console.error(`Failed to process question ${aq.question?.id || index}:`, {
+              error: error instanceof Error ? error.message : String(error),
+              question: aq.question
+            })
+            return null
+          }
+        })
+        .filter(q => q !== null) // Remove failed questions
+
+      if (questions.length === 0) {
         return NextResponse.json(
-          { 
-            message: "Assessment has not started yet",
-            startTime: assessment.startTime,
-            windowOpens: windowStart,
-          },
+          { message: "No valid questions found for this assessment" },
           { status: 400 }
         )
       }
 
-      // Check if too late (after start time + duration)
-      if (assessment.timeLimit) {
-        const windowEnd = new Date(startTime.getTime() + assessment.timeLimit * 60 * 1000)
-        if (now > windowEnd) {
-          return NextResponse.json(
-            { 
-              message: "Assessment has ended",
-              endTime: new Date(startTime.getTime() + assessment.timeLimit * 60 * 1000).toISOString(),
-            },
-            { status: 400 }
-          )
-        }
+      // Calculate time remaining for existing attempt
+      const timeLimit = (assessment.timeLimit || 0) * 60 // Convert minutes to seconds
+      const timeElapsed = Math.floor((new Date().getTime() - new Date(existingAttempt.startedAt).getTime()) / 1000)
+      const timeRemaining = Math.max(0, timeLimit - timeElapsed)
+
+      // Format assessment data for frontend
+      const assessmentData = {
+        id: assessment.id,
+        title: assessment.title,
+        description: assessment.description || "",
+        timeLimit: assessment.timeLimit,
+        maxTabs: assessment.maxTabs,
+        disableCopyPaste: assessment.disableCopyPaste,
+        checkAnswerEnabled: false,
+        startTime: assessment.startTime
       }
-    }
-
-    // Check if user already has an attempt in progress
-    const existingAttempt = await db.assessmentAttempt.findFirst({
-      where: {
-        assessmentId: assessmentId,
-        userId: session.user.id,
-        status: { in: ['NOT_STARTED', 'IN_PROGRESS'] },
-      },
-      orderBy: { createdAt: 'desc' },
-    })
-
-    if (existingAttempt) {
-      // Resume existing attempt
-      const questions = await db.assessmentQuestion.findMany({
-        where: { assessmentId: assessmentId },
-        include: {
-          question: true,
-        },
-        orderBy: { order: 'asc' },
-      })
-
-      const totalPoints = questions.reduce((sum, aq) => sum + (aq.question.points || 1), 0)
 
       return NextResponse.json({
-        message: "Resuming existing attempt",
         attemptId: existingAttempt.id,
-        assessment: {
-          id: assessment.id,
-          title: assessment.title,
-          description: assessment.description,
-          timeLimit: assessment.timeLimit,
-          disableCopyPaste: assessment.disableCopyPaste,
-          campus: assessment.campus,
-          startTime: assessment.startTime,
-          endTime: assessment.timeLimit ? new Date(new Date(assessment.startTime!).getTime() + assessment.timeLimit! * 60 * 1000).toISOString() : null,
-        },
-        questions,
-        totalPoints,
-        status: existingAttempt.status,
-        timeRemaining: existingAttempt.timeTaken || assessment.timeLimit ? assessment.timeLimit! * 60 : null,
-        answers: {},
-        questionIndex: 0,
+        assessment: assessmentData,
+        questions: questions,
+        timeRemaining: timeRemaining,
+        tabSwitches: existingAttempt.tabSwitches,
+        switchesRemaining: assessment.maxTabs ? assessment.maxTabs - existingAttempt.tabSwitches : null,
+        shouldAutoSubmit: assessment.maxTabs ? existingAttempt.tabSwitches >= assessment.maxTabs : false,
       })
+    }
+
+    // Check if assessment is within availability window
+    const now = new Date()
+    const startTime = assessment.startTime ? new Date(assessment.startTime) : null
+
+    if (startTime && startTime > now) {
+      return NextResponse.json(
+        { message: "Assessment has not started yet" },
+        { status: 403 }
+      )
     }
 
     // Create new attempt
     const attempt = await db.assessmentAttempt.create({
       data: {
-        assessmentId: assessmentId,
-        userId: session.user.id,
-        status: 'NOT_STARTED',
-      },
+        assessmentId: id,
+        userId,
+        status: AttemptStatus.NOT_STARTED,
+        startedAt: new Date().toISOString(),
+        tabSwitches: 0,
+      }
     })
 
-    // Fetch questions with their order
-    const questions = await db.assessmentQuestion.findMany({
-      where: { assessmentId: assessmentId },
-      include: {
-        question: true,
-      },
-      orderBy: { order: 'asc' },
-    })
+    // Format questions for frontend (similar to quiz attempt endpoint)
+    const questions = assessment.assessmentQuestions
+      .filter(aq => aq.question) // Filter out null questions
+      .map((aq, index) => {
+        try {
+          if (!aq.question.id || !aq.question.content || !aq.question.type) {
+            console.error(`Question at index ${index} missing required fields:`, aq.question)
+            return null
+          }
 
-    const totalPoints = questions.reduce((sum, aq) => sum + (aq.question.points || 1), 0)
+          let options = []
+          if (aq.question.options) {
+            if (typeof aq.question.options === 'string') {
+              try {
+                options = JSON.parse(aq.question.options)
+              } catch (parseError) {
+                console.error(`Failed to parse options for question ${aq.question.id}:`, parseError)
+                options = []
+              }
+            } else if (Array.isArray(aq.question.options)) {
+              options = aq.question.options
+            }
+          }
 
-    return NextResponse.json({
-      message: "Assessment started successfully",
+          if (!Array.isArray(options)) {
+            console.error(`Options is not an array for question ${aq.question.id}:`, options)
+            options = []
+          }
+
+          return {
+            id: aq.question.id,
+            title: aq.question.title || `Question ${index + 1}`,
+            content: aq.question.content,
+            type: aq.question.type,
+            options: options,
+            correctAnswer: aq.question.correctAnswer || '0',
+            explanation: aq.question.explanation || '',
+            difficulty: aq.question.difficulty,
+            order: aq.order,
+            points: aq.points
+          }
+        } catch (error) {
+          console.error(`Failed to process question ${aq.question?.id || index}:`, {
+            error: error instanceof Error ? error.message : String(error),
+            question: aq.question
+          })
+          return null
+        }
+      })
+      .filter(q => q !== null) // Remove failed questions
+
+    if (questions.length === 0) {
+      return NextResponse.json(
+        { message: "No valid questions found for this assessment" },
+        { status: 400 }
+      )
+    }
+
+    // Calculate time remaining
+    const timeLimit = (assessment.timeLimit || 0) * 60 // Convert minutes to seconds
+    const timeRemaining = timeLimit
+
+    // Format assessment data for frontend
+    const assessmentData = {
+      id: attempt.id,
+      title: assessment.title,
+      description: assessment.description || "",
+      timeLimit: assessment.timeLimit,
+      maxTabs: assessment.maxTabs,
+      disableCopyPaste: assessment.disableCopyPaste,
+      checkAnswerEnabled: false,
+      questions: questions
+    }
+
+    const responseData = {
       attemptId: attempt.id,
-      assessment: {
-        id: assessment.id,
-        title: assessment.title,
-        description: assessment.description,
-        timeLimit: assessment.timeLimit,
-        disableCopyPaste: assessment.disableCopyPaste,
-        campus: assessment.campus,
-        startTime: assessment.startTime,
-        endTime: assessment.timeLimit ? new Date(new Date(assessment.startTime!).getTime() + assessment.timeLimit! * 60 * 1000).toISOString() : null,
-      },
-      questions,
-      totalPoints,
-      status: 'NOT_STARTED',
-      timeRemaining: assessment.timeLimit ? assessment.timeLimit! * 60 : null,
-      answers: {},
-      questionIndex: 0,
-    })
+      assessment: assessmentData,
+      timeRemaining: timeRemaining
+    }
+
+    return NextResponse.json(responseData)
   } catch (error) {
     console.error("Error starting assessment:", error)
     return NextResponse.json(
-      { message: "Failed to start assessment" },
+      { message: "Internal server error" },
       { status: 500 }
     )
   }

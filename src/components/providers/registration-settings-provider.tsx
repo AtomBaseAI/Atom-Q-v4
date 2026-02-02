@@ -50,7 +50,7 @@ export function RegistrationSettingsProvider({ children }: RegistrationSettingsP
     setError(null)
 
     try {
-      const response = await fetch('/api/admin/registration-settings', {
+      const response = await fetch('/api/public/registration-settings', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

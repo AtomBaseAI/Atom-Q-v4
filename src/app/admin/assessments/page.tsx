@@ -62,6 +62,7 @@ import { DataTable } from "@/components/ui/data-table"
 import { ColumnDef } from "@tanstack/react-table"
 import HexagonLoader from "@/components/Loader/Loading"
 import { LoadingButton } from "@/components/ui/laodaing-button"
+import { DateTimePicker } from "@/components/ui/datetime-picker"
 
 // Helper function to generate a 6-digit alphanumeric access key (format: 1a-2b-3c)
 const generateAccessKey = () => {
@@ -253,6 +254,21 @@ export default function AssessmentsPage() {
       cell: ({ row }) => {
         const assessment = row.original
         return assessment._count?.assessmentQuestions || 0
+      },
+    },
+    {
+      accessorKey: "accessKey",
+      header: "Access Key",
+      cell: ({ row }) => {
+        const accessKey = row.getValue("accessKey") as string
+        return accessKey ? (
+          <div className="flex items-center gap-2">
+            <Key className="h-4 w-4 text-muted-foreground" />
+            <code className="text-sm bg-muted px-2 py-1 rounded">{accessKey}</code>
+          </div>
+        ) : (
+          <span className="text-muted-foreground text-sm">Not set</span>
+        )
       },
     },
     {
@@ -701,11 +717,11 @@ export default function AssessmentsPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="startTime">Start Time</Label>
-                <Input
+                <DateTimePicker
                   id="startTime"
-                  type="datetime-local"
                   value={createFormData.startTime}
-                  onChange={(e) => setCreateFormData(prev => ({ ...prev, startTime: e.target.value }))}
+                  onChange={(value) => setCreateFormData(prev => ({ ...prev, startTime: value }))}
+                  placeholder="Select date and time"
                 />
               </div>
             </div>
@@ -885,11 +901,11 @@ export default function AssessmentsPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="edit-startTime">Start Time</Label>
-                <Input
+                <DateTimePicker
                   id="edit-startTime"
-                  type="datetime-local"
                   value={editFormData.startTime}
-                  onChange={(e) => setEditFormData(prev => ({ ...prev, startTime: e.target.value }))}
+                  onChange={(value) => setEditFormData(prev => ({ ...prev, startTime: value }))}
+                  placeholder="Select date and time"
                 />
               </div>
             </div>

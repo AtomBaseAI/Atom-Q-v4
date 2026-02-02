@@ -50,24 +50,24 @@ interface Assessment {
   title: string
   description: string
   timeLimit: number
-  showAnswers: boolean
   checkAnswerEnabled: boolean
   disableCopyPaste: boolean
   accessKey?: string
   startTime?: string
-  endTime?: string
   campus?: {
     id: string
     name: string
     shortName: string
   }
   maxTabs?: number
+  startedAt?: string
+  tabSwitches?: number
 }
 
 interface TabSwitchResponse {
   message: string
   currentSwitches: number
-  switchesRemaining: number
+  switchesRemaining: number | null
   shouldAutoSubmit: boolean
 }
 
@@ -149,9 +149,28 @@ export default function AssessmentTakingPage() {
         setQuestions(data.questions)
         setAttemptId(data.attemptId)
         setTimeRemaining(data.timeRemaining || 0)
-        setCanShowAnswers(data.assessment.showAnswers || false)
-        setShowAccessKeyDialog(false)
+        setCanShowAnswers(false)
         assessmentAttemptIdRef.current = data.attemptId
+        
+        // Check if access key was required
+        if (assessment?.accessKey && accessKeyInput) {
+          toasts.success('Access key verified! Starting assessment...')
+        } else {
+          toasts.success('Assessment started!')
+        }
+
+        // Enable fullscreen automatically
+        if (typeof document.documentElement.requestFullscreen === 'function') {
+          try {
+            await document.documentElement.requestFullscreen()
+            setIsFullscreen(true)
+          } catch (err) {
+            console.log('Fullscreen request failed:', err)
+          }
+        }
+
+        // Store assessment start time in database (this will help with tab tracking)
+        // Assessment will be auto-submitted when time runs out
       } else {
         const error = await response.json()
         toasts.error(error.message || "Failed to start assessment")
@@ -160,7 +179,7 @@ export default function AssessmentTakingPage() {
       console.error("Error starting assessment:", error)
       toasts.error("Failed to start assessment")
     }
-  }, [params.id])
+  }, [params.id, accessKeyInput])
 
   const handleTabSwitch = async () => {
     if (!assessmentAttemptIdRef.current) return
@@ -211,12 +230,14 @@ export default function AssessmentTakingPage() {
 
   const handleAccessKeySubmit = async () => {
     if (!accessKeyInput.trim()) {
-      toasts.error("Please enter the access key")
+      toasts.error("Please enter an access key")
       return
     }
 
     setShowAccessKeyDialog(false)
+    setLoading(true)
     await fetchAssessment()
+    setLoading(false)
   }
 
   const handleAnswerChange = (questionId: string, answer: string) => {
@@ -321,6 +342,23 @@ export default function AssessmentTakingPage() {
       if (response.ok) {
         const result = await response.json()
         toasts.success(`Assessment submitted! Score: ${result.score}%`)
+        
+        // Auto-exit fullscreen after submission
+        if (document.fullscreenElement && isFullscreen) {
+          try {
+            await document.exitFullscreen()
+            setIsFullscreen(false)
+            console.log('Auto-exited fullscreen after submission')
+          } catch (err) {
+            console.error('Failed to exit fullscreen:', err)
+          }
+        }
+
+        // Redirect to assessments page after short delay
+        setTimeout(() => {
+          router.push('/user/assessment')
+        }, 1000)
+        
         router.push(`/user/assessment/${params.id}/result?attemptId=${attemptId}`)
       } else {
         const error = await response.json()
@@ -404,7 +442,74 @@ export default function AssessmentTakingPage() {
       document.removeEventListener('copy', handleCopyPaste)
       document.removeEventListener('paste', handlePaste)
     }
-  }, [assessment])
+  }, [assessment?.disableCopyPaste])
+
+  // Disable sidebar, inspect, and developer tools when assessment is running
+  useEffect(() => {
+    const disableContextMenu = (e: Event) => {
+      e.preventDefault()
+      toasts.warning("Context menu is disabled during assessment")
+    }
+
+    const disableKeyboardShortcuts = (e: KeyboardEvent) => {
+      if (
+        (e.ctrlKey || e.major === 'F12' || 
+         e.key === 'I' || 
+         e.key === 'C' || 
+         e.key === 'U' || 
+         e.key === 'D' || 
+         e.key === 'J' || 
+         e.key === 'T')
+      ) {
+        e.preventDefault()
+        toasts.warning("Keyboard shortcuts are disabled during assessment")
+      }
+    }
+
+    if (assessment && attemptId) {
+      document.addEventListener('contextmenu', disableContextMenu)
+      document.addEventListener('keydown', disableKeyboardShortcuts)
+    }
+
+    return () => {
+      document.removeEventListener('contextmenu', disableContextMenu)
+      document.removeEventListener('keydown', disableKeyboardShortcuts)
+    }
+  }, [assessment, attemptId])
+
+  // Disable sidebar, inspect, and developer tools when assessment is running
+  useEffect(() => {
+    const disableContextMenu = (e: Event) => {
+      e.preventDefault()
+      toasts.warning("Context menu is disabled during assessment")
+    }
+
+    const disableKeyboardShortcuts = (e: KeyboardEvent) => {
+      if (
+        (e.ctrlKey || e.metaKey) && 
+        (e.key === 'f12' || 
+         e.key === 'i' || 
+         e.key === 'c' || 
+         e.key === 'u' || 
+         e.key === 'd' || 
+         e.key === 'j' || 
+         e.key === 't')
+      ) {
+        e.preventDefault()
+        toasts.warning("Keyboard shortcuts are disabled during assessment")
+      }
+    }
+
+    if (assessment && attemptId) {
+      document.addEventListener('contextmenu', disableContextMenu)
+      document.addEventListener('keydown', disableKeyboardShortcuts)
+    }
+
+    return () => {
+      document.removeEventListener('contextmenu', disableContextMenu)
+      document.removeEventListener('keydown', disableKeyboardShortcuts)
+    }
+  }, [assessment, attemptId])
 
   // Timer for auto-submit
   useEffect(() => {
@@ -430,15 +535,42 @@ export default function AssessmentTakingPage() {
     }
   }, [timeRemaining, submitting, handleSubmit])
 
-  // Effect to start assessment with access key dialog
+  // Effect to fetch assessment metadata and show access key dialog if needed
   useEffect(() => {
-    if (session && !attemptId && !assessment) {
-      // Show access key dialog when page loads without attempt
-      setShowAccessKeyDialog(true)
+    const fetchMetadata = async () => {
+      if (session && params.id && !assessment && !attemptId) {
+        try {
+          const response = await fetch(`/api/user/assessment/${params.id}/metadata`)
+          if (response.ok) {
+            const data = await response.json()
+            // Store metadata in assessment state temporarily
+            setAssessment(data.assessment)
+            setLoading(false)
+            
+            // Show access key dialog only if assessment requires one
+            if (data.assessment.requiresAccessKey && !data.hasExistingAttempt) {
+              setShowAccessKeyDialog(true)
+            } else {
+              // If no access key required or has existing attempt, start assessment directly
+              await fetchAssessment()
+            }
+          } else {
+            const error = await response.json()
+            toasts.error(error.message || "Failed to load assessment")
+            setLoading(false)
+          }
+        } catch (error) {
+          console.error("Error fetching assessment metadata:", error)
+          toasts.error("Failed to load assessment")
+          setLoading(false)
+        }
+      }
     }
-  }, [session, attemptId, assessment])
+    
+    fetchMetadata()
+  }, [session, params.id, assessment, attemptId])
 
-  if (loading) {
+  if (loading && !assessment) {
     return (
       <div className="min-h-screen bg-background dark:bg-background flex items-center justify-center">
         <HexagonLoader size={120} />
@@ -460,6 +592,15 @@ export default function AssessmentTakingPage() {
   const currentQuestion = questions[currentQuestionIndex]
   const progress = questions.length > 0 ? ((currentQuestionIndex + 1) / questions.length) * 100 : 0
   const isLastQuestion = currentQuestionIndex === questions.length - 1
+
+  // If we have assessment but no questions yet, show loading
+  if (!loading && assessment && questions.length === 0) {
+    return (
+      <div className="min-h-screen bg-background dark:bg-background flex items-center justify-center">
+        <HexagonLoader size={120} />
+      </div>
+    )
+  }
 
   const getTimeColor = () => {
     const percentage = (timeRemaining / ((assessment?.timeLimit || 0) * 60)) * 100
@@ -700,7 +841,7 @@ export default function AssessmentTakingPage() {
             <DialogTitle>Enter Assessment Access Key</DialogTitle>
             <DialogDescription>
               This assessment requires an access key to start.
-              {assessment.startTime && (
+              {assessment?.startTime && (
                 <>
                   <br />
                   <span className="text-sm text-muted-foreground">
@@ -708,7 +849,7 @@ export default function AssessmentTakingPage() {
                   </span>
                 </>
               )}
-              {assessment.timeLimit && (
+              {assessment?.timeLimit && (
                 <>
                   <br />
                   <span className="text-sm text-muted-foreground">
