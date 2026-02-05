@@ -80,7 +80,6 @@ interface TabSwitchResponse {
 const TIME_WINDOW_MINUTES = 15
 const FULLSCREEN_EXIT_DEBOUNCE_MS = 1000
 const AUTO_SUBMIT_DELAY_MS = 2000
-const DEVELOPER_TOOLS_CHECK_INTERVAL_MS = 500
 
 // ==================== MAIN COMPONENT ====================
 
@@ -114,10 +113,12 @@ export default function AssessmentTakingPage() {
   const [tabSwitchCount, setTabSwitchCount] = useState(0)
   const [switchesRemaining, setSwitchesRemaining] = useState<number | null>(null)
   const [showTabSwitchWarning, setShowTabSwitchWarning] = useState(false)
-  
+
   const [showAutoSubmitWarning, setShowAutoSubmitWarning] = useState(false)
   const [isAutoSubmitting, setIsAutoSubmitting] = useState(false)
-  
+
+  const [showFullscreenExitModal, setShowFullscreenExitModal] = useState(false)
+
   const [showAnswer, setShowAnswer] = useState<string | null>(null)
   const [checkedAnswers, setCheckedAnswers] = useState<Set<string>>(new Set())
 
@@ -136,6 +137,7 @@ export default function AssessmentTakingPage() {
   const securityCheckRef = useRef<NodeJS.Timeout | null>(null)
   const tabSwitchDebounceRef = useRef<NodeJS.Timeout | null>(null)
   const lastFullscreenStateRef = useRef<boolean>(false)
+  const devToolsWarningShownRef = useRef<boolean>(false)
 
   // ==================== SYNC REFS WITH STATE ====================
   
@@ -185,12 +187,15 @@ export default function AssessmentTakingPage() {
 
       setAssessment(data.assessment)
 
-      if (data.hasExistingAttempt) {
-        await startAssessment("")
-      } else if (data.assessment.accessKey) {
+      // Always require access key if assessment has one, even for continuing attempts
+      if (data.assessment.accessKey) {
         setShowAccessKeyDialog(true)
         setLoading(false)
+      } else if (data.hasExistingAttempt) {
+        // No access key required, continue existing attempt
+        await startAssessment("")
       } else {
+        // No access key required, start new attempt
         await startAssessment("")
       }
     } catch (error) {
@@ -282,18 +287,30 @@ export default function AssessmentTakingPage() {
   const handleFullscreenChange = useCallback(() => {
     const isNowFullscreen = !!document.fullscreenElement
     setIsFullscreen(isNowFullscreen)
-    
+
     // Detect exit (was fullscreen, now not)
     if (lastFullscreenStateRef.current && !isNowFullscreen) {
       lastFullscreenStateRef.current = false
-      
+
       if (assessmentAttemptIdRef.current && !isSubmittingRef.current && !isAutoSubmittingRef.current) {
-        recordFullscreenExit()
+        // Show fullscreen exit modal instead of directly recording the exit
+        setShowFullscreenExitModal(true)
       }
     }
-    
+
     lastFullscreenStateRef.current = isNowFullscreen
   }, [])
+
+  const handleFullscreenExitContinue = useCallback(async () => {
+    // Close the modal
+    setShowFullscreenExitModal(false)
+
+    // Request fullscreen
+    await enterFullscreen()
+
+    // Record the fullscreen exit violation after enabling fullscreen
+    await recordFullscreenExit()
+  }, [enterFullscreen, recordFullscreenExit])
 
   const recordFullscreenExit = useCallback(async () => {
     if (!assessmentAttemptIdRef.current || isSubmittingRef.current || isAutoSubmittingRef.current) {
@@ -335,6 +352,57 @@ export default function AssessmentTakingPage() {
       tabSwitchDebounceRef.current = null
     }, FULLSCREEN_EXIT_DEBOUNCE_MS)
   }, [params.id])
+
+  // ==================== SUBMISSION ====================
+
+  const handleSubmit = useCallback(async (isAutoSubmitted: boolean = false) => {
+    if (isSubmittingRef.current || isAutoSubmittingRef.current || !attemptId) {
+      return
+    }
+
+    setSubmitting(true)
+    isSubmittingRef.current = true
+
+    try {
+      const allAnswers: Record<string, string> = { ...answers }
+      Object.entries(multiSelectAnswers).forEach(([questionId, selectedOptions]) => {
+        allAnswers[questionId] = JSON.stringify(selectedOptions.sort())
+      })
+
+      const response = await fetch(`/api/user/assessment/${params.id}/submit`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          attemptId,
+          answers: allAnswers,
+          isAutoSubmitted,
+        }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        if (isAutoSubmitted) {
+          toasts.error(`Assessment auto-submitted due to violations! Score: ${data.score}%`)
+          // Redirect to assessment list instead of result page
+          router.push('/user/assessment')
+        } else {
+          toasts.success(`Assessment submitted! Score: ${data.score}%`)
+          router.push(`/user/assessment/${params.id}/result`)
+        }
+      } else {
+        const error = await response.json()
+        toasts.error(error.message || "Failed to submit assessment")
+      }
+    } catch (error) {
+      console.error("Error submitting assessment:", error)
+      toasts.error("Failed to submit assessment")
+    } finally {
+      setSubmitting(false)
+      isSubmittingRef.current = false
+    }
+  }, [attemptId, answers, multiSelectAnswers, params.id, router])
 
   // ==================== TAB VISIBILITY TRACKING ====================
 
@@ -399,9 +467,9 @@ export default function AssessmentTakingPage() {
     toasts.error("Maximum violations reached! Auto-submitting in 2 seconds...")
 
     setTimeout(() => {
-      handleSubmit()
+      handleSubmit(true) // Pass true for isAutoSubmitted
     }, AUTO_SUBMIT_DELAY_MS)
-  }, [])
+  }, [handleSubmit])
 
   // ==================== TIMER MANAGEMENT ====================
 
@@ -413,14 +481,14 @@ export default function AssessmentTakingPage() {
           if (newTime <= 0) {
             clearInterval(intervalRef.current!)
             intervalRef.current = null
-            
+
             setIsAutoSubmitting(true)
             isAutoSubmittingRef.current = true
             setShowAutoSubmitWarning(true)
             toasts.info("Time is up! Auto-submitting...")
-            
+
             setTimeout(() => {
-              handleSubmit()
+              handleSubmit(true) // Time expiry should also be marked as auto-submitted
             }, AUTO_SUBMIT_DELAY_MS)
           }
           return newTime
@@ -434,7 +502,7 @@ export default function AssessmentTakingPage() {
         intervalRef.current = null
       }
     }
-  }, [timeRemaining, submitting, isAutoSubmitting])
+  }, [timeRemaining, submitting, isAutoSubmitting, handleSubmit])
 
   // ==================== EVENT LISTENERS ====================
 
@@ -537,26 +605,49 @@ export default function AssessmentTakingPage() {
     }
   }, [assessment, attemptId, handleCopyPaste])
 
-  // Prevent developer tools
+  // Prevent developer tools - Improved detection with debouncing
   useEffect(() => {
     if (!assessment || !attemptId) {
       return
     }
 
+    // Reset warning shown flag when assessment changes
+    devToolsWarningShownRef.current = false
+
     const checkDevTools = () => {
-      const devtools = /./
-      if (
-        (window.outerWidth - window.innerWidth) > 160 ||
-        (window.outerHeight - window.innerHeight) > 160 ||
-        window.Firebug ||
-        window.chrome?.DevTools ||
-        devtools.test(window.navigator.userAgent)
-      ) {
-        toasts.error("Developer tools detected! Please close them.")
+      // Skip if we've already shown the warning
+      if (devToolsWarningShownRef.current) {
+        return
+      }
+
+      let devToolsDetected = false
+
+      // Check for Firebug (browser extension) - this is reliable
+      if (window.Firebug) {
+        devToolsDetected = true
+      }
+
+      // Check for DevTools by detecting console timing differences
+      // This is more reliable than window size checks
+      const threshold = 160
+      const widthDiff = window.outerWidth - window.innerWidth
+      const heightDiff = window.outerHeight - window.innerHeight
+
+      // Only consider it DevTools if the difference is very large and sustained
+      // In incognito mode, small differences can occur, but DevTools creates larger ones
+      if ((widthDiff > threshold || heightDiff > threshold) && widthDiff < 500 && heightDiff < 500) {
+        devToolsDetected = true
+      }
+
+      // Only warn if actually detected and haven't warned yet
+      if (devToolsDetected && !devToolsWarningShownRef.current) {
+        devToolsWarningShownRef.current = true
+        toasts.error("Developer tools detected! Please close them to continue.")
       }
     }
 
-    securityCheckRef.current = setInterval(checkDevTools, DEVELOPER_TOOLS_CHECK_INTERVAL_MS)
+    // Run check every 2 seconds instead of 500ms to be less intrusive
+    securityCheckRef.current = setInterval(checkDevTools, 2000)
 
     return () => {
       if (securityCheckRef.current) {
@@ -565,52 +656,6 @@ export default function AssessmentTakingPage() {
       }
     }
   }, [assessment, attemptId])
-
-  // ==================== SUBMISSION ====================
-
-  const handleSubmit = useCallback(async () => {
-    if (isSubmittingRef.current || isAutoSubmittingRef.current || !attemptId) {
-      return
-    }
-
-    setSubmitting(true)
-    isSubmittingRef.current = true
-
-    try {
-      const allAnswers: Record<string, string> = { ...answers }
-      
-      Object.entries(multiSelectAnswers).forEach(([questionId, selectedOptions]) => {
-        allAnswers[questionId] = JSON.stringify(selectedOptions.sort())
-      })
-
-      const response = await fetch(`/api/user/assessment/${params.id}/submit`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          attemptId,
-          answers: allAnswers,
-        }),
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        toasts.success(`Assessment submitted! Score: ${data.score}%`)
-        
-        router.push(`/user/assessment/${params.id}/result`)
-      } else {
-        const error = await response.json()
-        toasts.error(error.message || "Failed to submit assessment")
-      }
-    } catch (error) {
-      console.error("Error submitting assessment:", error)
-      toasts.error("Failed to submit assessment")
-    } finally {
-      setSubmitting(false)
-      isSubmittingRef.current = false
-    }
-  }, [attemptId, answers, multiSelectAnswers, params.id, router])
 
   // ==================== UI HELPERS ====================
 
@@ -992,6 +1037,36 @@ export default function AssessmentTakingPage() {
                   <HexagonLoader size={40} />
                 </div>
               </div>
+            </DialogContent>
+          </Dialog>
+        )}
+
+        {showFullscreenExitModal && (
+          <Dialog open={showFullscreenExitModal} onOpenChange={setShowFullscreenExitModal}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-orange-600">
+                  <Maximize className="h-5 w-5" />
+                  Fullscreen Exited
+                </DialogTitle>
+              </DialogHeader>
+              <div className="py-4">
+                <p className="text-sm">
+                  You have exited fullscreen mode. To continue with the assessment, you must remain in fullscreen.
+                </p>
+                <p className="text-sm mt-2 font-semibold">
+                  Tab switches: {tabSwitchCount} / {assessmentRef.current?.maxTabs || 3}
+                </p>
+                <p className="text-sm mt-2 text-muted-foreground">
+                  Please click the button below to re-enable fullscreen and continue.
+                </p>
+              </div>
+              <DialogFooter>
+                <Button onClick={handleFullscreenExitContinue} className="w-full">
+                  <Maximize className="w-4 h-4 mr-2" />
+                  Enable Fullscreen to Continue
+                </Button>
+              </DialogFooter>
             </DialogContent>
           </Dialog>
         )}

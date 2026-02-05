@@ -49,6 +49,7 @@ interface Assessment {
   canAttempt: boolean
   attemptStatus: string
   hasInProgress: boolean
+  isAutoSubmitted: boolean
 }
 
 enum DifficultyLevel {
@@ -114,7 +115,11 @@ export default function UserAssessmentsPage() {
     router.push(`/user/assessment/${assessmentId}/take`)
   }
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: string, isAutoSubmitted: boolean = false) => {
+    if (isAutoSubmitted) {
+      return <Badge variant="destructive" className="bg-orange-100 text-orange-800 border-orange-300 text-xs py-1 px-2"><AlertCircle className="w-3 h-3 mr-1" />Auto Submitted</Badge>
+    }
+
     switch (status) {
       case "completed":
         return <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs py-1 px-2"><CheckCircle2 className="w-3 h-3 mr-1" />Completed</Badge>
@@ -243,7 +248,7 @@ export default function UserAssessmentsPage() {
               <CardHeader className="flex-shrink-0 pb-3 px-4">
                 <div className="flex justify-between items-start gap-2 mb-2">
                   <CardTitle className="text-base font-semibold line-clamp-2 flex-1">{assessment.title}</CardTitle>
-                  {getStatusBadge(assessment.attemptStatus)}
+                  {getStatusBadge(assessment.attemptStatus, assessment.isAutoSubmitted)}
                 </div>
                 <CardDescription className="text-sm line-clamp-2">{assessment.description}</CardDescription>
               </CardHeader>
@@ -285,6 +290,15 @@ export default function UserAssessmentsPage() {
                     <CheckCircle2 className="w-3.5 h-3.5 mr-1 text-yellow-500" />
                     Best Score: {Math.round(assessment.bestScore)}%
                   </div>
+                )}
+
+                {assessment.isAutoSubmitted && (
+                  <Alert className="border-orange-200 bg-orange-50 py-2 px-3">
+                    <AlertCircle className="h-3.5 w-3.5 text-orange-600" />
+                    <AlertDescription className="text-orange-800 text-xs leading-tight">
+                      <span className="font-semibold">Auto-submitted</span> due to violations or timeout
+                    </AlertDescription>
+                  </Alert>
                 )}
 
                 {assessment.startTime && new Date(assessment.startTime) > new Date() && (

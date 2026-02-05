@@ -183,8 +183,9 @@ model QuizAttempt {
   totalPoints Float?
   timeTaken   Int?
   startedAt   DateTime?
-  submittedAt DateTime?
-  createdAt   DateTime      @default(now())
+  submittedAt   DateTime?
+  isAutoSubmitted Boolean          @default(false)
+  createdAt     DateTime          @default(now())
   updatedAt   DateTime      @updatedAt
   answers     QuizAnswer[]
   quiz        Quiz          @relation(fields: [quizId], references: [id], onDelete: Cascade)
@@ -271,8 +272,9 @@ model AssessmentAttempt {
   totalPoints   Float?
   timeTaken     Int?
   startedAt     DateTime?
-  submittedAt   DateTime?
-  createdAt     DateTime         @default(now())
+  submittedAt    DateTime?
+  isAutoSubmitted Boolean          @default(false)
+  createdAt      DateTime          @default(now())
   updatedAt     DateTime         @updatedAt
   answers       AssessmentAnswer[]
   assessment    Assessment      @relation(fields: [assessmentId], references: [id], onDelete: Cascade)

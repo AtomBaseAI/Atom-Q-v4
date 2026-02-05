@@ -20,7 +20,7 @@ export async function POST(
 
     const { id: assessmentId } = await params
     const body = await request.json()
-    const { attemptId, answers } = body
+    const { attemptId, answers, isAutoSubmitted } = body
 
     if (!attemptId || !answers) {
       return NextResponse.json(
@@ -78,6 +78,7 @@ export async function POST(
         data: {
           status: AttemptStatus.SUBMITTED,
           submittedAt: new Date(),
+          isAutoSubmitted: isAutoSubmitted || false,
         },
       })
     } else {
@@ -86,6 +87,7 @@ export async function POST(
         data: {
           status: AttemptStatus.SUBMITTED,
           submittedAt: new Date(),
+          isAutoSubmitted: isAutoSubmitted || false,
         },
       })
     }
