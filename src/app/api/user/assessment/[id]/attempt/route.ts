@@ -55,6 +55,13 @@ export async function POST(
           orderBy: {
             order: 'asc'
           }
+        },
+        campus: {
+          select: {
+            id: true,
+            name: true,
+            shortName: true
+          }
         }
       }
     })
@@ -157,7 +164,8 @@ export async function POST(
         maxTabs: assessment.maxTabs,
         disableCopyPaste: assessment.disableCopyPaste,
         checkAnswerEnabled: false,
-        startTime: assessment.startTime
+        startTime: assessment.startTime,
+        campus: assessment.campus
       }
 
       return NextResponse.json({
@@ -189,7 +197,6 @@ export async function POST(
         userId,
         status: AttemptStatus.NOT_STARTED,
         startedAt: new Date().toISOString(),
-        tabSwitches: 0,
       }
     })
 
@@ -257,19 +264,21 @@ export async function POST(
 
     // Format assessment data for frontend
     const assessmentData = {
-      id: attempt.id,
+      id: assessment.id,
       title: assessment.title,
       description: assessment.description || "",
       timeLimit: assessment.timeLimit,
       maxTabs: assessment.maxTabs,
       disableCopyPaste: assessment.disableCopyPaste,
       checkAnswerEnabled: false,
-      questions: questions
+      startTime: assessment.startTime,
+      campus: assessment.campus
     }
 
     const responseData = {
       attemptId: attempt.id,
       assessment: assessmentData,
+      questions: questions,
       timeRemaining: timeRemaining
     }
 

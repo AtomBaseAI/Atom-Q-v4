@@ -96,6 +96,8 @@ export default function AssessmentTakingPage() {
   // Access key states
   const [showAccessKeyDialog, setShowAccessKeyDialog] = useState(false)
   const [accessKeyInput, setAccessKeyInput] = useState("")
+  const [metadataLoaded, setMetadataLoaded] = useState(false)
+  const [isFetching, setIsFetching] = useState(false)
 
   // Tab switching states
   const [tabSwitchCount, setTabSwitchCount] = useState(0)
@@ -109,6 +111,7 @@ export default function AssessmentTakingPage() {
   const answersRef = useRef<Record<string, string>>(answers)
   const multiSelectAnswersRef = useRef<Record<string, string[]>>(multiSelectAnswers)
   const assessmentAttemptIdRef = useRef<string>("")
+  const hasFetchedMetadataRef = useRef(false)
 
   // Update refs when state changes
   useEffect(() => {
@@ -133,14 +136,15 @@ export default function AssessmentTakingPage() {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
   }, [attemptId])
 
-  const fetchAssessment = useCallback(async () => {
+  const fetchAssessment = useCallback(async (accessKey?: string) => {
+    setLoading(true)
     try {
       const response = await fetch(`/api/user/assessment/${params.id}/attempt`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ accessKey: accessKeyInput }),
+        body: JSON.stringify({ accessKey: accessKey || '' }),
       })
 
       if (response.ok) {
@@ -151,9 +155,10 @@ export default function AssessmentTakingPage() {
         setTimeRemaining(data.timeRemaining || 0)
         setCanShowAnswers(false)
         assessmentAttemptIdRef.current = data.attemptId
-        
-        // Check if access key was required
-        if (assessment?.accessKey && accessKeyInput) {
+        setLoading(false) // Clear loading state on success
+
+        // Check if access key was provided
+        if (accessKey) {
           toasts.success('Access key verified! Starting assessment...')
         } else {
           toasts.success('Assessment started!')
@@ -174,12 +179,9 @@ export default function AssessmentTakingPage() {
       } else {
         const error = await response.json()
         toasts.error(error.message || "Failed to start assessment")
+        // Don't clear loading on error so user sees error message
       }
-    } catch (error) {
-      console.error("Error starting assessment:", error)
-      toasts.error("Failed to start assessment")
-    }
-  }, [params.id, accessKeyInput])
+  }, [params.id])
 
   const handleTabSwitch = async () => {
     if (!assessmentAttemptIdRef.current) return
@@ -229,14 +231,15 @@ export default function AssessmentTakingPage() {
   }
 
   const handleAccessKeySubmit = async () => {
-    if (!accessKeyInput.trim()) {
+    const key = accessKeyInput.trim()
+    if (!key) {
       toasts.error("Please enter an access key")
       return
     }
 
     setShowAccessKeyDialog(false)
     setLoading(true)
-    await fetchAssessment()
+    await fetchAssessment(key)
     setLoading(false)
   }
 
@@ -538,37 +541,39 @@ export default function AssessmentTakingPage() {
   // Effect to fetch assessment metadata and show access key dialog if needed
   useEffect(() => {
     const fetchMetadata = async () => {
-      if (session && params.id && !assessment && !attemptId) {
+      if (session && params.id && !hasFetchedMetadataRef.current) {
         try {
           const response = await fetch(`/api/user/assessment/${params.id}/metadata`)
           if (response.ok) {
             const data = await response.json()
-            // Store metadata in assessment state temporarily
-            setAssessment(data.assessment)
-            setLoading(false)
-            
+            // Don't set loading to false yet - assessment state is not set
+            // Mark as fetched to prevent multiple calls
+            hasFetchedMetadataRef.current = true
+
             // Show access key dialog only if assessment requires one
             if (data.assessment.requiresAccessKey && !data.hasExistingAttempt) {
               setShowAccessKeyDialog(true)
+              // Keep loading true so we don't show "Assessment not found"
             } else {
               // If no access key required or has existing attempt, start assessment directly
               await fetchAssessment()
+              // fetchAssessment will set loading to false when it succeeds
             }
           } else {
             const error = await response.json()
             toasts.error(error.message || "Failed to load assessment")
-            setLoading(false)
+            s
           }
         } catch (error) {
           console.error("Error fetching assessment metadata:", error)
           toasts.error("Failed to load assessment")
-          setLoading(false)
+          s
         }
       }
     }
-    
+
     fetchMetadata()
-  }, [session, params.id, assessment, attemptId])
+  }, [session, params.id])
 
   if (loading && !assessment) {
     return (
@@ -590,11 +595,11 @@ export default function AssessmentTakingPage() {
   }
 
   const currentQuestion = questions[currentQuestionIndex]
-  const progress = questions.length > 0 ? ((currentQuestionIndex + 1) / questions.length) * 100 : 0
-  const isLastQuestion = currentQuestionIndex === questions.length - 1
+  const progress = useMemo(() => questions.length > 0 ? ((currentQuestionIndex + 1) / questions.length) * 100 : 0, [questions.length, currentQuestionIndex])
+  const isLastQuestion = useMemo(() => currentQuestionIndex === questions.length - 1, [currentQuestionIndex, questions.length])
 
-  // If we have assessment but no questions yet, show loading
-  if (!loading && assessment && questions.length === 0) {
+  // If we have assessment but no questions yet, show loading (but not if access key dialog is open)
+  if (!loading && assessment && questions.length === 0 && !showAccessKeyDialog) {
     return (
       <div className="min-h-screen bg-background dark:bg-background flex items-center justify-center">
         <HexagonLoader size={120} />
@@ -602,12 +607,12 @@ export default function AssessmentTakingPage() {
     )
   }
 
-  const getTimeColor = () => {
+  const getTimeColor = useMemo(() => {
     const percentage = (timeRemaining / ((assessment?.timeLimit || 0) * 60)) * 100
     if (percentage > 50) return "text-green-500"
     if (percentage > 20) return "text-yellow-500"
     return "text-red-500"
-  }
+  }, [timeRemaining, assessment?.timeLimit])
 
   return (
     <div className={`min-h-screen bg-background dark:bg-background ${isFullscreen ? 'p-0' : 'p-4'}`}>
@@ -662,8 +667,9 @@ export default function AssessmentTakingPage() {
         </CardContent>
       </Card>
 
-      {/* Main Question Card */}
-      <Card className="bg-card/90 dark:bg-card/90 backdrop-blur-sm shadow-xl border border-border/50">
+      {/* Main Question Card - Only render if questions are loaded */}
+      {currentQuestion && (
+        <Card className="bg-card/90 dark:bg-card/90 backdrop-blur-sm shadow-xl border border-border/50">
         <CardContent className="space-y-6">
           {/* Question Header */}
           <div className="flex items-center justify-between mb-4">
@@ -817,22 +823,25 @@ export default function AssessmentTakingPage() {
           </div>
         </CardContent>
       </Card>
+      )}
 
-      {/* Question Navigation */}
-      <div ref={paginationContainerRef} className="flex items-center justify-center gap-2 py-6 overflow-x-auto">
-        {questions.map((question, index) => (
-          <Button
-            key={index}
-            variant={index === currentQuestionIndex ? "default" : "outline"}
-            size="icon"
-            data-question-index={index}
-            onClick={() => goToQuestion(index)}
-            className="flex-shrink-0"
-          >
-            {index + 1}
-          </Button>
-        ))}
-      </div>
+      {/* Question Navigation - Only render if questions are loaded */}
+      {currentQuestion && (
+        <div ref={paginationContainerRef} className="flex items-center justify-center gap-2 py-6 overflow-x-auto">
+          {questions.map((question, index) => (
+            <Button
+              key={index}
+              variant={index === currentQuestionIndex ? "default" : "outline"}
+              size="icon"
+              data-question-index={index}
+              onClick={() => goToQuestion(index)}
+              className="flex-shrink-0"
+            >
+              {index + 1}
+            </Button>
+          ))}
+        </div>
+      )}
 
       {/* Access Key Dialog */}
       <Dialog open={showAccessKeyDialog} onOpenChange={setShowAccessKeyDialog}>
