@@ -53,7 +53,8 @@ import {
   FileQuestion,
   ArrowUpDown,
   Loader2,
-  Key
+  Key,
+  Copy
 } from "lucide-react"
 import { toasts } from "@/lib/toasts"
 import { DifficultyLevel, QuizStatus } from "@prisma/client"
@@ -81,6 +82,17 @@ const formatDateDDMMYYYY = (dateString: string) => {
   const month = String(date.getMonth() + 1).padStart(2, '0')
   const year = date.getFullYear()
   return `${day}/${month}/${year}`
+}
+
+// Helper function to format dates with time
+const formatDateTime = (dateString: string) => {
+  const date = new Date(dateString)
+  const day = String(date.getDate()).padStart(2, '0')
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const year = date.getFullYear()
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  return `${day}/${month}/${year} ${hours}:${minutes}`
 }
 
 interface Assessment {
@@ -187,6 +199,15 @@ export default function AssessmentsPage() {
 
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      toasts.success("Access key copied to clipboard")
+    } catch (error) {
+      toasts.error("Failed to copy access key")
+    }
+  }
+
   const columns: ColumnDef<Assessment>[] = [
     {
       accessorKey: "title",
@@ -257,6 +278,19 @@ export default function AssessmentsPage() {
       },
     },
     {
+      accessorKey: "_count.assessmentUsers",
+      header: "Users",
+      cell: ({ row }) => {
+        const assessment = row.original
+        return (
+          <div className="flex items-center gap-1">
+            <Users className="h-4 w-4 text-muted-foreground" />
+            <span>{assessment._count?.assessmentUsers || 0}</span>
+          </div>
+        )
+      },
+    },
+    {
       accessorKey: "accessKey",
       header: "Access Key",
       cell: ({ row }) => {
@@ -265,6 +299,14 @@ export default function AssessmentsPage() {
           <div className="flex items-center gap-2">
             <Key className="h-4 w-4 text-muted-foreground" />
             <code className="text-sm bg-muted px-2 py-1 rounded">{accessKey}</code>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onClick={() => copyToClipboard(accessKey)}
+            >
+              <Copy className="h-3 w-3" />
+            </Button>
           </div>
         ) : (
           <span className="text-muted-foreground text-sm">Not set</span>
@@ -273,10 +315,10 @@ export default function AssessmentsPage() {
     },
     {
       accessorKey: "startTime",
-      header: "Start Date",
+      header: "Start Time",
       cell: ({ row }) => {
         const startTime = row.getValue("startTime") as string
-        return startTime ? formatDateDDMMYYYY(startTime) : "Not set"
+        return startTime ? formatDateTime(startTime) : "Not set"
       },
     },
     {

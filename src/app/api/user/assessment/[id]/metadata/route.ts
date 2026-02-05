@@ -21,23 +21,8 @@ export async function GET(
     const { id } = await params
     const userId = session.user.id
 
-    // Verify user is enrolled in this assessment
-    const enrollment = await db.assessmentUser.findFirst({
-      where: {
-        assessmentId: id,
-        userId
-      }
-    })
-
-    if (!enrollment) {
-      return NextResponse.json(
-        { message: "You are not enrolled in this assessment" },
-        { status: 403 }
-      )
-    }
-
-    // Get assessment metadata (including whether access key is required)
-    const assessment = await db.assessment.findUnique({
+    // Try to find as Assessment first
+    let assessment = await db.assessment.findUnique({
       where: { id },
       select: {
         id: true,
@@ -63,36 +48,140 @@ export async function GET(
       }
     })
 
+    let isAssessment = true
+
+    // If not found as Assessment, try as Quiz
+    if (!assessment) {
+      assessment = await db.quiz.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          timeLimit: true,
+          startTime: true,
+          accessKey: true,
+          maxTabs: true,
+          disableCopyPaste: true,
+          campus: {
+            select: {
+              id: true,
+              name: true,
+              shortName: true
+            }
+          },
+          _count: {
+            select: {
+              quizQuestions: true
+            }
+          }
+        }
+      })
+
+      if (assessment) {
+        isAssessment = false
+      }
+    }
+
     if (!assessment) {
       return NextResponse.json(
-        { message: "Assessment not found" },
+        { message: "Assessment/Quiz not found" },
         { status: 404 }
       )
     }
 
-    // Check if there's an existing in-progress attempt
-    const existingAttempt = await db.assessmentAttempt.findFirst({
-      where: {
-        assessmentId: id,
-        userId,
-        status: 'IN_PROGRESS'
-      },
-      select: {
-        id: true,
-        tabSwitches: true
+    // Check enrollment based on type
+    let enrollment
+    let hasExistingAttempt = false
+    let existingAttemptId = ""
+    let existingTabSwitches = 0
+
+    if (isAssessment) {
+      // Check assessment enrollment
+      enrollment = await db.assessmentUser.findFirst({
+        where: {
+          assessmentId: id,
+          userId
+        }
+      })
+
+      if (!enrollment) {
+        return NextResponse.json(
+          { message: "You are not enrolled in this assessment" },
+          { status: 403 }
+        )
       }
-    })
+
+      // Check if there's an existing in-progress attempt
+      const existingAttempt = await db.assessmentAttempt.findFirst({
+        where: {
+          assessmentId: id,
+          userId,
+          status: 'IN_PROGRESS'
+        },
+        select: {
+          id: true,
+          tabSwitches: true
+        }
+      })
+
+      hasExistingAttempt = !!existingAttempt
+      existingAttemptId = existingAttempt?.id || ""
+      existingTabSwitches = existingAttempt?.tabSwitches || 0
+    } else {
+      // Check quiz enrollment
+      enrollment = await db.quizUser.findUnique({
+        where: {
+          quizId_userId: {
+            quizId: id,
+            userId
+          }
+        }
+      })
+
+      if (!enrollment) {
+        return NextResponse.json(
+          { message: "You are not enrolled in this quiz" },
+          { status: 403 }
+        )
+      }
+
+      // Check if there's an existing in-progress attempt
+      const existingAttempt = await db.quizAttempt.findFirst({
+        where: {
+          quizId: id,
+          userId,
+          status: 'IN_PROGRESS'
+        },
+        select: {
+          id: true
+        }
+      })
+
+      hasExistingAttempt = !!existingAttempt
+      existingAttemptId = existingAttempt?.id || ""
+      
+      // Tab switches for quizzes are tracked differently (no relation)
+      const tabSwitches = await db.quizTabSwitch?.count?.({
+        where: { attemptId: existingAttemptId }
+      }) || 0
+      existingTabSwitches = tabSwitches
+    }
 
     return NextResponse.json({
       assessment: {
         ...assessment,
-        requiresAccessKey: !!assessment.accessKey,
-        // Don't send the actual access key to the client for security
-        accessKey: undefined
+        // Map quizQuestions to assessmentQuestions for consistency
+        _count: {
+          assessmentQuestions: assessment._count?.assessmentQuestions || assessment._count?.quizQuestions || 0
+        }
       },
-      hasExistingAttempt: !!existingAttempt,
-      existingAttemptId: existingAttempt?.id,
-      existingTabSwitches: existingAttempt?.tabSwitches || 0
+      requiresAccessKey: !!assessment.accessKey,
+      // Don't send actual access key to client for security
+      accessKey: undefined,
+      hasExistingAttempt,
+      existingAttemptId,
+      existingTabSwitches
     })
   } catch (error) {
     console.error("Error fetching assessment metadata:", error)

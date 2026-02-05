@@ -76,6 +76,7 @@ model User {
   assessmentAttempts   AssessmentAttempt[]
   assessmentUsers      AssessmentUser[]
   tabSwitches         AssessmentTabSwitch[]
+  quizTabSwitches     QuizTabSwitch[]
   createdQuizzes       Quiz[]             @relation("QuizCreator")
   createdAssessments   Assessment[]       @relation("AssessmentCreator")
   questionGroups       QuestionGroup[]
@@ -140,6 +141,7 @@ model Quiz {
   updatedAt          DateTime        @updatedAt
   quizAttempts       QuizAttempt[]
   quizQuestions      QuizQuestion[]
+  quizTabSwitches QuizTabSwitch[]
   quizUsers          QuizUser[]
   creator            User            @relation("QuizCreator", fields: [creatorId], references: [id])
   checkAnswerEnabled Boolean         @default(false)
@@ -187,6 +189,7 @@ model QuizAttempt {
   answers     QuizAnswer[]
   quiz        Quiz          @relation(fields: [quizId], references: [id], onDelete: Cascade)
   user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quizTabSwitches QuizTabSwitch[]
 
   @@map("quiz_attempts")
 }
@@ -400,4 +403,17 @@ model AssessmentTabSwitch {
   user          User       @relation(fields: [userId], references: [id])
   assessment    Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
   @@map("assessment_tab_switches")
+}
+
+model QuizTabSwitch {
+  id            String   @id @default(cuid())
+  attemptId     String
+  userId        String
+  quizId        String
+  createdAt      DateTime @default(now())
+  attempt        QuizAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  user          User       @relation(fields: [userId], references: [id])
+  quiz          Quiz       @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  
+  @@map("quiz_tab_switches")
 }
