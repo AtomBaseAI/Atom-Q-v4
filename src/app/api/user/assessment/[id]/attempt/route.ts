@@ -4,6 +4,9 @@ import { authOptions } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { UserRole, AttemptStatus } from "@prisma/client"
 
+// Time window for starting assessment (in minutes)
+const TIME_WINDOW_MINUTES = 15
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -44,7 +47,7 @@ export async function POST(
       )
     }
 
-    // Get assessment data to check access key requirement
+    // Get assessment data
     const assessment = await db.assessment.findUnique({
       where: { id },
       include: {
@@ -91,10 +94,33 @@ export async function POST(
     })
 
     if (existingAttempt) {
-      // Return existing attempt with questions (don't increment tab switches, just return data)
-      // Format questions for frontend (similar to new attempt logic)
+      // Validate existing attempt is still within time window
+      if (assessment.startTime) {
+        const startTime = new Date(assessment.startTime)
+        const now = new Date()
+        const diffMs = now.getTime() - startTime.getTime()
+        const diffMinutes = diffMs / (1000 * 60)
+
+        // If outside the time window, mark as expired
+        if (diffMinutes > TIME_WINDOW_MINUTES) {
+          // Update attempt status to show it's expired
+          await db.assessmentAttempt.update({
+            where: { id: existingAttempt.id },
+            data: { status: AttemptStatus.SUBMITTED }
+          })
+
+          return NextResponse.json(
+            { 
+              message: `This assessment is no longer available. It was available for ${TIME_WINDOW_MINUTES} minutes after start time.` 
+            },
+            { status: 403 }
+          )
+        }
+      }
+
+      // Return existing attempt data
       const questions = assessment.assessmentQuestions
-        .filter(aq => aq.question) // Filter out null questions
+        .filter(aq => aq.question)
         .map((aq, index) => {
           try {
             if (!aq.question.id || !aq.question.content || !aq.question.type) {
@@ -102,7 +128,7 @@ export async function POST(
               return null
             }
 
-            let options = []
+            let options: string[] = []
             if (aq.question.options) {
               if (typeof aq.question.options === 'string') {
                 try {
@@ -141,7 +167,7 @@ export async function POST(
             return null
           }
         })
-        .filter(q => q !== null) // Remove failed questions
+        .filter(q => q !== null)
 
       if (questions.length === 0) {
         return NextResponse.json(
@@ -152,8 +178,13 @@ export async function POST(
 
       // Calculate time remaining for existing attempt
       const timeLimit = (assessment.timeLimit || 0) * 60 // Convert minutes to seconds
-      const timeElapsed = Math.floor((new Date().getTime() - new Date(existingAttempt.startedAt).getTime()) / 1000)
+      const timeElapsed = Math.floor((new Date().getTime() - new Date(existingAttempt.startedAt || existingAttempt.createdAt).getTime()) / 1000)
       const timeRemaining = Math.max(0, timeLimit - timeElapsed)
+
+      // Get tab switch count
+      const tabSwitchCount = await db.assessmentTabSwitch.count({
+        where: { attemptId: existingAttempt.id }
+      })
 
       // Format assessment data for frontend
       const assessmentData = {
@@ -173,21 +204,47 @@ export async function POST(
         assessment: assessmentData,
         questions: questions,
         timeRemaining: timeRemaining,
-        tabSwitches: existingAttempt.tabSwitches,
-        switchesRemaining: assessment.maxTabs ? assessment.maxTabs - existingAttempt.tabSwitches : null,
-        shouldAutoSubmit: assessment.maxTabs ? existingAttempt.tabSwitches >= assessment.maxTabs : false,
+        tabSwitches: tabSwitchCount,
+        switchesRemaining: assessment.maxTabs ? assessment.maxTabs - tabSwitchCount : null,
+        shouldAutoSubmit: assessment.maxTabs ? tabSwitchCount >= assessment.maxTabs : false,
       })
     }
 
-    // Check if assessment is within availability window
-    const now = new Date()
-    const startTime = assessment.startTime ? new Date(assessment.startTime) : null
+    // Validate start time window for new attempt
+    if (assessment.startTime) {
+      const startTime = new Date(assessment.startTime)
+      const now = new Date()
+      const diffMs = now.getTime() - startTime.getTime()
+      const diffMinutes = diffMs / (1000 * 60)
 
-    if (startTime && startTime > now) {
-      return NextResponse.json(
-        { message: "Assessment has not started yet" },
-        { status: 403 }
-      )
+      // Before start time
+      if (diffMinutes < 0) {
+        const timeUntilStart = Math.abs(diffMinutes)
+        const hours = Math.floor(timeUntilStart / 60)
+        const minutes = Math.floor(timeUntilStart % 60)
+        
+        let timeMessage = `${Math.ceil(timeUntilStart)} minutes`
+        if (hours > 0) {
+          timeMessage = `${hours} hour${hours > 1 ? 's' : ''} and ${minutes} minute${minutes !== 1 ? 's' : ''}`
+        }
+
+        return NextResponse.json(
+          { 
+            message: `Assessment has not started yet. It will be available in ${timeMessage}.` 
+          },
+          { status: 403 }
+        )
+      }
+
+      // After time window
+      if (diffMinutes > TIME_WINDOW_MINUTES) {
+        return NextResponse.json(
+          { 
+            message: `This assessment is no longer available. It was available for ${TIME_WINDOW_MINUTES} minutes after the start time.` 
+          },
+          { status: 403 }
+        )
+      }
     }
 
     // Create new attempt
@@ -195,14 +252,14 @@ export async function POST(
       data: {
         assessmentId: id,
         userId,
-        status: AttemptStatus.NOT_STARTED,
+        status: AttemptStatus.IN_PROGRESS,
         startedAt: new Date().toISOString(),
       }
     })
 
-    // Format questions for frontend (similar to quiz attempt endpoint)
+    // Format questions for frontend
     const questions = assessment.assessmentQuestions
-      .filter(aq => aq.question) // Filter out null questions
+      .filter(aq => aq.question)
       .map((aq, index) => {
         try {
           if (!aq.question.id || !aq.question.content || !aq.question.type) {
@@ -210,7 +267,7 @@ export async function POST(
             return null
           }
 
-          let options = []
+          let options: string[] = []
           if (aq.question.options) {
             if (typeof aq.question.options === 'string') {
               try {
@@ -249,7 +306,7 @@ export async function POST(
           return null
         }
       })
-      .filter(q => q !== null) // Remove failed questions
+      .filter(q => q !== null)
 
     if (questions.length === 0) {
       return NextResponse.json(
