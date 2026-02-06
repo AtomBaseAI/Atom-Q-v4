@@ -46,6 +46,8 @@ interface DataTableProps<TData, TValue> {
   data: TData[]
   searchKey?: string
   searchPlaceholder?: string
+  searchValue?: string
+  onSearchChange?: (value: string) => void
   filters?: {
     key: string
     label: string
@@ -62,6 +64,8 @@ export function DataTable<TData, TValue>({
   data,
   searchKey,
   searchPlaceholder = "Search...",
+  searchValue,
+  onSearchChange,
   filters,
   rowSelection: controlledRowSelection,
   onRowSelectionChange,
@@ -114,10 +118,14 @@ export function DataTable<TData, TValue>({
           {searchKey && (
             <Input
               placeholder={searchPlaceholder}
-              value={(table.getColumn(searchKey)?.getFilterValue() as string) ?? ""}
-              onChange={(event) =>
-                table.getColumn(searchKey)?.setFilterValue(event.target.value)
-              }
+              value={onSearchChange !== undefined ? (searchValue ?? "") : (table.getColumn(searchKey)?.getFilterValue() as string) ?? ""}
+              onChange={(event) => {
+                if (onSearchChange !== undefined) {
+                  onSearchChange(event.target.value)
+                } else {
+                  table.getColumn(searchKey)?.setFilterValue(event.target.value)
+                }
+              }}
               className="max-w-sm"
             />
           )}

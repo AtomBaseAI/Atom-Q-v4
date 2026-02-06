@@ -3,7 +3,10 @@
 import { useState, useEffect, useMemo } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { LoadingButton } from "@/components/ui/laodaing-button"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Sheet,
   SheetContent,
@@ -23,6 +26,13 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
   ArrowLeft,
   Search,
   UserPlus,
@@ -30,9 +40,9 @@ import {
   Users,
   ArrowUpDown,
   ChevronLeft,
-  CheckCircle2,
-  Loader2,
-  UserCheck,
+  Filter,
+  X,
+  CheckCircle2
 } from "lucide-react"
 import { toast } from "sonner"
 import { DataTable } from "@/components/ui/data-table"
@@ -44,7 +54,6 @@ interface User {
   id: string
   name: string
   email: string
-  uoid?: string
   campus?: {
     id: string
     name: string
@@ -221,9 +230,22 @@ export default function QuizUsersPage() {
   }
 
   // Helper functions for user selection
+  const hasActiveEnrollFilters = () => {
+    return enrollSearchTerm !== "" ||
+           enrollCampusFilter !== "all" ||
+           enrollDepartmentFilter !== "all" ||
+           enrollBatchFilter !== "all" ||
+           enrollSectionFilter !== "all"
+  }
+
   const selectAllUsers = () => {
     const allUserIds = availableUsers.map(u => u.id)
     setSelectedUsers(allUserIds)
+  }
+
+  const selectFilteredUsers = () => {
+    const filteredUserIds = availableUsers.map(u => u.id)
+    setSelectedUsers(filteredUserIds)
   }
 
   const clearUserSelection = () => {
@@ -306,11 +328,6 @@ export default function QuizUsersPage() {
 
   const columns: ColumnDef<User>[] = [
     {
-      id: "searchable",
-      accessorFn: (row) => `${row.name} ${row.email} ${row.uoid || ''}`,
-      enableHiding: true,
-    },
-    {
       accessorKey: "name",
       header: ({ column }) => {
         return (
@@ -330,37 +347,26 @@ export default function QuizUsersPage() {
       header: "Email",
     },
     {
-      accessorKey: "uoid",
-      header: "UOID",
-      cell: ({ row }) => {
-        const uoid = row.getValue("uoid") as string
-        return uoid || "-"
-      },
-    },
-    {
-      id: "campus",
-      accessorFn: (row) => row.campus?.shortName || "",
+      accessorKey: "campus",
       header: "Campus",
       cell: ({ row }) => {
-        const campus = row.original.campus
-        return campus?.shortName || campus?.name || "-"
+        const campus = row.getValue("campus") as User["campus"]
+        return campus?.name || campus?.shortName || "-"
       },
     },
     {
-      id: "department",
-      accessorFn: (row) => row.department?.name || "",
+      accessorKey: "department",
       header: "Department",
       cell: ({ row }) => {
-        const department = row.original.department
+        const department = row.getValue("department") as User["department"]
         return department?.name || "-"
       },
     },
     {
-      id: "batch",
-      accessorFn: (row) => row.batch?.name || "",
+      accessorKey: "batch",
       header: "Batch",
       cell: ({ row }) => {
-        const batch = row.original.batch
+        const batch = row.getValue("batch") as User["batch"]
         return batch?.name || "-"
       },
     },
@@ -439,9 +445,8 @@ export default function QuizUsersPage() {
       <DataTable
         columns={columns}
         data={users}
-        searchKey="searchable"
-        searchPlaceholder="Search by name, email, or UOID..."
-        initialColumnVisibility={{ searchable: false }}
+        searchKey="name"
+        searchPlaceholder="Search enrolled users..."
         filters={[
           {
             key: "campus",
@@ -505,71 +510,66 @@ export default function QuizUsersPage() {
             <div className="flex flex-col gap-2">
               <div className="relative w-full">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <input
-                  type="text"
+                <Input
                   placeholder="Search users by name or email..."
                   value={enrollSearchTerm}
                   onChange={(e) => setEnrollSearchTerm(e.target.value)}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 pl-9 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="pl-9"
                 />
               </div>
               <div className="flex flex-wrap gap-2">
-                <div className="relative">
-                  <select
-                    value={enrollCampusFilter}
-                    onChange={(e) => setEnrollCampusFilter(e.target.value)}
-                    className="flex h-10 w-[150px] items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <option value="all">All Campuses</option>
+                <Select value={enrollCampusFilter} onValueChange={setEnrollCampusFilter}>
+                  <SelectTrigger className="w-[150px]">
+                    <SelectValue placeholder="Campus" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Campuses</SelectItem>
                     {enrollUniqueCampuses.map(campus => (
-                      <option key={campus} value={campus}>
+                      <SelectItem key={campus} value={campus}>
                         {campus}
-                      </option>
+                      </SelectItem>
                     ))}
-                  </select>
-                </div>
-                <div className="relative">
-                  <select
-                    value={enrollDepartmentFilter}
-                    onChange={(e) => setEnrollDepartmentFilter(e.target.value)}
-                    className="flex h-10 w-[150px] items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <option value="all">All Departments</option>
+                  </SelectContent>
+                </Select>
+                <Select value={enrollDepartmentFilter} onValueChange={setEnrollDepartmentFilter}>
+                  <SelectTrigger className="w-[150px]">
+                    <SelectValue placeholder="Department" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Departments</SelectItem>
                     {enrollUniqueDepartments.map(dept => (
-                      <option key={dept} value={dept}>
+                      <SelectItem key={dept} value={dept}>
                         {dept}
-                      </option>
+                      </SelectItem>
                     ))}
-                  </select>
-                </div>
-                <div className="relative">
-                  <select
-                    value={enrollBatchFilter}
-                    onChange={(e) => setEnrollBatchFilter(e.target.value)}
-                    className="flex h-10 w-[150px] items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <option value="all">All Batches</option>
+                  </SelectContent>
+                </Select>
+                <Select value={enrollBatchFilter} onValueChange={setEnrollBatchFilter}>
+                  <SelectTrigger className="w-[150px]">
+                    <SelectValue placeholder="Batch" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Batches</SelectItem>
                     {enrollUniqueBatches.map(batch => (
-                      <option key={batch} value={batch}>
+                      <SelectItem key={batch} value={batch}>
                         {batch}
-                      </option>
+                      </SelectItem>
                     ))}
-                  </select>
-                </div>
-                <div className="relative">
-                  <select
-                    value={enrollSectionFilter}
-                    onChange={(e) => setEnrollSectionFilter(e.target.value)}
-                    className="flex h-10 w-[150px] items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <option value="all">All Sections</option>
+                  </SelectContent>
+                </Select>
+                <Select value={enrollSectionFilter} onValueChange={setEnrollSectionFilter}>
+                  <SelectTrigger className="w-[150px]">
+                    <SelectValue placeholder="Section" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Sections</SelectItem>
                     {enrollUniqueSections.map(section => (
-                      <option key={section} value={section}>
+                      <SelectItem key={section} value={section}>
                         {section}
-                      </option>
+                      </SelectItem>
                     ))}
-                  </select>
-                </div>
+                  </SelectContent>
+                </Select>
                 {(enrollSearchTerm || enrollCampusFilter !== "all" || enrollDepartmentFilter !== "all" || enrollBatchFilter !== "all" || enrollSectionFilter !== "all") && (
                   <Button
                     variant="outline"
@@ -582,6 +582,7 @@ export default function QuizUsersPage() {
                       setEnrollSectionFilter("all")
                     }}
                   >
+                    <X className="h-4 w-4 mr-1" />
                     Clear
                   </Button>
                 )}
@@ -589,17 +590,21 @@ export default function QuizUsersPage() {
             </div>
 
             {/* Selection Controls */}
-            <div className="flex items-center justify-between border-b pb-4">
-              <div className="flex items-center gap-2">
+            <div className="flex flex-wrap gap-2 items-center justify-between border-b pb-4">
+              <div className="flex flex-wrap gap-2">
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={selectAllUsers}
+                  onClick={hasActiveEnrollFilters() ? selectFilteredUsers : selectAllUsers}
+                  disabled={availableUsers.length === 0}
                 >
-                  Select All ({availableUsers.length})
+                  {hasActiveEnrollFilters()
+                    ? `Select Filtered (${availableUsers.length})`
+                    : `Select All (${availableUsers.length})`
+                  }
                 </Button>
                 <Button
-                  variant="ghost"
+                  variant="outline"
                   size="sm"
                   onClick={clearUserSelection}
                   disabled={selectedUsers.length === 0}
@@ -607,137 +612,123 @@ export default function QuizUsersPage() {
                   Clear Selection ({selectedUsers.length})
                 </Button>
               </div>
+              <Badge variant={selectedUsers.length > 0 ? "default" : "outline"}>
+                {selectedUsers.length} selected
+              </Badge>
             </div>
 
             {/* Users List */}
-            <ScrollArea className="h-[calc(100vh-280px)]">
-              <div className="space-y-2 px-4 pb-4">
-                {availableUsers.length === 0 ? (
-                  <div className="flex items-center justify-center h-32 text-muted-foreground">
-                    No users found
-                  </div>
-                ) : (
-                  availableUsers.map((user) => (
+            <ScrollArea className="h-[50vh] min-h-[300px] border rounded-md p-4">
+              {availableUsers.length > 0 ? (
+                <div className="space-y-2">
+                  {availableUsers.map((user) => (
                     <div
                       key={user.id}
-                      onClick={() => toggleUserSelection(user.id)}
-                      className={`flex items-center justify-between p-4 rounded-lg border cursor-pointer transition-colors ${
-                        isUserSelected(user.id)
-                          ? "bg-primary/10 border-primary"
-                          : "hover:bg-muted/50"
+                      className={`flex items-start gap-3 p-4 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer ${
+                        isUserSelected(user.id) ? "bg-muted/80 border-primary" : ""
                       }`}
+                      onClick={() => toggleUserSelection(user.id)}
                     >
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3">
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="checkbox"
-                              checked={isUserSelected(user.id)}
-                              onChange={() => toggleUserSelection(user.id)}
-                              className="h-4 w-4"
-                            />
-                            <span className="font-medium">{user.name}</span>
-                          </div>
-                          {user.email && (
-                            <span className="text-sm text-muted-foreground">{user.email}</span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
-                          {user.campus?.shortName && (
+                      <Checkbox
+                        checked={isUserSelected(user.id)}
+                        onChange={() => toggleUserSelection(user.id)}
+                        className="mt-0.5"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <p className="font-medium truncate">{user.name || "No name"}</p>
+                          {user.campus && (
                             <Badge variant="outline" className="text-xs">
                               {user.campus.shortName}
                             </Badge>
                           )}
-                          {user.department?.name && (
+                          {user.department && (
                             <Badge variant="outline" className="text-xs">
                               {user.department.name}
                             </Badge>
                           )}
-                          {user.batch?.name && (
+                          {user.batch && (
                             <Badge variant="outline" className="text-xs">
                               {user.batch.name}
                             </Badge>
                           )}
                           {user.section && (
                             <Badge variant="outline" className="text-xs">
-                              Sec {user.section}
+                              {user.section}
                             </Badge>
                           )}
                         </div>
+                        <p className="text-sm text-muted-foreground truncate">
+                          {user.email}
+                        </p>
                       </div>
                       {isUserSelected(user.id) && (
-                        <div className="flex items-center gap-1">
-                          <CheckCircle2 className="h-5 w-5 text-primary" />
-                        </div>
+                        <CheckCircle2 className="h-5 w-5 text-primary flex-shrink-0" />
                       )}
                     </div>
-                  ))
-                )}
-              </div>
-            </ScrollArea>
-          </div>
-
-          <SheetFooter>
-            <Button
-              variant="outline"
-              onClick={() => setIsEnrollSheetOpen(false)}
-              disabled={isEnrolling}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleEnrollUsers}
-              disabled={selectedUsers.length === 0 || isEnrolling}
-            >
-              {isEnrolling ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Enrolling...
-                </>
+                  ))}
+                </div>
               ) : (
-                <>
-                  <UserCheck className="mr-2 h-4 w-4" />
-                  Enroll {selectedUsers.length} User{selectedUsers.length !== 1 ? 's' : ''}
-                </>
+                <div className="flex flex-col items-center justify-center h-64 text-center">
+                  <Users className="h-12 w-12 text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground">
+                    {enrollSearchTerm || enrollCampusFilter !== "all"
+                      ? "No users match your search criteria"
+                      : "No available users to enroll"}
+                  </p>
+                </div>
               )}
-            </Button>
-          </SheetFooter>
+            </ScrollArea>
+
+            {/* Footer Actions */}
+            <div className="flex items-center justify-between pt-4 border-t">
+              <p className="text-sm text-muted-foreground">
+                {selectedUsers.length} user(s) will be enrolled
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setIsEnrollSheetOpen(false)}
+                  disabled={isEnrolling}
+                >
+                  Cancel
+                </Button>
+                <LoadingButton
+                  onClick={handleEnrollUsers}
+                  isLoading={isEnrolling}
+                  loadingText="Enrolling..."
+                  disabled={selectedUsers.length === 0}
+                >
+                  Enroll Selected Users ({selectedUsers.length})
+                </LoadingButton>
+              </div>
+            </div>
+          </div>
         </SheetContent>
       </Sheet>
 
-      {/* Unenroll Confirmation Dialog */}
+      {/* Unenroll User Dialog */}
       <AlertDialog open={isUnenrollDialogOpen} onOpenChange={setIsUnenrollDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Unenroll User</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to unenroll <strong>{userToUnenroll?.name}</strong> from this quiz?
-              This will also delete all their quiz attempts and data.
-              This action cannot be undone.
+              Are you sure you want to unenroll <strong>"{userToUnenroll?.name}"</strong> from this quiz?
+              This action cannot be undone and will remove their quiz data.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isUnenrolling}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(e) => {
-                e.preventDefault()
-                handleUnenrollUser()
-              }}
-              disabled={isUnenrolling}
+            <AlertDialogCancel onClick={() => setUserToUnenroll(null)}>
+              Cancel
+            </AlertDialogCancel>
+            <LoadingButton
+              onClick={handleUnenrollUser}
+              isLoading={isUnenrolling}
+              loadingText="Unenrolling..."
               className="bg-red-600 hover:bg-red-700"
             >
-              {isUnenrolling ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Unenrolling...
-                </>
-              ) : (
-                <>
-                  <UserMinus className="mr-2 h-4 w-4" />
-                  Unenroll
-                </>
-              )}
-            </AlertDialogAction>
+              Unenroll User
+            </LoadingButton>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

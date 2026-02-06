@@ -74,6 +74,23 @@ const formatDateDDMMYYYY = (dateString: string) => {
   return `${day}/${month}/${year}`
 }
 
+// Debounce hook to prevent too many API calls
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value)
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value)
+    }, delay)
+
+    return () => {
+      clearTimeout(handler)
+    }
+  }, [value, delay])
+
+  return debouncedValue
+}
+
 interface User {
   id: string
   name: string
@@ -175,6 +192,10 @@ export default function UsersPage() {
   const [availableDepartments, setAvailableDepartments] = useState<{ id: string; name: string }[]>([])
   const [availableBatches, setAvailableBatches] = useState<{ id: string; name: string }[]>([])
   const [availableSections, setAvailableSections] = useState<string[]>([])
+  
+  // Search state for name, email, and uoid
+  const [searchQuery, setSearchQuery] = useState<string>('')
+  const debouncedSearchQuery = useDebounce(searchQuery, 300)
 
 
 
@@ -458,12 +479,12 @@ export default function UsersPage() {
     fetchFilterOptions()
   }, [filterCampusId, filterDepartmentId, filterBatchId, fetchFilterOptions])
 
-  // Refetch users when any filter changes
+  // Refetch users when any filter or search changes
   useEffect(() => {
-    if (isAuthenticated && isAdmin && !loading) {
+    if (isAuthenticated && isAdmin) {
       fetchUsers()
     }
-  }, [filterCampusId, filterDepartmentId, filterBatchId, filterSection, isAuthenticated, isAdmin])
+  }, [filterCampusId, filterDepartmentId, filterBatchId, filterSection, debouncedSearchQuery, isAuthenticated, isAdmin])
 
   const fetchBatches = async (campusId: string) => {
     if (!campusId || campusId === "general") {
@@ -523,6 +544,9 @@ export default function UsersPage() {
       if (filterSection && filterSection !== 'all') {
         params.append('section', filterSection)
       }
+      if (debouncedSearchQuery && debouncedSearchQuery.trim()) {
+        params.append('search', debouncedSearchQuery.trim())
+      }
 
       const url = params.toString() ? `/api/admin/users?${params.toString()}` : "/api/admin/users"
       const response = await fetch(url)
@@ -536,6 +560,7 @@ export default function UsersPage() {
         toasts.error("Failed to fetch users")
       }
     } catch (error) {
+      console.error("Error fetching users:", error)
       toasts.networkError()
     } finally {
       setLoading(false)
@@ -1024,7 +1049,9 @@ export default function UsersPage() {
             columns={columns}
             data={users}
             searchKey="name"
-            searchPlaceholder="Search users..."
+            searchPlaceholder="Search by name, email, or UOID..."
+            searchValue={searchQuery}
+            onSearchChange={setSearchQuery}
             filters={dataTableFilters}
             rowSelection={selectedUserIds}
             onRowSelectionChange={setSelectedUserIds}

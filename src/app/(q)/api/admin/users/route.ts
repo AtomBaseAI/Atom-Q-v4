@@ -6,6 +6,7 @@ import { UserRole } from "@prisma/client"
 import bcrypt from "bcryptjs"
 
 export async function GET(request: NextRequest) {
+  console.log('GET /api/admin/users called') // Debug log
   try {
     const session = await getServerSession(authOptions)
 
@@ -27,11 +28,12 @@ export async function GET(request: NextRequest) {
     const whereClause: any = {}
 
     // Add search functionality for name, email, or uoid
+    // Note: SQLite doesn't support mode: 'insensitive' in the same way as PostgreSQL
     if (search && search.trim()) {
       whereClause.OR = [
-        { name: { contains: search, mode: 'insensitive' } },
-        { email: { contains: search, mode: 'insensitive' } },
-        { uoid: { contains: search, mode: 'insensitive' } },
+        { name: { contains: search.trim() } },
+        { email: { contains: search.trim() } },
+        { uoid: { contains: search.trim() } },
       ]
     }
 

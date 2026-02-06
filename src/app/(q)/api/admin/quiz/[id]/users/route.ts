@@ -1,4 +1,3 @@
-
 import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
@@ -20,21 +19,61 @@ export async function GET(
     }
 
     const { id } = await params
+    const { searchParams } = new URL(request.url)
+    
+    const search = searchParams.get('search')
+    const campusId = searchParams.get('campusId')
+    const noCampus = searchParams.get('noCampus')
+    const departmentId = searchParams.get('departmentId')
+    const batchId = searchParams.get('batchId')
+    const section = searchParams.get('section')
 
-    // Get enrolled users for this quiz
-    const enrolledUsers = await db.user.findMany({
-      where: {
-        quizUsers: {
-          some: {
-            quizId: id
-          }
-        },
-        role: UserRole.USER
+    // Build where clause for filtering
+    const whereClause: any = {
+      quizUsers: {
+        some: {
+          quizId: id
+        }
       },
+      role: UserRole.USER
+    }
+
+    // Add search functionality for name, email, or uoid
+    if (search && search.trim()) {
+      whereClause.OR = [
+        { name: { contains: search.trim() } },
+        { email: { contains: search.trim() } },
+        { uoid: { contains: search.trim() } },
+      ]
+    }
+
+    // Handle campus filtering
+    if (noCampus === 'true') {
+      whereClause.campusId = null
+    } else if (campusId && campusId !== 'all') {
+      whereClause.campusId = campusId
+    }
+
+    if (departmentId && departmentId !== 'all') {
+      whereClause.departmentId = departmentId
+    }
+
+    if (batchId && batchId !== 'all') {
+      whereClause.batchId = batchId
+    }
+
+    if (section && section !== 'all') {
+      whereClause.section = section
+    }
+
+    // Get enrolled users for this quiz with filters
+    const enrolledUsers = await db.user.findMany({
+      where: whereClause,
       select: {
         id: true,
         name: true,
         email: true,
+        uoid: true,
         campus: {
           select: {
             id: true,
@@ -55,10 +94,22 @@ export async function GET(
           }
         },
         section: true,
+      },
+      orderBy: {
+        createdAt: "desc"
       }
     })
 
-    return NextResponse.json(enrolledUsers)
+    // Transform data to match frontend expectations
+    const transformedUsers = enrolledUsers.map(user => ({
+      ...user,
+      campusShortName: user.campus?.shortName || null,
+      campusId: user.campus?.id || null,
+      departmentId: user.department?.id || null,
+      batchId: user.batch?.id || null
+    }))
+
+    return NextResponse.json(transformedUsers)
   } catch (error) {
     console.error("Error fetching enrolled users:", error)
     return NextResponse.json(
@@ -153,6 +204,72 @@ export async function POST(
     })
   } catch (error) {
     console.error("Error enrolling users:", error)
+    return NextResponse.json(
+      { message: "Internal server error" },
+      { status: 500 }
+    )
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await getServerSession(authOptions)
+
+    if (!session || session.user.role !== UserRole.ADMIN) {
+      return NextResponse.json(
+        { message: "Unauthorized" },
+        { status: 401 }
+      )
+    }
+
+    const { id } = await params
+    const { userIds } = await request.json()
+
+    if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
+      return NextResponse.json(
+        { message: "User IDs are required" },
+        { status: 400 }
+      )
+    }
+
+    // Check if quiz exists
+    const quiz = await db.quiz.findUnique({
+      where: { id }
+    })
+
+    if (!quiz) {
+      return NextResponse.json(
+        { message: "Quiz not found" },
+        { status: 404 }
+      )
+    }
+
+    // Delete all quiz attempts for these users in this quiz
+    const deletedAttempts = await db.quizAttempt.deleteMany({
+      where: {
+        quizId: id,
+        userId: { in: userIds }
+      }
+    })
+
+    // Delete quiz enrollments for these users
+    const deletedEnrollments = await db.quizUser.deleteMany({
+      where: {
+        quizId: id,
+        userId: { in: userIds }
+      }
+    })
+
+    return NextResponse.json({
+      message: `${deletedEnrollments.count} user(s) unenrolled successfully. ${deletedAttempts.count} attempt(s) deleted.`,
+      unenrolledCount: deletedEnrollments.count,
+      deletedAttemptsCount: deletedAttempts.count
+    })
+  } catch (error) {
+    console.error("Error unenrolling users:", error)
     return NextResponse.json(
       { message: "Internal server error" },
       { status: 500 }
