@@ -105,10 +105,10 @@ export default function AssessmentResultPage() {
   }
 
   const getScoreIcon = (score: number) => {
-    if (score >= 80) return CheckCircle2
-    if (score >= 60) return Trophy
-    if (score >= 40) return XCircle
-    return XCircle
+    if (score >= 80) return <CheckCircle2 className="h-16 w-16" />
+    if (score >= 60) return <Trophy className="h-16 w-16" />
+    if (score >= 40) return <XCircle className="h-16 w-16" />
+    return <XCircle className="h-16 w-16" />
   }
 
   return (

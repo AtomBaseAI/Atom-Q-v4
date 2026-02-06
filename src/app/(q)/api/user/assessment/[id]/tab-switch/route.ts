@@ -81,7 +81,7 @@ export async function POST(
     let maxTabs = assessment?.maxTabs || MAX_TAB_SWITCHES
 
     // Check existing tab switches based on type
-    let existingSwitches = 0
+    let existingSwitches: any[] = []
 
     if (isAssessment) {
       existingSwitches = await db.assessmentTabSwitch.findMany({

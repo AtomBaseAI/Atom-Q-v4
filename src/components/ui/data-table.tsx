@@ -54,6 +54,7 @@ interface DataTableProps<TData, TValue> {
   }[]
   rowSelection?: Record<string, boolean>
   onRowSelectionChange?: (selection: Record<string, boolean>) => void
+  initialColumnVisibility?: VisibilityState
 }
 
 export function DataTable<TData, TValue>({
@@ -64,13 +65,14 @@ export function DataTable<TData, TValue>({
   filters,
   rowSelection: controlledRowSelection,
   onRowSelectionChange,
+  initialColumnVisibility,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     []
   )
   const [columnVisibility, setColumnVisibility] =
-    React.useState<VisibilityState>({})
+    React.useState<VisibilityState>(initialColumnVisibility || {})
   const [internalRowSelection, setInternalRowSelection] = React.useState({})
 
   // Use controlled rowSelection if provided, otherwise use internal state

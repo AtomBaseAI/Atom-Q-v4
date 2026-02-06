@@ -78,11 +78,13 @@ interface User {
   id: string
   name: string
   email: string
+  uoid: string
   role: UserRole
   isActive: boolean
   phone?: string
   section?: string
   campus?: string
+  campusShortName?: string
   campusId?: string | null
   department?: string
   departmentId?: string | null
@@ -102,6 +104,7 @@ interface Campus {
 interface FormData {
   name: string
   email: string
+  uoid: string
   password: string
   role: UserRole
   phone: string
@@ -152,6 +155,7 @@ export default function UsersPage() {
   const [formData, setFormData] = useState<FormData>({
     name: "",
     email: "",
+    uoid: "",
     password: "",
     role: UserRole.USER,
     phone: "",
@@ -271,8 +275,47 @@ export default function UsersPage() {
       },
     },
     {
+      accessorKey: "uoid",
+      header: ({ column }) => {
+        return (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          >
+            UOID
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          </Button>
+        )
+      },
+      cell: ({ row }) => (
+        <Badge variant="outline" className="font-mono text-xs">
+          {row.getValue("uoid") || "-"}
+        </Badge>
+      ),
+    },
+    {
+      accessorKey: "campusShortName",
+      header: ({ column }) => {
+        return (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          >
+            Campus
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          </Button>
+        )
+      },
+      cell: ({ row }) => (
+        <Badge variant="secondary" className="font-mono text-xs">
+          {row.getValue("campusShortName") || "-"}
+        </Badge>
+      ),
+    },
+    {
       accessorKey: "role",
       header: "Role",
+      meta: { defaultHidden: true },
       cell: ({ row }) => {
         const role = row.getValue("role") as UserRole
         return (
@@ -320,6 +363,7 @@ export default function UsersPage() {
     {
       accessorKey: "isActive",
       header: "Status",
+      meta: { defaultHidden: true },
       cell: ({ row }) => {
         const isActive = row.getValue("isActive") as boolean
         return (
@@ -342,6 +386,7 @@ export default function UsersPage() {
           </Button>
         )
       },
+      meta: { defaultHidden: true },
       cell: ({ row }) => {
         const date = new Date(row.getValue("createdAt"))
         return formatDateDDMMYYYY(date.toISOString())
@@ -657,6 +702,7 @@ export default function UsersPage() {
     setFormData({
       name: user.name,
       email: user.email,
+      uoid: user.uoid || "",
       password: "",
       role: user.role,
       phone: user.phone || "",
@@ -693,6 +739,7 @@ export default function UsersPage() {
     setFormData({
       name: "",
       email: "",
+      uoid: "",
       password: "",
       role: UserRole.USER,
       phone: "",
@@ -709,6 +756,7 @@ export default function UsersPage() {
     const csvData = users.map(user => ({
       name: user.name,
       email: user.email,
+      uoid: user.uoid || "",
       role: user.role,
       phone: user.phone || "",
       campus: user.campus || "",
@@ -980,6 +1028,11 @@ export default function UsersPage() {
             filters={dataTableFilters}
             rowSelection={selectedUserIds}
             onRowSelectionChange={setSelectedUserIds}
+            initialColumnVisibility={{
+              role: false,
+              isActive: false,
+              createdAt: false,
+            }}
           />
         </CardContent>
       </Card>
@@ -1002,6 +1055,16 @@ export default function UsersPage() {
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   required
+                />
+              </div>
+              <div className="grid gap-3">
+                <Label htmlFor="add-uoid">Unique Organization ID (UOID)</Label>
+                <Input
+                  id="add-uoid"
+                  value={formData.uoid}
+                  onChange={(e) => setFormData({ ...formData, uoid: e.target.value })}
+                  required
+                  placeholder="e.g., EMP001"
                 />
               </div>
               <div className="grid gap-3">
@@ -1169,6 +1232,16 @@ export default function UsersPage() {
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   required
+                />
+              </div>
+              <div className="grid gap-3">
+                <Label htmlFor="edit-uoid">Unique Organization ID (UOID)</Label>
+                <Input
+                  id="edit-uoid"
+                  value={formData.uoid}
+                  onChange={(e) => setFormData({ ...formData, uoid: e.target.value })}
+                  required
+                  placeholder="e.g., EMP001"
                 />
               </div>
               <div className="grid gap-3">

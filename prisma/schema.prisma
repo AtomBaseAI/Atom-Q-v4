@@ -54,6 +54,7 @@ model Department {
 model User {
   id                   String             @id @default(cuid())
   email                String             @unique
+  uoid                 String             @unique @default("")
   name                 String?
   password             String
   role                 UserRole           @default(USER)

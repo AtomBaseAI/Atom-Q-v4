@@ -107,8 +107,12 @@ async function main() {
       const sectionValues: StudentSection[] = ['A', 'B', 'C', 'D']
       const section = sectionValues[sectionIndex]
 
+      // Generate unique UOID
+      const uoid = `TSO${String(i).padStart(3, '0')}`
+
       user = await prisma.user.create({
         data: {
+          uoid,
           email,
           name: `Seed Test User ${i}`,
           password: userPassword,
@@ -154,6 +158,7 @@ async function main() {
   if (!creator) {
     creator = await prisma.user.create({
       data: {
+        uoid: 'TESTADMIN',
         email: 'testadmin@seed.org',
         name: 'Test Admin for Seed',
         password: await bcrypt.hash('admin123', 10),

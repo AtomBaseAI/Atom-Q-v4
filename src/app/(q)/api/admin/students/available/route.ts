@@ -53,6 +53,7 @@ export async function GET(request: NextRequest) {
       where.OR = [
         { name: { contains: search, mode: "insensitive" } },
         { email: { contains: search, mode: "insensitive" } },
+        { uoid: { contains: search, mode: "insensitive" } },
       ]
     }
 
@@ -87,6 +88,7 @@ export async function GET(request: NextRequest) {
       select: {
         id: true,
         name: true,
+        uoid: true,
         email: true,
         campus: {
           select: {

@@ -85,6 +85,7 @@ async function main() {
   const adminPassword = await bcrypt.hash('admin@atomcode.dev', 10)
   const admin = await prisma.user.create({
     data: {
+      uoid: 'ADMIN001',
       email: 'admin@atomcode.dev',
       name: 'Atom Admin',
       password: adminPassword,
@@ -100,6 +101,7 @@ async function main() {
   const users = await Promise.all([
     prisma.user.create({
       data: {
+        uoid: 'MIT001',
         email: 'student@mit.edu',
         name: 'MIT Student',
         password: userPassword,
@@ -109,6 +111,7 @@ async function main() {
     }),
     prisma.user.create({
       data: {
+        uoid: 'STF001',
         email: 'student@stanford.edu',
         name: 'Stanford Student',
         password: userPassword,
@@ -118,6 +121,7 @@ async function main() {
     }),
     prisma.user.create({
       data: {
+        uoid: 'HRV001',
         email: 'student@harvard.edu',
         name: 'Harvard Student',
         password: userPassword,

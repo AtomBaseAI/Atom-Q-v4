@@ -9,6 +9,7 @@ export const loginSchema = z.object({
 
 // Register schema
 export const registerSchema = z.object({
+  uoid: z.string().min(1, "UOID is required"),
   name: z.string().min(1, "Name is required"),
   email: z.string().email("Please enter a valid email"),
   password: z.string().min(6, "Password must be at least 6 characters"),

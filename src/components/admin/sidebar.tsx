@@ -263,7 +263,7 @@ export function AppSidebar({
               <Button
                 variant="ghost"
                 className={cn(
-                  "w-full justify-start gap-3 px-3 py-2 h-auto",
+                  "w-full justify-start gap-3 px-2 py-2 h-auto",
                   "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                 )}
               >

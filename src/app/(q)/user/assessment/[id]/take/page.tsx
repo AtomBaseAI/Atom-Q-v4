@@ -632,7 +632,7 @@ export default function AssessmentTakingPage() {
       let devToolsDetected = false
 
       // Check for Firebug (browser extension) - this is reliable
-      if (window.Firebug) {
+      if ('Firebug' in window && (window as any).Firebug) {
         devToolsDetected = true
       }
 
@@ -933,7 +933,7 @@ export default function AssessmentTakingPage() {
                       <Checkbox
                         id={`q${currentQuestion.id}-opt${idx}`}
                         checked={(multiSelectAnswers[currentQuestion.id] || []).includes(option)}
-                        onCheckedChange={(checked) => handleMultiSelectChange(currentQuestion.id, option, checked)}
+                        onCheckedChange={(checked) => handleMultiSelectChange(currentQuestion.id, option, Boolean(checked))}
                       />
                       <Label 
                         htmlFor={`q${currentQuestion.id}-opt${idx}`} 

@@ -80,6 +80,7 @@ export default function RegisterPage() {
   const form = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
+      uoid: "",
       name: "",
       email: "",
       password: "",
@@ -149,6 +150,7 @@ export default function RegisterPage() {
 
     try {
       const payload: any = {
+        uoid: data.uoid,
         name: data.name,
         email: data.email,
         password: data.password,
@@ -430,6 +432,20 @@ export default function RegisterPage() {
                       )}
                     </div>
                   )}
+
+                  <FormField
+                    control={form.control}
+                    name="uoid"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Unique Organization ID (UOID)</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Enter your unique organization ID" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
                   <FormField
                     control={form.control}

@@ -111,23 +111,13 @@ export async function GET(request: NextRequest) {
       // Check time constraints with proper timezone handling
       const now = new Date()
       const startTime = assessment.startTime ? new Date(assessment.startTime) : null
-      const endTime = assessment.endTime ? new Date(assessment.endTime) : null
 
       if (startTime && startTime > now) {
         canAttempt = false
         attemptStatus = 'not_started'
       }
 
-      if (endTime && endTime < now) {
-        canAttempt = false
-        attemptStatus = 'expired'
-      }
-
-      // Additional validation: ensure end time is after start time if both are set
-      if (startTime && endTime && endTime <= startTime) {
-        canAttempt = false
-        attemptStatus = 'not_started'
-      }
+      // Note: Assessment model doesn't have endTime field like Quiz model
 
       return {
         id: assessment.id,
@@ -138,7 +128,6 @@ export async function GET(request: NextRequest) {
         maxTabs: assessment.maxTabs,
         disableCopyPaste: assessment.disableCopyPaste,
         startTime: assessment.startTime,
-        endTime: assessment.endTime,
         questionCount: assessment._count.assessmentQuestions,
         attempts: completedAttempts.length,
         bestScore: completedAttempts.length > 0

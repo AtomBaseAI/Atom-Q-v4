@@ -78,10 +78,23 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Check if UOID already exists
+    const existingUOID = await db.user.findUnique({
+      where: { uoid: validatedFields.data.uoid }
+    })
+
+    if (existingUOID) {
+      return NextResponse.json(
+        { message: 'User already exists with this UOID' },
+        { status: 400 }
+      )
+    }
+
     const hashedPassword = await hash(validatedFields.data.password, 12)
 
     // Prepare user data
     const userData: any = {
+      uoid: validatedFields.data.uoid,
       name: validatedFields.data.name,
       email: validatedFields.data.email,
       password: hashedPassword,

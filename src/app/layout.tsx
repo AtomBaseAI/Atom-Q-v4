@@ -1,5 +1,4 @@
 import { Metadata } from "next"
-import "./(q)/globals.css"
 
 export const metadata: Metadata = {
   title: "Atom Q",

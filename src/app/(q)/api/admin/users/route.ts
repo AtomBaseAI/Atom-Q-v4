@@ -21,9 +21,19 @@ export async function GET(request: NextRequest) {
     const departmentId = searchParams.get('departmentId')
     const batchId = searchParams.get('batchId')
     const section = searchParams.get('section')
+    const search = searchParams.get('search')
 
     // Build where clause for filtering
     const whereClause: any = {}
+
+    // Add search functionality for name, email, or uoid
+    if (search && search.trim()) {
+      whereClause.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { email: { contains: search, mode: 'insensitive' } },
+        { uoid: { contains: search, mode: 'insensitive' } },
+      ]
+    }
 
     if (campusId && campusId !== 'all') {
       whereClause.campusId = campusId
@@ -47,6 +57,7 @@ export async function GET(request: NextRequest) {
         id: true,
         email: true,
         name: true,
+        uoid: true,
         role: true,
         isActive: true,
         phone: true,
@@ -54,7 +65,8 @@ export async function GET(request: NextRequest) {
         campus: {
           select: {
             id: true,
-            name: true
+            name: true,
+            shortName: true
           }
         },
         department: {
@@ -85,6 +97,7 @@ export async function GET(request: NextRequest) {
     const transformedUsers = users.map(user => ({
       ...user,
       campus: user.campus?.name || null,
+      campusShortName: user.campus?.shortName || null,
       department: user.department?.name || null,
       batch: user.batch?.name || null,
       registrationCode: user.registrationCode?.code || null,
@@ -149,16 +162,16 @@ export async function POST(request: NextRequest) {
       for (const item of importData) {
         try {
           // Skip if required fields are missing
-          if (!item.name || !item.email) {
+          if (!item.name || !item.email || !item.uoid) {
             results.push({
               email: item.email || 'unknown',
               status: 'failed',
-              message: 'Missing required fields (name, email)'
+              message: 'Missing required fields (name, email, uoid)'
             })
             continue
           }
 
-          // Check if user already exists
+          // Check if user already exists by email
           const existingUser = await db.user.findUnique({
             where: { email: item.email }
           })
@@ -172,9 +185,24 @@ export async function POST(request: NextRequest) {
             continue
           }
 
+          // Check if UOID already exists
+          const existingUOID = await db.user.findUnique({
+            where: { uoid: item.uoid }
+          })
+
+          if (existingUOID) {
+            results.push({
+              uoid: item.uoid,
+              status: 'failed',
+              message: 'User already exists with this UOID'
+            })
+            continue
+          }
+
           // Create user with default password
           const user = await db.user.create({
             data: {
+              uoid: item.uoid,
               name: item.name,
               email: item.email,
               password: hashedPassword,
@@ -187,6 +215,7 @@ export async function POST(request: NextRequest) {
               id: true,
               email: true,
               name: true,
+              uoid: true,
               role: true,
               isActive: true,
               phone: true,
@@ -233,9 +262,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Handle single user creation
-    const { name, email, password, phone, campus, department, batch, section, role, isActive } = userData
+    const { name, email, uoid, password, phone, campus, department, batch, section, role, isActive } = userData
 
-    // Check if user already exists
+    // Check if user already exists by email
     const existingUser = await db.user.findUnique({
       where: { email }
     })
@@ -247,11 +276,24 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Check if UOID already exists
+    const existingUOID = await db.user.findUnique({
+      where: { uoid }
+    })
+
+    if (existingUOID) {
+      return NextResponse.json(
+        { message: "User with this UOID already exists" },
+        { status: 400 }
+      )
+    }
+
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 12)
 
     // Prepare user data
     const userDataToCreate: any = {
+      uoid,
       name,
       email,
       password: hashedPassword,
@@ -283,6 +325,7 @@ export async function POST(request: NextRequest) {
         id: true,
         email: true,
         name: true,
+        uoid: true,
         role: true,
         isActive: true,
         phone: true,

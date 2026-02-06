@@ -274,7 +274,7 @@ export default function UserAssessmentsPage() {
                 {assessment.maxTabs !== null && (
                   <div className="flex items-center text-xs text-muted-foreground">
                     <FileText className="w-3.5 h-3.5 mr-1" />
-                    Max tabs: {assessment.maxTabs}
+                    Max tab switches: {assessment.maxTabs}
                   </div>
                 )}
 
