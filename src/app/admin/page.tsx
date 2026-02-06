@@ -60,7 +60,7 @@ export default function AdminDashboard() {
       value: stats.totalQuestions,
       description: "Available questions",
       icon: TrendingUp,
-      color: "text-purple-600",
+      color: "text-primary",
     },
     {
       title: "Quiz Attempts",

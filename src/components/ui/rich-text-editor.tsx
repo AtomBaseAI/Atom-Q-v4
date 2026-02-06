@@ -223,7 +223,7 @@ export function RichTextEditor({
           <PopoverContent className="w-64">
             <div className="grid grid-cols-6 gap-2">
               {[
-                '#000000', '#ffffff', '#ef4444', '#facc15', '#22c55e', '#a855f7'
+                '#000000', '#ffffff', '#ef4444', '#f59e0b', '#22c55e', '#d97706'
               ].map((color) => (
                 <button
                   key={color}

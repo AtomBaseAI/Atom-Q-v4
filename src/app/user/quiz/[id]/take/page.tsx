@@ -560,7 +560,7 @@ export default function QuizTakingPage() {
       case QuestionType.TRUE_FALSE:
         return "text-green-600 bg-green-50 dark:text-green-400 dark:bg-green-900/30"
       case QuestionType.FILL_IN_BLANK:
-        return "text-purple-600 bg-purple-50 dark:text-purple-400 dark:bg-purple-900/30"
+        return "text-primary bg-primary/10 dark:text-primary dark:bg-primary/20"
       case QuestionType.MULTI_SELECT:
         return "text-orange-600 bg-orange-50 dark:text-orange-400 dark:bg-orange-900/30"
       default:

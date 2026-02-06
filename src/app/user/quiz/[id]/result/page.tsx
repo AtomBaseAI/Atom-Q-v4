@@ -211,7 +211,7 @@ export default function QuizResultPage() {
                     {scorePercentage}%
                   </p>
                 </div>
-                <Target className="h-8 w-8 text-purple-600" />
+                <Target className="h-8 w-8 text-primary" />
               </div>
               <Progress value={scorePercentage} className="mt-2" />
             </CardContent>
@@ -236,11 +236,11 @@ export default function QuizResultPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Time Taken</p>
-                  <p className="text-2xl font-bold text-blue-600">
+                  <p className="text-2xl font-bold text-primary">
                     {formatTime(result.timeTaken)}
                   </p>
                 </div>
-                <Clock className="h-8 w-8 text-blue-600" />
+                <Clock className="h-8 w-8 text-primary" />
               </div>
             </CardContent>
           </Card>
@@ -250,11 +250,11 @@ export default function QuizResultPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Points</p>
-                  <p className="text-2xl font-bold text-purple-600">
+                  <p className="text-2xl font-bold text-primary">
                     {result.score}
                   </p>
                 </div>
-                <Award className="h-8 w-8 text-purple-600" />
+                <Award className="h-8 w-8 text-primary" />
               </div>
             </CardContent>
           </Card>

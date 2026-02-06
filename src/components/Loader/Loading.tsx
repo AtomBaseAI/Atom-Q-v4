@@ -29,7 +29,7 @@ export default function HexagonLoader({ size = 80, className = "" }: { size?: nu
     return (
         <div className={`inline-flex items-center justify-center ${className}`}>
             <div className="relative">
-                <div className="absolute inset-0 rounded-full opacity-20 dark:opacity-30 bg-gradient-to-r from-blue-500/30 via-purple-500/20 to-blue-500/30 blur-[10px] animate-pulse" />
+                <div className="absolute inset-0 rounded-full opacity-20 dark:opacity-30 bg-gradient-to-r from-primary/30 via-primary/20 to-primary/30 blur-[10px] animate-pulse" />
 
                 <svg
                     width={size}
@@ -63,7 +63,7 @@ export default function HexagonLoader({ size = 80, className = "" }: { size?: nu
 
                     <path
                         d={innerPath}
-                        className="fill-purple-600 dark:fill-purple-400 transition-colors duration-300"
+                        className="fill-primary transition-colors duration-300"
                         filter={`url(#glow-${size})`}
                         style={{
                             transformOrigin: 'center',

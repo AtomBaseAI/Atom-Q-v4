@@ -15,7 +15,7 @@ const AccentColorContext = createContext<AccentColorContextType>({
 
 export const useAccentColor = () => useContext(AccentColorContext)
 
-const primaryColor = "hsl(270 100% 50%)"
+const primaryColor = "oklch(0.7 0.2 45)"
 
 export function AccentColorProvider({ children }: { children: React.ReactNode }) {
   const [accentColor, setAccentColor] = useState("primary")
@@ -23,7 +23,7 @@ export function AccentColorProvider({ children }: { children: React.ReactNode })
   useEffect(() => {
     const root = document.documentElement
     root.style.setProperty("--primary", primaryColor)
-    root.style.setProperty("--primary-foreground", "hsl(0 0% 98%)")
+    root.style.setProperty("--primary-foreground", "oklch(0.985 0 0)")
   }, [])
 
   return (

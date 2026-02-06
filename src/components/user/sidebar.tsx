@@ -17,9 +17,9 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { useSession, signOut } from "next-auth/react"
 import { toasts } from "@/lib/toasts"
 import { useUserStore } from "@/stores/user"
-import { 
-  LayoutDashboard, 
-  BookOpen, 
+import {
+  LayoutDashboard,
+  BookOpen,
   Settings,
   ChevronLeft,
   ChevronRight,
@@ -29,6 +29,7 @@ import {
   Maximize,
   Minimize,
   FileText,
+  CreditCard,
 } from "lucide-react"
 import { useSidebar } from "@/components/ui/sidebar"
 import { flushSync } from "react-dom"
@@ -49,6 +50,11 @@ const userNavItems = [
     title: "Assessments",
     href: "/user/assessment",
     icon: FileText,
+  },
+  {
+    title: "Subscription",
+    href: "/user/subscription",
+    icon: CreditCard,
   },
 ]
 

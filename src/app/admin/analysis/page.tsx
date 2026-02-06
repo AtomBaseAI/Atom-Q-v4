@@ -238,7 +238,7 @@ export default function AnalyticsPage() {
                       <div className="text-xs text-muted-foreground">Quizzes</div>
                     </div>
                     <div className="text-center">
-                      <div className="text-lg font-bold text-purple-600">
+                      <div className="text-lg font-bold text-primary">
                         {campus._count.assessments}
                       </div>
                       <div className="text-xs text-muted-foreground">
