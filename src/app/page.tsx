@@ -9,6 +9,7 @@ import { HeroSection } from "@/components/web/hero-section"
 import { SignalsSection } from "@/components/web/signals-section"
 import { WorkSection } from "@/components/web/work-section"
 import { PrinciplesSection } from "@/components/web/principles-section"
+import { PricingSection } from "@/components/web/pricing-section"
 import { ColophonSection } from "@/components/web/colophon-section"
 import WebLayout from "@/components/layout/web-layout"
 
@@ -26,6 +27,7 @@ export default function LandingPage() {
           <SignalsSection />
           <WorkSection />
           <PrinciplesSection />
+          <PricingSection />
           <ColophonSection />
         </div>
       </main>
