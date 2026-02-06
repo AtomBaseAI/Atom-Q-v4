@@ -2,32 +2,21 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { AnimatedThemeToggler } from "@/components/magicui/animated-theme-toggler"
+
 import { useTheme } from "next-themes"
+import { SideNav } from "@/components/web/side-nav"
+import { HeroSection } from "@/components/web/hero-section"
+import { SignalsSection } from "@/components/web/signals-section"
+import { WorkSection } from "@/components/web/work-section"
+import { PrinciplesSection } from "@/components/web/principles-section"
+import { ColophonSection } from "@/components/web/colophon-section"
+import WebLayout from "@/components/layout/web-layout"
 
 export default function LandingPage() {
-  const [siteTitle, setSiteTitle] = useState("Atom Q")
+
   const [mounted, setMounted] = useState(false)
   const { theme } = useTheme()
 
-  useEffect(() => {
-    setMounted(true)
-
-    const fetchSettings = async () => {
-      try {
-        const response = await fetch('/api/public/settings')
-        if (response.ok) {
-          const data = await response.json()
-          setSiteTitle(data.siteTitle || "Atom Q")
-        }
-      } catch (error) {
-        console.error('Failed to fetch settings:', error)
-      }
-    }
-
-    fetchSettings()
-  }, [])
 
   const toggleTheme = () => {
     const newTheme = theme === "light" ? "dark" : "light"
@@ -77,78 +66,21 @@ export default function LandingPage() {
     }
   }
 
-  if (!mounted) {
-    return null
-  }
+
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
-      {/* Header */}
-      <header className="border-b">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <h1 className="text-2xl font-bold">{siteTitle}</h1>
-          <AnimatedThemeToggler />
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="flex-1 flex items-center justify-center px-4">
-        <div className="text-center max-w-3xl">
-          <h2 className="text-4xl md:text-6xl font-bold mb-6">
-            Welcome to {siteTitle}
-          </h2>
-          <p className="text-xl text-muted-foreground mb-8">
-            A comprehensive knowledge testing portal for assessments, quizzes, and learning management.
-          </p>
-
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <Button asChild size="lg" className="w-full sm:w-auto">
-              <Link href="/login">
-                Login to Continue
-              </Link>
-            </Button>
-            <Button
-              asChild
-              size="lg"
-              variant="outline"
-              className="w-full sm:w-auto"
-            >
-              <Link href="/register">
-                Create Account
-              </Link>
-            </Button>
-          </div>
-
-          {/* Features */}
-          <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="p-6 border rounded-lg">
-              <h3 className="text-lg font-semibold mb-2">Assessments</h3>
-              <p className="text-sm text-muted-foreground">
-                Take comprehensive assessments to test your knowledge and track your progress.
-              </p>
-            </div>
-            <div className="p-6 border rounded-lg">
-              <h3 className="text-lg font-semibold mb-2">Quizzes</h3>
-              <p className="text-sm text-muted-foreground">
-                Participate in interactive quizzes and compete with others on the leaderboard.
-              </p>
-            </div>
-            <div className="p-6 border rounded-lg">
-              <h3 className="text-lg font-semibold mb-2">Analytics</h3>
-              <p className="text-sm text-muted-foreground">
-                View detailed analytics and insights to improve your performance.
-              </p>
-            </div>
-          </div>
+    <WebLayout>
+      <main className="relative min-h-screen">
+        <SideNav />
+        <div className="grid-bg fixed inset-0 opacity-30" aria-hidden="true" />
+        <div className="relative z-10">
+          <HeroSection />
+          <SignalsSection />
+          <WorkSection />
+          <PrinciplesSection />
+          <ColophonSection />
         </div>
       </main>
-
-      {/* Footer */}
-      <footer className="border-t py-6 mt-auto">
-        <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
-          <p>&copy; {new Date().getFullYear()} {siteTitle}. Powered by Atom Labs.</p>
-        </div>
-      </footer>
-    </div>
+    </WebLayout>
   )
 }
