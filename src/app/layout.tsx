@@ -1,11 +1,10 @@
 import { Metadata } from "next"
-import "./globals.css"
-import ClientLayout from "@/components/layout/client-layout"
+import "./(q)/globals.css"
 
 export const metadata: Metadata = {
   title: "Atom Q",
   description: "Knowledge testing portal powered by Atom Labs",
-  
+
   openGraph: {
     title: "Atom Q",
     description: "Knowledge testing portal powered by Atom Labs",
@@ -26,9 +25,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body>
-        <ClientLayout>{children}</ClientLayout>
-      </body>
+      <body>{children}</body>
     </html>
   )
 }

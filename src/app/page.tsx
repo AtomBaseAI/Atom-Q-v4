@@ -1,79 +1,37 @@
 "use client"
 
-import { useState, useEffect, Suspense } from "react"
-import { useSession } from "next-auth/react"
-import { useRouter, useSearchParams } from "next/navigation"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { useTheme } from "next-themes"
-import { toasts } from "@/lib/toasts"
-import HexagonLoader from "@/components/Loader/Loading"
-import { LoginForm } from "@/components/forms/login-form"
-import { useUserStore } from "@/stores/user"
+import { useState, useEffect } from "react"
+import Link from "next/link"
+import { Button } from "@/components/ui/button"
 import { AnimatedThemeToggler } from "@/components/magicui/animated-theme-toggler"
+import { useTheme } from "next-themes"
 
-function LoginPage() {
-  const [error, setError] = useState("")
+export default function LandingPage() {
   const [siteTitle, setSiteTitle] = useState("Atom Q")
-  const [isMaintenanceMode, setIsMaintenanceMode] = useState(false)
-  const [allowRegistration, setAllowRegistration] = useState(true)
-  const router = useRouter()
-  const { theme, setTheme } = useTheme()
-  const { data: session, status } = useSession()
-  const searchParams = useSearchParams()
-  const { user } = useUserStore()
+  const [mounted, setMounted] = useState(false)
+  const { theme } = useTheme()
 
-  // Fetch basic settings locally for login screen only
   useEffect(() => {
-    const fetchLoginSettings = async () => {
+    setMounted(true)
+
+    const fetchSettings = async () => {
       try {
         const response = await fetch('/api/public/settings')
         if (response.ok) {
           const data = await response.json()
           setSiteTitle(data.siteTitle || "Atom Q")
-          setIsMaintenanceMode(data.maintenanceMode || false)
-          setAllowRegistration(data.allowRegistration !== undefined ? data.allowRegistration : true)
         }
       } catch (error) {
-        console.error('Failed to fetch login settings:', error)
+        console.error('Failed to fetch settings:', error)
       }
     }
 
-    fetchLoginSettings()
+    fetchSettings()
   }, [])
-
-  useEffect(() => {
-    const maintenanceError = searchParams.get('error')
-    if (maintenanceError === 'maintenance') {
-      setError("Site is under maintenance. Only administrators can login.")
-    }
-  }, [searchParams])
-
-  // Redirect based on role when session is available and authenticated
-  useEffect(() => {
-    if (status === "authenticated" && session) {
-      if (session.user.role === 'ADMIN') {
-        router.push("/admin")
-      } else {
-        router.push("/user")
-      }
-    }
-  }, [session, status, router])
-
-  // Remove the problematic redirect that uses user store without session
-  // This was causing the infinite redirect loop after logout
-
-  // Handle maintenance mode
-  useEffect(() => {
-    if (isMaintenanceMode) {
-      setError("Site is under maintenance. Only administrators can login.")
-    }
-  }, [isMaintenanceMode])
 
   const toggleTheme = () => {
     const newTheme = theme === "light" ? "dark" : "light"
-    setTheme(newTheme)
-    
+
     // Apply theme changes instantly to CSS custom properties
     const root = document.documentElement
     if (newTheme === "dark") {
@@ -119,58 +77,78 @@ function LoginPage() {
     }
   }
 
-  const handleLoginSuccess = () => {
-    // The redirect will be handled by the useEffect hooks
-  }
-
-  const handleLoginError = (errorMessage: string) => {
-    // Error is already handled by the form component
+  if (!mounted) {
+    return null
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <div className="absolute top-4 right-4">
-       <AnimatedThemeToggler />
-      </div>
+    <div className="min-h-screen flex flex-col bg-background">
+      {/* Header */}
+      <header className="border-b">
+        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+          <h1 className="text-2xl font-bold">{siteTitle}</h1>
+          <AnimatedThemeToggler />
+        </div>
+      </header>
 
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center">{siteTitle}</CardTitle>
-          <CardDescription className="text-center">
-            Enter your credentials to access your account
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-          
-          <LoginForm 
-            onSuccess={handleLoginSuccess}
-            onError={handleLoginError}
-          />
-        </CardContent>
-        <CardFooter className="flex flex-col space-y-4 pt-0">
-          {allowRegistration && (
-            <div className="text-center text-sm">
-              Don't have an account?{" "}
-              <a href="/register" className="text-primary hover:underline">
-                Sign up
-              </a>
+      {/* Main Content */}
+      <main className="flex-1 flex items-center justify-center px-4">
+        <div className="text-center max-w-3xl">
+          <h2 className="text-4xl md:text-6xl font-bold mb-6">
+            Welcome to {siteTitle}
+          </h2>
+          <p className="text-xl text-muted-foreground mb-8">
+            A comprehensive knowledge testing portal for assessments, quizzes, and learning management.
+          </p>
+
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+            <Button asChild size="lg" className="w-full sm:w-auto">
+              <Link href="/login">
+                Login to Continue
+              </Link>
+            </Button>
+            <Button
+              asChild
+              size="lg"
+              variant="outline"
+              className="w-full sm:w-auto"
+            >
+              <Link href="/register">
+                Create Account
+              </Link>
+            </Button>
+          </div>
+
+          {/* Features */}
+          <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="p-6 border rounded-lg">
+              <h3 className="text-lg font-semibold mb-2">Assessments</h3>
+              <p className="text-sm text-muted-foreground">
+                Take comprehensive assessments to test your knowledge and track your progress.
+              </p>
             </div>
-          )}
-        </CardFooter>
-      </Card>
-    </div>
-  )
-}
+            <div className="p-6 border rounded-lg">
+              <h3 className="text-lg font-semibold mb-2">Quizzes</h3>
+              <p className="text-sm text-muted-foreground">
+                Participate in interactive quizzes and compete with others on the leaderboard.
+              </p>
+            </div>
+            <div className="p-6 border rounded-lg">
+              <h3 className="text-lg font-semibold mb-2">Analytics</h3>
+              <p className="text-sm text-muted-foreground">
+                View detailed analytics and insights to improve your performance.
+              </p>
+            </div>
+          </div>
+        </div>
+      </main>
 
-export default function HomePage() {
-  return (
-    <Suspense fallback={<div className="flex items-center justify-center h-[80vh] "><HexagonLoader size={80} /></div>}>
-      <LoginPage />
-    </Suspense>
+      {/* Footer */}
+      <footer className="border-t py-6 mt-auto">
+        <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
+          <p>&copy; {new Date().getFullYear()} {siteTitle}. Powered by Atom Labs.</p>
+        </div>
+      </footer>
+    </div>
   )
 }

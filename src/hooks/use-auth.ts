@@ -75,12 +75,12 @@ export function useAuthOptimized(): UseAuthOptimizedReturn {
 
   const logout = useCallback(async () => {
     setIsLoading(true)
-    
+
     try {
       await signOut({ redirect: false })
       clearUser()
       toasts.logoutSuccess()
-      router.push("/")
+      router.push("/login")
     } catch (error) {
       console.error("Logout error:", error)
       toasts.logoutFailed("Failed to logout")

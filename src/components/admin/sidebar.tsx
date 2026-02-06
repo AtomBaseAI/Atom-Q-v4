@@ -161,9 +161,9 @@ export function AppSidebar({
 
   const handleSignOut = async () => {
     setUser(null);
-    await signOut({ callbackUrl: "/" });
+    await signOut({ callbackUrl: "/login" });
     toast.success("Logged out successfully");
-    window.location.href = '/';
+    window.location.href = '/login';
   };
 
   return (
