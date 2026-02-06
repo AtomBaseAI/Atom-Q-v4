@@ -2,7 +2,7 @@
 
 import { useEffect } from "react"
 import { useSession } from "next-auth/react"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 import { AppSidebar } from "@/components/user/sidebar"
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar"
 import { Loader2 } from "lucide-react"
@@ -16,7 +16,13 @@ export default function UserLayout({
 }) {
   const { data: session, status } = useSession()
   const router = useRouter()
+  const pathname = usePathname()
   const { open, setOpen, mounted } = usePersistentSidebar(false)
+
+  // Check if current page is an assessment or quiz taking page
+  const isAssessmentTakingPage = pathname?.includes('/assessment/') && pathname?.includes('/take')
+  const isQuizTakingPage = pathname?.includes('/quiz/') && pathname?.includes('/take')
+  const isTakingAssessmentOrQuiz = isAssessmentTakingPage || isQuizTakingPage
 
   useEffect(() => {
     if (status !== "loading" && status === "authenticated") {
@@ -55,7 +61,7 @@ export default function UserLayout({
   return (
     <SidebarProvider>
       <div className="flex h-screen w-full">
-        <AppSidebar open={open} onOpenChange={setOpen} />
+        {!isTakingAssessmentOrQuiz && <AppSidebar open={open} onOpenChange={setOpen} />}
         <SidebarInset className="flex-1">
           <main className="flex-1 overflow-y-auto p-6">
             {children}

@@ -15,8 +15,6 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    console.log("Creating source code archive using archiver...")
-    
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
     const zipFileName = `atom-q-source-${timestamp}.zip`
     
@@ -71,8 +69,6 @@ export async function GET() {
     
     collectFiles(process.cwd())
     
-    console.log(`Found ${filesToInclude.length} files to include`)
-    
     // Convert archive to buffer
     const chunks: Buffer[] = []
     
@@ -81,7 +77,7 @@ export async function GET() {
     })
     
     archive.on('end', () => {
-      console.log('Archive creation completed')
+      // Archive completed
     })
     
     archive.on('error', (error) => {
@@ -113,9 +109,7 @@ export async function GET() {
     if (zipBuffer.length === 0) {
       throw new Error("Created archive is empty")
     }
-    
-    console.log(`Archive created successfully: ${zipBuffer.length} bytes`)
-    
+
     // Return the zip file as response
     return new NextResponse(zipBuffer, {
       status: 200,

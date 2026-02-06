@@ -6,34 +6,25 @@ import { UserRole } from "@prisma/client"
 
 export async function GET() {
   try {
-    console.log("Registration Settings API: Attempting to fetch registration settings...")
     const session = await getServerSession(authOptions)
 
     if (!session) {
-      console.log("Registration Settings API: No session found")
       return NextResponse.json({ error: "Unauthorized - No session" }, { status: 401 })
     }
 
     if (session.user.role !== UserRole.ADMIN) {
-      console.log("Registration Settings API: User role is not admin:", session.user.role)
       return NextResponse.json({ error: "Unauthorized - Not admin" }, { status: 401 })
     }
-
-    console.log("Registration Settings API: User authenticated as admin, fetching registration settings...")
 
     // Get registration settings, create default if not exists
     let registrationSettings = await db.registrationSettings.findFirst()
 
     if (!registrationSettings) {
-      console.log("Registration Settings API: No registration settings found, creating defaults...")
       registrationSettings = await db.registrationSettings.create({
         data: {
           allowRegistration: true,
         }
       })
-      console.log("Registration Settings API: Default registration settings created:", registrationSettings.id)
-    } else {
-      console.log("Registration Settings API: Registration settings found:", registrationSettings.id)
     }
 
     return NextResponse.json(registrationSettings, {

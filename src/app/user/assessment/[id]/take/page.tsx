@@ -15,6 +15,7 @@ import { RichTextDisplay } from "@/components/ui/rich-text-display"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog"
 import {
   Clock,
   ChevronLeft,
@@ -30,7 +31,8 @@ import {
   Shield,
   Lock,
   Calendar,
-  Info
+  Info,
+  Send
 } from "lucide-react"
 import { toasts } from "@/lib/toasts"
 import { QuestionType, DifficultyLevel } from "@prisma/client"
@@ -118,6 +120,9 @@ export default function AssessmentTakingPage() {
   const [isAutoSubmitting, setIsAutoSubmitting] = useState(false)
 
   const [showFullscreenExitModal, setShowFullscreenExitModal] = useState(false)
+
+  const [showSubmitDialog, setShowSubmitDialog] = useState(false)
+  const [submitConfirmation, setSubmitConfirmation] = useState("")
 
   const [showAnswer, setShowAnswer] = useState<string | null>(null)
   const [checkedAnswers, setCheckedAnswers] = useState<Set<string>>(new Set())
@@ -268,7 +273,6 @@ export default function AssessmentTakingPage() {
         lastFullscreenStateRef.current = true
       }
     } catch (error) {
-      console.log('Fullscreen request failed:', error)
     }
   }, [])
 
@@ -280,7 +284,6 @@ export default function AssessmentTakingPage() {
         lastFullscreenStateRef.current = false
       }
     } catch (error) {
-      console.log('Fullscreen exit failed:', error)
     }
   }, [])
 
@@ -300,17 +303,6 @@ export default function AssessmentTakingPage() {
 
     lastFullscreenStateRef.current = isNowFullscreen
   }, [])
-
-  const handleFullscreenExitContinue = useCallback(async () => {
-    // Close the modal
-    setShowFullscreenExitModal(false)
-
-    // Request fullscreen
-    await enterFullscreen()
-
-    // Record the fullscreen exit violation after enabling fullscreen
-    await recordFullscreenExit()
-  }, [enterFullscreen, recordFullscreenExit])
 
   const recordFullscreenExit = useCallback(async () => {
     if (!assessmentAttemptIdRef.current || isSubmittingRef.current || isAutoSubmittingRef.current) {
@@ -352,6 +344,17 @@ export default function AssessmentTakingPage() {
       tabSwitchDebounceRef.current = null
     }, FULLSCREEN_EXIT_DEBOUNCE_MS)
   }, [params.id])
+
+  const handleFullscreenExitContinue = useCallback(async () => {
+    // Close the modal
+    setShowFullscreenExitModal(false)
+
+    // Request fullscreen
+    await enterFullscreen()
+
+    // Record the fullscreen exit violation after enabling fullscreen
+    await recordFullscreenExit()
+  }, [enterFullscreen, recordFullscreenExit])
 
   // ==================== SUBMISSION ====================
 
@@ -403,6 +406,12 @@ export default function AssessmentTakingPage() {
       isSubmittingRef.current = false
     }
   }, [attemptId, answers, multiSelectAnswers, params.id, router])
+
+  const handleConfirmSubmit = useCallback(async () => {
+    setShowSubmitDialog(false)
+    setSubmitConfirmation("")
+    await handleSubmit()
+  }, [handleSubmit])
 
   // ==================== TAB VISIBILITY TRACKING ====================
 
@@ -849,6 +858,15 @@ export default function AssessmentTakingPage() {
                   </span>
                 </div>
               )}
+
+              <Button
+                onClick={() => setShowSubmitDialog(true)}
+                disabled={submitting || isAutoSubmitting}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                <Send className="h-4 w-4 mr-2" />
+                Submit
+              </Button>
             </div>
           </div>
         </div>
@@ -1069,6 +1087,54 @@ export default function AssessmentTakingPage() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+        )}
+
+        {/* Submit Confirmation Dialog */}
+        {showSubmitDialog && (
+          <AlertDialog open={showSubmitDialog} onOpenChange={setShowSubmitDialog}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle className="flex items-center gap-2 text-green-600">
+                  <Send className="h-5 w-5" />
+                  Submit Assessment
+                </AlertDialogTitle>
+                <AlertDialogDescription>
+                  Are you sure you want to submit your assessment? This action cannot be undone.
+                  <br />
+                  <span className="font-semibold">Questions answered: {Object.keys(answers).length} / {questions.length}</span>
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <div className="mt-4 space-y-2">
+                <Label htmlFor="submit-confirmation">
+                  Type <span className="font-semibold text-green-600">CONFIRM SUBMIT</span> to proceed:
+                </Label>
+                <Input
+                  id="submit-confirmation"
+                  value={submitConfirmation}
+                  onChange={(e) => setSubmitConfirmation(e.target.value)}
+                  placeholder="CONFIRM SUBMIT"
+                  autoComplete="off"
+                  className="uppercase"
+                />
+              </div>
+              <AlertDialogFooter>
+                <AlertDialogCancel onClick={() => {
+                  setShowSubmitDialog(false)
+                  setSubmitConfirmation("")
+                }}>
+                  Cancel
+                </AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleConfirmSubmit}
+                  disabled={submitConfirmation !== "CONFIRM SUBMIT"}
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  <Send className="h-4 w-4 mr-2" />
+                  Submit
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         )}
       </AnimatePresence>
     </div>

@@ -10,39 +10,26 @@ export async function GET() {
   let zipFilePath = ""
   
   try {
-    // Temporarily bypass authentication for testing
-    // TODO: Re-enable authentication after testing
-    /*
     const session = await getServerSession(authOptions)
-    
+
     if (!session || session.user.role !== UserRole.ADMIN) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
-    */
-
-    console.log("🔄 Starting source code download...")
 
     // Create a timestamp for the zip filename
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
     const zipFileName = `atom-q-source-${timestamp}.zip`
     zipFilePath = join(process.cwd(), zipFileName)
 
-    console.log("📦 Creating zip file:", zipFileName)
-
     // Create zip file with simpler command
     const command = `zip -r "${zipFileName}" src/ prisma/ skills/ package.json tsconfig.json next.config.ts tailwind.config.ts components.json eslint.config.mjs postcss.config.mjs middleware.ts bun.lock README.md context.txt -x "*.log" "*.tmp" "*.temp"`
-    
-    console.log("🔧 Executing command:", command)
-    
+
     try {
       const result = execSync(command, {
         cwd: process.cwd(),
         stdio: 'pipe',
         timeout: 120000 // 2 minute timeout
       })
-      
-      console.log("✅ Zip command completed")
-      console.log("📊 Output:", result.toString())
     } catch (execError) {
       console.error("❌ Zip command failed:", execError)
       throw new Error(`Zip command failed: ${execError instanceof Error ? execError.message : 'Unknown error'}`)
@@ -50,11 +37,10 @@ export async function GET() {
     
     // Check if zip file exists
     if (!existsSync(zipFilePath)) {
-      console.error("❌ Zip file was not created")
       throw new Error("Zip file was not created")
     }
 
-    console.log("📖 Reading zip file...")
+    // Read zip file
     const zipBuffer = readFileSync(zipFilePath)
     
     if (zipBuffer.length === 0) {
@@ -62,12 +48,9 @@ export async function GET() {
       throw new Error("Created zip file is empty")
     }
 
-    console.log(`✅ Zip file created successfully: ${zipBuffer.length} bytes`)
-
     // Clean up the zip file
     try {
       unlinkSync(zipFilePath)
-      console.log("🧹 Temporary zip file cleaned up")
     } catch (cleanupError) {
       console.error("⚠️ Error cleaning up zip file:", cleanupError)
     }

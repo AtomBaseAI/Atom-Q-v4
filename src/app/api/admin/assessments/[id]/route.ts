@@ -6,7 +6,7 @@ import { UserRole } from "@prisma/client";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -14,8 +14,10 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const { id: assessmentId } = await params;
+
     const assessment = await db.assessment.findUnique({
-      where: { id: params.id },
+      where: { id: assessmentId },
       include: {
         creator: {
           select: {
@@ -56,7 +58,7 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -81,8 +83,10 @@ export async function PUT(
       accessKey,
     } = data;
 
+    const { id: assessmentId } = await params;
+
     const assessment = await db.assessment.update({
-      where: { id: params.id },
+      where: { id: assessmentId },
       data: {
         title,
         description,
@@ -134,7 +138,7 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -142,8 +146,10 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const { id: assessmentId } = await params;
+
     await db.assessment.delete({
-      where: { id: params.id },
+      where: { id: assessmentId },
     });
 
     return NextResponse.json({ message: "Assessment deleted successfully" });

@@ -7,21 +7,15 @@ import { db } from "@/lib/db"
 
 export async function GET() {
   try {
-    console.log("Public Registration Settings API: Attempting to fetch registration settings...")
-    
     // Get registration settings, create default if not exists
     let registrationSettings = await db.registrationSettings.findFirst()
     
     if (!registrationSettings) {
-      console.log("Public Registration Settings API: No registration settings found, creating defaults...")
       registrationSettings = await db.registrationSettings.create({
         data: {
           allowRegistration: true,
         }
       })
-      console.log("Public Registration Settings API: Default registration settings created:", registrationSettings.id)
-    } else {
-      console.log("Public Registration Settings API: Registration settings found:", registrationSettings.id)
     }
     
     return NextResponse.json(registrationSettings, {
@@ -40,8 +34,6 @@ export async function GET() {
 
 export async function PUT(request: NextRequest) {
   try {
-    console.log("Public Registration Settings API: Updating registration settings...")
-    
     const body = await request.json()
     const { allowRegistration } = body
     
@@ -49,13 +41,11 @@ export async function PUT(request: NextRequest) {
     let registrationSettings = await db.registrationSettings.findFirst()
     
     if (!registrationSettings) {
-      console.log("Public Registration Settings API: No registration settings found, creating defaults...")
       registrationSettings = await db.registrationSettings.create({
         data: {
           allowRegistration: true,
         }
       })
-      console.log("Public Registration Settings API: Default registration settings created:", registrationSettings.id)
     }
     
     // Update registration settings

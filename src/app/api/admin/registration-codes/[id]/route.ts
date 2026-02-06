@@ -19,12 +19,6 @@ export async function PATCH(request: NextRequest) {
     const pathParts = url.pathname.split('/')
     const codeId = pathParts[pathParts.length - 1]
 
-    console.log('PATCH request received:', {
-      codeId,
-      path: url.pathname,
-      pathParts
-    })
-
     if (!codeId) {
       console.error('No codeId extracted from path:', url.pathname)
       return NextResponse.json(
@@ -41,8 +35,6 @@ export async function PATCH(request: NextRequest) {
         expiry: new Date() // Set expiry to now to make it immediately expire
       }
     })
-
-    console.log('Code disabled successfully:', codeId)
 
     return NextResponse.json({ success: true, message: "Registration code disabled" })
   } catch (error) {

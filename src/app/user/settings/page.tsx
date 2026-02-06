@@ -15,10 +15,6 @@ import { Loader2, Save, Upload, Camera } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { UserRole } from "@prisma/client"
 
-// Assuming these imports are available for Zustand stores and User type
-// import { useUserStore } from "@/stores/userStore";
-// import { useQuizStore } from "@/stores/quizStore";
-
 // Mock types and stores for demonstration if they are not provided
 interface User {
   id: string;

@@ -19,7 +19,7 @@ import { Loader2, Save, Settings, CheckCircle, Shield, Server, Info, Download, C
 import { useSettings } from "@/components/providers/settings-provider"
 import { useRegistrationSettings } from "@/components/providers/registration-settings-provider"
 import HexagonLoader from "@/components/Loader/Loading"
-import { LoadingButton } from "@/components/ui/laodaing-button" // Fixed typo in import
+import { LoadingButton } from "@/components/ui/laodaing-button"
 
 export default function SettingsPage() {
   const {
@@ -185,7 +185,6 @@ export default function SettingsPage() {
     setDownloadingSource(true)
 
     try {
-      console.log("Starting source code download...")
       const response = await fetch('/api/admin/download/source')
 
       if (!response.ok) {
@@ -199,11 +198,8 @@ export default function SettingsPage() {
       const filenameMatch = contentDisposition && contentDisposition.match(/filename="(.+)"/)
       const filename = filenameMatch ? filenameMatch[1] : 'source-code.zip'
 
-      console.log("Downloading file:", filename)
-
       // Get content length if available
       const contentLength = response.headers.get('Content-Length')
-      console.log("File size:", contentLength ? `${(parseInt(contentLength) / 1024 / 1024).toFixed(2)} MB` : 'Unknown')
 
       // Create a blob from response
       const blob = await response.blob()
@@ -211,8 +207,6 @@ export default function SettingsPage() {
       if (blob.size === 0) {
         throw new Error('Downloaded file is empty')
       }
-
-      console.log("Blob created, size:", blob.size, "bytes")
 
       // Create a download link
       const url = window.URL.createObjectURL(blob)
@@ -229,7 +223,6 @@ export default function SettingsPage() {
         document.body.removeChild(a)
       }, 100)
 
-      console.log("Download completed successfully")
       toasts.actionSuccess('Source code downloaded successfully')
     } catch (error) {
       console.error('Download error:', error)
@@ -350,17 +343,12 @@ export default function SettingsPage() {
     }
 
     try {
-      console.log('Attempting to disable code:', { codeId, code })
-
       const res = await fetch(`/api/admin/registration-codes/${codeId}`, {
         method: 'PATCH',
       headers: {
           'Content-Type': 'application/json',
         },
       })
-
-      console.log('Response status:', res.status)
-      console.log('Response ok:', res.ok)
 
       if (res.ok) {
         toasts.actionSuccess('Registration code disabled immediately')
@@ -370,10 +358,8 @@ export default function SettingsPage() {
         let errorMessage = 'Failed to disable registration code'
         try {
           const errorData = await res.json()
-          console.log('Error data:', errorData)
           errorMessage = errorData.error || errorMessage
         } catch (jsonError) {
-          console.log('Failed to parse error as JSON:', jsonError)
           errorMessage = res.statusText || errorMessage
         }
 

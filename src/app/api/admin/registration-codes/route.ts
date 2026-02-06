@@ -59,15 +59,6 @@ export async function GET() {
       const timeDiff = expiryDate.getTime() - now.getTime()
       const daysRemaining = Math.ceil(timeDiff / msPerDay)
 
-      // Debug log to verify calculation
-      console.log(`Code ${code.code}:`, {
-        now: now.toISOString(),
-        expiry: expiryDate.toISOString(),
-        timeDiff,
-        daysRemaining,
-        isActive: code.isActive,
-      })
-
       let status = 'active'
       let statusColor = 'text-green-600'
 

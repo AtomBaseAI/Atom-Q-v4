@@ -6,26 +6,20 @@ import { UserRole } from "@prisma/client"
 
 export async function GET() {
   try {
-    console.log("Settings API: Attempting to fetch settings...")
     const session = await getServerSession(authOptions)
 
     if (!session) {
-      console.log("Settings API: No session found")
       return NextResponse.json({ error: "Unauthorized - No session" }, { status: 401 })
     }
 
     if (session.user.role !== UserRole.ADMIN) {
-      console.log("Settings API: User role is not admin:", session.user.role)
       return NextResponse.json({ error: "Unauthorized - Not admin" }, { status: 401 })
     }
-
-    console.log("Settings API: User authenticated as admin, fetching settings...")
 
     // Get settings, create default if not exists
     let settings = await db.settings.findFirst()
 
     if (!settings) {
-      console.log("Settings API: No settings found, creating defaults...")
       settings = await db.settings.create({
         data: {
           siteTitle: "Atom Q",
@@ -33,9 +27,6 @@ export async function GET() {
           maintenanceMode: false,
         }
       })
-      console.log("Settings API: Default settings created:", settings.id)
-    } else {
-      console.log("Settings API: Settings found:", settings.id)
     }
 
     return NextResponse.json(settings, {

@@ -47,9 +47,11 @@ interface Submission {
   score?: number
   totalPoints?: number
   timeTaken?: number
+  tabSwitches?: number
   startedAt?: string
   submittedAt?: string
   createdAt: string
+  isAutoSubmitted?: boolean
   _count: {
     answers: number
   }
@@ -277,6 +279,10 @@ export default function AssessmentSubmissionsPage() {
                   <TableHead>Time Taken</TableHead>
                   <TableHead>Started At</TableHead>
                   <TableHead>Submitted At</TableHead>
+                  <TableHead className="w-24">Tab Switches</TableHead>
+                  <TableHead>Time Taken</TableHead>
+                  <TableHead>Started At</TableHead>
+                  <TableHead>Submitted At</TableHead>
                   <TableHead className="w-24">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -316,6 +322,12 @@ export default function AssessmentSubmissionsPage() {
                       ) : (
                         <span className="text-muted-foreground">Not scored</span>
                       )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Shield className="h-4 w-4 text-orange-600" />
+                        <span>{submission.tabSwitches || 0}</span>
+                      </div>
                     </TableCell>
                     <TableCell>
                       {submission.timeTaken ? (

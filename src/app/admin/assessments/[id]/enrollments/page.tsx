@@ -132,11 +132,8 @@ export default function AssessmentEnrollmentsPage() {
     setLoading(true)
     try {
       const response = await fetch(`/api/admin/assessments/${assessmentId}/enrollments`)
-      console.log("Fetch enrolled users response status:", response.status)
       if (response.ok) {
         const data = await response.json()
-        console.log("Enrolled users data from API:", data)
-        console.log("Number of enrollments:", data?.length)
         // Map enrollment data to user data format expected by table
         const usersData = data.map((enrollment: any) => ({
           id: enrollment.user.id,
@@ -147,8 +144,6 @@ export default function AssessmentEnrollmentsPage() {
           batch: enrollment.user.batch,
           section: enrollment.user.section || "",
         }))
-        console.log("Mapped users data:", usersData)
-        console.log("Setting users state with length:", usersData.length)
         setUsers(usersData)
       } else {
         console.error("Failed to fetch enrolled users. Status:", response.status)
