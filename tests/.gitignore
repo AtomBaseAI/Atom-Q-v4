@@ -1,6 +1,0 @@
-# Test coverage
-coverage/
-*.lcov
-
-# Vitest cache
-.vitest/
