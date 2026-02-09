@@ -3,6 +3,8 @@
 import React, { useEffect, createContext, useContext, useCallback } from "react"
 import { useSettingsStore, Settings } from "@/stores/settings"
 import { toasts } from "@/lib/toasts"
+import { signOut } from "next-auth/react"
+import { useUserStore } from "@/stores/user"
 
 interface SettingsContextType {
   settings: Settings
@@ -14,8 +16,6 @@ interface SettingsContextType {
 
 const SettingsContext = createContext<SettingsContextType>({
   settings: {
-    siteTitle: "Atom Q",
-    siteDescription: "Knowledge testing portal powered by Atom Labs",
     maintenanceMode: false,
   },
   isLoading: false,
@@ -42,31 +42,23 @@ export function SettingsProvider({ children }: SettingsProviderProps) {
     fetchSettings: fetchStoreSettings
   } = useSettingsStore()
 
-  // Update document title when site title changes
-  useEffect(() => {
-    if (settings.siteTitle) {
-      document.title = settings.siteTitle
-    }
-  }, [settings.siteTitle])
-
-  // Update meta tags when settings change
-  useEffect(() => {
-    // Update Open Graph meta tags
-    const ogTitle = document.querySelector('meta[property="og:title"]')
-    const ogDescription = document.querySelector('meta[property="og:description"]')
-    const twitterTitle = document.querySelector('meta[name="twitter:title"]')
-    const twitterDescription = document.querySelector('meta[name="twitter:description"]')
-
-    if (ogTitle) ogTitle.setAttribute('content', settings.siteTitle)
-    if (ogDescription) ogDescription.setAttribute('content', settings.siteDescription)
-    if (twitterTitle) twitterTitle.setAttribute('content', settings.siteTitle)
-    if (twitterDescription) twitterDescription.setAttribute('content', settings.siteDescription)
-  }, [settings.siteTitle, settings.siteDescription])
+  const { user } = useUserStore()
 
   // Fetch settings on mount - only once
   useEffect(() => {
     fetchStoreSettings()
   }, [])
+
+  // Logout non-admin users when maintenance mode is enabled
+  useEffect(() => {
+    if (settings?.maintenanceMode && user?.role !== 'ADMIN') {
+      // Show toast notification
+      toasts.error('Site is under maintenance. You have been logged out.')
+
+      // Sign out the user
+      signOut({ callbackUrl: '/' })
+    }
+  }, [settings?.maintenanceMode, user?.role])
 
   const updateSettings = useCallback(async (updates: Partial<Settings>) => {
     setLoading(true)

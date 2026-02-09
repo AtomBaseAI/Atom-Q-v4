@@ -42,7 +42,5 @@ export function useSettingsSync(options: UseSettingsSyncOptions = {}) {
     isLoading,
     error,
     isMaintenanceMode: settings?.maintenanceMode || false,
-    siteTitle: settings?.siteTitle || "Atom Q",
-    siteDescription: settings?.siteDescription || "Knowledge testing portal powered by Atom Labs",
   }
 }

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react"
 import { useSession } from "next-auth/react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -17,13 +17,11 @@ import { Button } from "@/components/ui/button"
 
 function LoginPage() {
   const [error, setError] = useState("")
-  const [siteTitle, setSiteTitle] = useState("Atom Q")
   const [isMaintenanceMode, setIsMaintenanceMode] = useState(false)
   const [allowRegistration, setAllowRegistration] = useState(true)
   const router = useRouter()
   const { theme, setTheme } = useTheme()
   const { data: session, status } = useSession()
-  const searchParams = useSearchParams()
   const { user } = useUserStore()
 
   // Fetch basic settings locally for login screen only
@@ -33,7 +31,6 @@ function LoginPage() {
         const response = await fetch('/api/public/settings')
         if (response.ok) {
           const data = await response.json()
-          setSiteTitle(data.siteTitle || "Atom Q")
           setIsMaintenanceMode(data.maintenanceMode || false)
           setAllowRegistration(data.allowRegistration !== undefined ? data.allowRegistration : true)
         }
@@ -45,13 +42,6 @@ function LoginPage() {
     fetchLoginSettings()
   }, [])
 
-  useEffect(() => {
-    const maintenanceError = searchParams.get('error')
-    if (maintenanceError === 'maintenance') {
-      setError("Site is under maintenance. Only administrators can login.")
-    }
-  }, [searchParams])
-
   // Redirect based on role when session is available and authenticated
   useEffect(() => {
     if (status === "authenticated" && session) {
@@ -62,16 +52,6 @@ function LoginPage() {
       }
     }
   }, [session, status, router])
-
-  // Remove the problematic redirect that uses user store without session
-  // This was causing the infinite redirect loop after logout
-
-  // Handle maintenance mode
-  useEffect(() => {
-    if (isMaintenanceMode) {
-      setError("Site is under maintenance. Only administrators can login.")
-    }
-  }, [isMaintenanceMode])
 
   const toggleTheme = () => {
     const newTheme = theme === "light" ? "dark" : "light"
@@ -145,7 +125,7 @@ function LoginPage() {
 
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center">{siteTitle}</CardTitle>
+          <CardTitle className="text-2xl font-bold text-center">Welcome Back</CardTitle>
           <CardDescription className="text-center">
             Enter your credentials to access your account
           </CardDescription>

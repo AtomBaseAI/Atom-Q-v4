@@ -6,8 +6,6 @@ export async function GET() {
     // Get public settings
     let settings = await db.settings.findFirst({
       select: {
-        siteTitle: true,
-        siteDescription: true,
         maintenanceMode: true,
       }
     })
@@ -15,8 +13,6 @@ export async function GET() {
     // Return default settings if none exist
     if (!settings) {
       settings = {
-        siteTitle: "Atom Q",
-        siteDescription: "Take quizzes and test your knowledge",
         maintenanceMode: false,
       }
     }
@@ -30,8 +26,6 @@ export async function GET() {
     console.error("Public Settings API: Error fetching settings:", error)
     // Return default settings on error
     return NextResponse.json({
-      siteTitle: "Atom Q",
-      siteDescription: "Take quizzes and test your knowledge",
       maintenanceMode: false,
     }, {
       headers: {

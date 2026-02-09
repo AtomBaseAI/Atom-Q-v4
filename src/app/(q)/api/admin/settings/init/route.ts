@@ -22,8 +22,6 @@ export async function POST() {
     // Create default settings
     const settings = await db.settings.create({
       data: {
-        siteTitle: "Atom Q",
-        siteDescription: "Take quizzes and test your knowledge",
         maintenanceMode: false,
       }
     })

@@ -43,7 +43,6 @@ export default function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [isVerifying, setIsVerifying] = useState(false)
   const [error, setError] = useState("")
-  const [siteTitle, setSiteTitle] = useState("Atom Q")
   const [allowRegistration, setAllowRegistration] = useState(true)
   const [step, setStep] = useState(1)
   const [verifiedCode, setVerifiedCode] = useState<VerifiedCodeData | null>(null)
@@ -62,7 +61,7 @@ export default function RegisterPage() {
 
         if (settingsRes.ok) {
           const settings = await settingsRes.json()
-          setSiteTitle(settings.siteTitle || "Atom Q")
+          // settings.siteTitle no longer exists
         }
 
         if (registrationRes.ok) {
@@ -217,7 +216,7 @@ export default function RegisterPage() {
         </div>
         <Card className="w-full max-w-md">
           <CardHeader className="space-y-1">
-            <CardTitle className="text-2xl font-bold text-center">{siteTitle}</CardTitle>
+            <CardTitle className="text-2xl font-bold text-center">Create Account</CardTitle>
             <CardDescription className="text-center">
               Registration is currently disabled
             </CardDescription>
@@ -257,7 +256,7 @@ export default function RegisterPage() {
 
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center">{siteTitle}</CardTitle>
+          <CardTitle className="text-2xl font-bold text-center">Create Account</CardTitle>
           <CardDescription className="text-center">
             {step === 1 && "Enter your registration code to continue"}
             {step === 2 && "Select your department and batch"}

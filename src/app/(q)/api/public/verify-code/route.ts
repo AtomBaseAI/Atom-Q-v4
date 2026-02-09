@@ -3,6 +3,18 @@ import { db } from "@/lib/db"
 
 export async function POST(request: NextRequest) {
   try {
+    // Check maintenance mode first
+    const settings = await db.settings.findFirst({
+      select: { maintenanceMode: true }
+    })
+
+    if (settings?.maintenanceMode) {
+      return NextResponse.json(
+        { error: "Site is under maintenance. Registration is temporarily disabled." },
+        { status: 503 }
+      )
+    }
+
     const { code } = await request.json()
 
     if (!code) {

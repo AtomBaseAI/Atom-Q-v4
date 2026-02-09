@@ -22,8 +22,6 @@ export async function GET() {
     if (!settings) {
       settings = await db.settings.create({
         data: {
-          siteTitle: "Atom Q",
-          siteDescription: "Take quizzes and test your knowledge",
           maintenanceMode: false,
         }
       })
@@ -54,8 +52,6 @@ export async function PUT(request: Request) {
 
     const body = await request.json()
     const {
-      siteTitle,
-      siteDescription,
       maintenanceMode
     } = body
 
@@ -67,8 +63,6 @@ export async function PUT(request: Request) {
       settings = await db.settings.update({
         where: { id: settings.id },
         data: {
-          siteTitle,
-          siteDescription,
           maintenanceMode
         }
       })
@@ -76,8 +70,6 @@ export async function PUT(request: Request) {
       // Create new settings
       settings = await db.settings.create({
         data: {
-          siteTitle,
-          siteDescription,
           maintenanceMode
         }
       })

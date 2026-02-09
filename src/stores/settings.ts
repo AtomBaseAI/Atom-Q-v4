@@ -3,8 +3,6 @@ import { persist } from 'zustand/middleware'
 
 export interface Settings {
   id?: string
-  siteTitle: string
-  siteDescription: string
   maintenanceMode: boolean
   createdAt?: string
   updatedAt?: string
@@ -33,8 +31,6 @@ interface SettingsState {
 }
 
 const defaultSettings: Settings = {
-  siteTitle: "Atom Q",
-  siteDescription: "Knowledge testing portal powered by Atom Labs",
   maintenanceMode: false,
 }
 

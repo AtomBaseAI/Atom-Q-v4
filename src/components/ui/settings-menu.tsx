@@ -54,13 +54,9 @@ export function SettingsMenu({
         <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground border-b">
           Site Settings
         </div>
-        
-        <div className="px-2 py-1.5 text-xs text-muted-foreground">
-          {settings?.siteTitle || "Atom Q"}
-        </div>
-        
+
         <DropdownMenuSeparator />
-        
+
         <div className="px-2 py-1.5 text-xs text-muted-foreground">
           <div className="flex items-center gap-2">
             <CheckCircle className="h-3 w-3 text-green-500" />
@@ -70,7 +66,7 @@ export function SettingsMenu({
             Last updated: {settings?.updatedAt ? formatLastUpdated(new Date(settings.updatedAt)) : "Never"}
           </div>
         </div>
-        
+
         {settings?.maintenanceMode && (
           <div className="px-2 py-1.5">
             <div className="flex items-center gap-2 text-xs text-yellow-600 bg-yellow-50 rounded p-1">

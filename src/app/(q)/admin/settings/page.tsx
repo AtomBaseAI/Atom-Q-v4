@@ -15,7 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter, SheetTrigger } from "@/components/ui/sheet"
 import { toasts } from "@/lib/toasts"
-import { Loader2, Save, Settings, CheckCircle, Shield, Server, Info, Download, Code, Copy, Plus, Trash2, PowerOff } from "lucide-react"
+import { Loader2, Save, Settings, CheckCircle, Shield, Server, Info, Code, Copy, Plus, Trash2, PowerOff } from "lucide-react"
 import { useSettings } from "@/components/providers/settings-provider"
 import { useRegistrationSettings } from "@/components/providers/registration-settings-provider"
 import HexagonLoader from "@/components/Loader/Loading"
@@ -41,10 +41,7 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false)
   const [hasChanges, setHasChanges] = useState(false)
   const [activeTab, setActiveTab] = useState("general")
-  const [downloadingSource, setDownloadingSource] = useState(false)
   const [formData, setFormData] = useState({
-    siteTitle: "",
-    siteDescription: "",
     maintenanceMode: false
   })
 
@@ -68,8 +65,6 @@ export default function SettingsPage() {
   useEffect(() => {
     if (settings) {
       setFormData({
-        siteTitle: settings.siteTitle,
-        siteDescription: settings.siteDescription,
         maintenanceMode: settings.maintenanceMode
       })
       setHasChanges(false)
@@ -141,8 +136,6 @@ export default function SettingsPage() {
   useEffect(() => {
     if (settings) {
       const changed =
-        formData.siteTitle !== settings.siteTitle ||
-        formData.siteDescription !== settings.siteDescription ||
         formData.maintenanceMode !== settings.maintenanceMode
 
       setHasChanges(changed)
@@ -173,63 +166,9 @@ export default function SettingsPage() {
   const handleReset = () => {
     if (settings) {
       setFormData({
-        siteTitle: settings.siteTitle,
-        siteDescription: settings.siteDescription,
         maintenanceMode: settings.maintenanceMode
       })
       setHasChanges(false)
-    }
-  }
-
-  const handleDownloadSource = async () => {
-    setDownloadingSource(true)
-
-    try {
-      const response = await fetch('/api/admin/download/source')
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        console.error("Download failed:", errorData)
-        throw new Error(errorData.error || errorData.details || 'Failed to download source code')
-      }
-
-      // Get filename from Content-Disposition header
-      const contentDisposition = response.headers.get('Content-Disposition')
-      const filenameMatch = contentDisposition && contentDisposition.match(/filename="(.+)"/)
-      const filename = filenameMatch ? filenameMatch[1] : 'source-code.zip'
-
-      // Get content length if available
-      const contentLength = response.headers.get('Content-Length')
-
-      // Create a blob from response
-      const blob = await response.blob()
-
-      if (blob.size === 0) {
-        throw new Error('Downloaded file is empty')
-      }
-
-      // Create a download link
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = filename
-      a.style.display = 'none'
-      document.body.appendChild(a)
-      a.click()
-
-      // Clean up
-      setTimeout(() => {
-        window.URL.revokeObjectURL(url)
-        document.body.removeChild(a)
-      }, 100)
-
-      toasts.actionSuccess('Source code downloaded successfully')
-    } catch (error) {
-      console.error('Download error:', error)
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-      toasts.actionFailed('Source code download', errorMessage)
-    } finally {
-      setDownloadingSource(false)
     }
   }
 
@@ -424,46 +363,6 @@ export default function SettingsPage() {
 
           {/* General & System Settings Tab (Combined) */}
           <TabsContent value="general" className="space-y-6">
-            {/* General Settings Card */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Settings className="h-5 w-5" />
-                  General Settings
-                </CardTitle>
-                <CardDescription>
-                  Basic site configuration and appearance
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="siteTitle">Site Title</Label>
-                  <Input
-                    id="siteTitle"
-                    value={formData.siteTitle}
-                    onChange={(e) => handleInputChange("siteTitle", e.target.value)}
-                    placeholder="Enter site title"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    This title appears in browser tab and across the application
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="siteDescription">Site Description</Label>
-                  <Textarea
-                    id="siteDescription"
-                    value={formData.siteDescription}
-                    onChange={(e) => handleInputChange("siteDescription", e.target.value)}
-                    placeholder="Enter site description"
-                    rows={3}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Used in meta tags and SEO descriptions
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-
             {/* System Settings Card */}
             <Card>
               <CardHeader>
@@ -514,10 +413,6 @@ export default function SettingsPage() {
                   </div>
                   <Separator />
                   <div className="flex justify-between">
-                    <span>Site Title:</span>
-                    <span className="font-medium">{settings?.siteTitle || 'N/A'}</span>
-                  </div>
-                  <div className="flex justify-between">
                     <span>Maintenance Mode:</span>
                     <span className={`font-medium ${settings?.maintenanceMode ? 'text-red-600' : 'text-green-600'}`}>
                       {settings?.maintenanceMode ? 'Enabled' : 'Disabled'}
@@ -529,46 +424,6 @@ export default function SettingsPage() {
                       {registrationSettings?.allowRegistration ? 'Enabled' : 'Disabled'}
                     </span>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Source Code Download Card */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Download className="h-5 w-5" />
-                  Source Code Management
-                </CardTitle>
-                <CardDescription>
-                  Download complete source code of this application
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="p-4 bg-blue-50 border-blue-200 rounded-lg">
-                  <p className="text-sm text-blue-800 mb-3">
-                    <strong>Source Code Download</strong><br />
-                    Download complete source code as a ZIP file. This includes all application files except node_modules, build artifacts, and git files.
-                  </p>
-                  <LoadingButton
-                    onClick={handleDownloadSource}
-                    isLoading={downloadingSource}
-                    loadingText="Preparing download..."
-                    className="w-full"
-                    variant="outline"
-                  >
-                    <Download className="mr-2 h-4 w-4" />
-                    Download Source Code
-                  </LoadingButton>
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  <p><strong>Note:</strong> The downloaded ZIP file will contain:</p>
-                  <ul className="list-disc list-inside mt-1 space-y-1">
-                    <li>Source code files (.ts, .tsx, .js, .jsx)</li>
-                    <li>Configuration files (package.json, tsconfig.json, etc.)</li>
-                    <li>Database schema and migration files</li>
-                    <li>Documentation and README files</li>
-                  </ul>
                 </div>
               </CardContent>
             </Card>

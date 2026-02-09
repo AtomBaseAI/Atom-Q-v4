@@ -315,12 +315,10 @@ model ReportedQuestion {
 }
 
 model Settings {
-  id                String   @id @default(cuid())
-  siteTitle         String   @default("Atom Q")
-  siteDescription   String   @default("Take quizzes and test your knowledge")
-  maintenanceMode   Boolean  @default(false)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id              String   @id @default(cuid())
+  maintenanceMode Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   @@map("settings")
 }
