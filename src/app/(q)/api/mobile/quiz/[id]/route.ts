@@ -3,6 +3,45 @@ import { db } from "@/lib/db"
 import { verifyToken } from "@/lib/mobile-auth"
 import { AttemptStatus } from "@prisma/client"
 
+/**
+ * Seeded random number generator
+ * Ensures consistent randomization across multiple requests for the same attempt
+ */
+class SeededRandom {
+  private seed: number;
+
+  constructor(seed: string) {
+    // Generate numeric seed from string
+    let hash = 0;
+    for (let i = 0; i < seed.length; i++) {
+      const char = seed.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32-bit integer
+    }
+    this.seed = Math.abs(hash);
+  }
+
+  next(): number {
+    this.seed = (this.seed * 9301 + 49297) % 233280;
+    return this.seed / 233280;
+  }
+
+  // Get random integer between min (inclusive) and max (exclusive)
+  randomInt(min: number, max: number): number {
+    return Math.floor(this.next() * (max - min)) + min;
+  }
+
+  // Fisher-Yates shuffle with seed
+  shuffleArray<T>(array: T[]): T[] {
+    const result = [...array];
+    for (let i = result.length - 1; i > 0; i--) {
+      const j = this.randomInt(0, i + 1);
+      [result[i], result[j]] = [result[j], result[i]];
+    }
+    return result;
+  }
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -59,6 +98,7 @@ export async function GET(
           checkAnswerEnabled: true,
           negativeMarking: true,
           negativePoints: true,
+          randomOrder: true,
           quizQuestions: {
             select: {
               points: true
@@ -157,7 +197,20 @@ export async function GET(
       where: { id: attemptId },
       include: {
         quiz: {
-          include: {
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            timeLimit: true,
+            status: true,
+            startTime: true,
+            endTime: true,
+            maxAttempts: true,
+            showAnswers: true,
+            checkAnswerEnabled: true,
+            negativeMarking: true,
+            negativePoints: true,
+            randomOrder: true,
             quizQuestions: {
               include: {
                 question: {
@@ -167,6 +220,7 @@ export async function GET(
                     content: true,
                     type: true,
                     options: true,
+                    correctAnswer: true,
                     explanation: true,
                     difficulty: true
                   }
@@ -201,10 +255,13 @@ export async function GET(
     const timeLimit = (attempt.quiz.timeLimit || 0) * 60 // Convert minutes to seconds
     const timeRemaining = Math.max(0, timeLimit - timeElapsed)
 
-    // Format questions
-    const questions = attempt.quiz.quizQuestions
+    // Initialize seeded random generator for consistent randomization
+    const random = new SeededRandom(attemptId)
+
+    // Format questions with optional randomization
+    let quizQuestions = attempt.quiz.quizQuestions
       .filter(qq => qq.question)
-      .map((qq, index) => {
+      .map((qq, originalIndex) => {
         let options: any[] = []
         if (qq.question.options) {
           try {
@@ -216,9 +273,9 @@ export async function GET(
           }
         }
 
-        return {
+        const questionData: any = {
           id: qq.question.id,
-          title: qq.question.title || `Question ${index + 1}`,
+          title: qq.question.title || `Question ${originalIndex + 1}`,
           content: qq.question.content,
           type: qq.question.type,
           options: Array.isArray(options) ? options : [],
@@ -227,7 +284,32 @@ export async function GET(
           order: qq.order,
           points: qq.points
         }
+
+        // Include correct answer only if check answer is enabled
+        if (attempt.quiz.checkAnswerEnabled && qq.question.correctAnswer) {
+          questionData.correctAnswer = qq.question.correctAnswer
+        }
+
+        return questionData
       })
+
+    // Apply random order if enabled
+    if (attempt.quiz.randomOrder) {
+      // Randomize question order
+      quizQuestions = random.shuffleArray(quizQuestions)
+
+      // Randomize options within each question
+      quizQuestions = quizQuestions.map(q => ({
+        ...q,
+        options: random.shuffleArray(q.options)
+      }))
+    }
+
+    // Update question titles to reflect display order (not original order)
+    quizQuestions = quizQuestions.map((q, displayIndex) => ({
+      ...q,
+      displayOrder: displayIndex + 1
+    }))
 
     // Format quiz data
     const quizData = {
@@ -239,7 +321,8 @@ export async function GET(
       checkAnswerEnabled: attempt.quiz.checkAnswerEnabled || false,
       negativeMarking: attempt.quiz.negativeMarking || false,
       negativePoints: attempt.quiz.negativePoints,
-      questions: questions
+      randomOrder: attempt.quiz.randomOrder || false,
+      questions: quizQuestions
     }
 
     // Format existing answers
