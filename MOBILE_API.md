@@ -1,37 +1,72 @@
-# Mobile API Documentation
+# Atom Q Mobile API Documentation
 
-This document provides comprehensive documentation for the mobile APIs.
-
-## Base URL
-```
-http://localhost:3000/api/mobile
-```
-
-## Authentication
-All API endpoints (except login) require Bearer token authentication. Include the token in the Authorization header:
-
-```
-Authorization: Bearer <your_jwt_token>
-```
+**Version:** 2.0.0
+**Base URL:** `http://localhost:3000/api/mobile`
+**Last Updated:** 2024-01-20
 
 ---
 
-## 1. Authentication
+## Table of Contents
 
-### Login
+1. [Overview](#overview)
+2. [Authentication](#authentication)
+3. [Quiz Management](#quiz-management)
+   - [Quiz List](#31-get-quiz-list)
+   - [Quiz Details (Take Quiz)](#32-get-quiz-details)
+   - [Save Quiz Answers](#33-save-quiz-answers)
+   - [Submit Quiz](#34-submit-quiz)
+   - [Quiz Results](#35-get-quiz-results)
+   - [Quiz History](#36-get-quiz-history)
+4. [Profile Management](#profile-management)
+5. [Question Types & Answer Matching](#question-types--answer-matching)
+6. [Quiz Settings Explained](#quiz-settings-explained)
+7. [Error Handling](#error-handling)
+8. [Integration Examples](#integration-examples)
+
+---
+
+## Overview
+
+The Atom Q Mobile API provides comprehensive functionality for mobile applications to interact with the quiz platform. All endpoints use JWT-based authentication and return JSON responses with a consistent format.
+
+### Key Features
+
+- **Secure Authentication**: JWT tokens with 60-day expiry
+- **Complete Quiz Management**: List, take, save, submit, and review quizzes
+- **Multiple Question Types**: Multiple Choice, Multi-Select, True/False, Fill-in-the-Blank
+- **Real-time Progress**: Auto-save functionality during quiz attempts
+- **Detailed Results**: Comprehensive scoring with explanations
+- **Answer Validation**: Sophisticated matching algorithms for each question type
+- **Negative Marking**: Configurable penalty system for wrong answers
+- **Quiz Constraints**: Time limits, max attempts, availability windows
+
+---
+
+## Authentication
+
+### 1.1 Login
+
 **Endpoint:** `POST /api/mobile/auth/login`
 
-**Description:** Authenticate user and get JWT token.
+**Description:** Authenticates a user with email and password, returning a JWT token and complete user profile information.
 
-**Request Body:**
+#### Request
+
+**Headers:**
+```
+Content-Type: application/json
+```
+
+**Body:**
 ```json
 {
   "email": "user@example.com",
-  "password": "userpassword"
+  "password": "userpassword123"
 }
 ```
 
-**Response:**
+#### Success Response (200 OK)
+
 ```json
 {
   "success": true,
@@ -39,61 +74,68 @@ Authorization: Bearer <your_jwt_token>
   "data": {
     "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
     "user": {
-      "id": "clxxxxxx",
+      "id": "cl7xxxxxxxxxxxxxxxxxx",
       "email": "user@example.com",
       "name": "John Doe",
+      "uoid": "STU-2024-001",
+      "phone": "+1 (555) 123-4567",
+      "avatar": "https://example.com/avatar.jpg",
       "role": "USER",
-      "avatar": null,
-      "phone": null,
       "isActive": true,
-      "uoid": "",
-      "departmentId": null,
-      "batchId": null,
       "section": "A",
-      "campusId": null
+      "departmentId": "cl7xxxxxxxxxxxxx",
+      "batchId": "cl7xxxxxxxxxxxxx",
+      "campusId": "cl7xxxxxxxxxxxxx"
     }
   }
 }
 ```
 
-**Error Responses:**
-- `400` - Email and password are required
-- `401` - Invalid email or password
-- `403` - Your account has been disabled
-- `500` - Internal server error
+#### Error Responses
+
+| Status | Message | Description |
+|---------|----------|-------------|
+| 400 | Email and password are required | Missing credentials |
+| 401 | Invalid email or password | Wrong credentials |
+| 403 | Your account has been disabled | Account inactive |
+| 500 | Internal server error | Server error |
 
 ---
 
-## 2. Quiz Management
+## Quiz Management
 
-### Get Quiz List
+### 3.1 Get Quiz List
+
 **Endpoint:** `GET /api/mobile/quiz`
 
-**Description:** Get list of quizzes assigned to the current user.
+**Description:** Retrieves all quizzes assigned to the authenticated user with attempt status and statistics.
+
+#### Request
 
 **Headers:**
 ```
-Authorization: Bearer <token>
+Authorization: Bearer <jwt_token>
 ```
 
-**Response:**
+#### Success Response (200 OK)
+
 ```json
 {
   "success": true,
   "data": [
     {
-      "id": "clxxxxxx",
+      "id": "cl7xxxxxxxxxxxxxxxxxx",
       "title": "AWS Fundamentals Quiz",
       "description": "Test your AWS knowledge",
       "timeLimit": 30,
       "difficulty": "MEDIUM",
       "maxAttempts": 3,
-      "startTime": "2024-01-01T10:00:00Z",
-      "endTime": "2024-12-31T23:59:59Z",
+      "startTime": "2024-01-01T10:00:00.000Z",
+      "endTime": "2024-12-31T23:59:59.000Z",
       "questionCount": 10,
       "attempts": 2,
       "bestScore": 85.5,
-      "lastAttemptDate": "2024-01-15T14:30:00Z",
+      "lastAttemptDate": "2024-01-15T14:30:00.000Z",
       "canAttempt": true,
       "attemptStatus": "completed",
       "hasInProgress": false,
@@ -103,36 +145,51 @@ Authorization: Bearer <token>
 }
 ```
 
-**Quiz Status Values:**
-- `not_started` - User hasn't attempted the quiz
-- `in_progress` - User has an active attempt
-- `completed` - User has completed the quiz
-- `not_started_yet` - Quiz hasn't started yet
-- `expired` - Quiz has ended
+#### Response Fields
+
+| Field | Type | Description |
+|--------|------|-------------|
+| id | string | Quiz unique identifier |
+| title | string | Quiz title |
+| description | string | Quiz description |
+| timeLimit | number | Time limit in minutes (null = unlimited) |
+| difficulty | string | EASY, MEDIUM, or HARD |
+| maxAttempts | number | Maximum allowed attempts (null = unlimited) |
+| startTime | string | ISO 8601 - Quiz availability start |
+| endTime | string | ISO 8601 - Quiz availability end |
+| questionCount | number | Total questions in quiz |
+| attempts | number | Completed attempts count |
+| bestScore | number | Best score achieved (0-100) or null |
+| lastAttemptDate | string | ISO 8601 - Last attempt date or null |
+| canAttempt | boolean | Whether user can start/resume quiz |
+| attemptStatus | string | Status: not_started, in_progress, completed, not_started_yet, expired |
+| hasInProgress | boolean | Active attempt exists |
+| inProgressAttemptId | string | ID of in-progress attempt or null |
 
 ---
 
-### Take Quiz (Get Questions)
+### 3.2 Get Quiz Details (Take Quiz)
+
 **Endpoint:** `GET /api/mobile/quiz/:id`
 
-**Description:** Get quiz questions to start or continue taking a quiz. Creates a new attempt if none exists.
+**Description:** Retrieves quiz questions and creates/resumes an attempt. Returns all quiz settings, questions with options, and current progress.
+
+#### Request
 
 **Headers:**
 ```
-Authorization: Bearer <token>
+Authorization: Bearer <jwt_token>
 ```
 
-**Path Parameters:**
-- `id` - Quiz ID
+#### Success Response (200 OK)
 
-**Response:**
 ```json
 {
   "success": true,
   "data": {
-    "attemptId": "clxxxxxx",
+    "attemptId": "cl7xxxxxxxxxxxxxxxxxx",
     "quiz": {
-      "id": "clxxxxxx",
+      "id": "cl7xxxxxxxxxxxxxxxxxx",
       "title": "AWS Fundamentals Quiz",
       "description": "Test your AWS knowledge",
       "timeLimit": 30,
@@ -142,83 +199,188 @@ Authorization: Bearer <token>
       "negativePoints": null,
       "questions": [
         {
-          "id": "clxxxxxx",
+          "id": "cl7xxxxxxxxxxxxxxxxxx",
           "title": "Amazon S3 Storage Classes",
-          "content": "Which S3 storage class is designed for data that is rarely accessed?",
+          "content": "Which S3 class is for rarely accessed data?",
           "type": "MULTIPLE_CHOICE",
           "options": [
-            "Standard",
-            "Standard-IA",
-            "Glacier",
-            "One Zone-IA"
+            { "id": "A", "text": "S3 Standard" },
+            { "id": "B", "text": "S3 Standard-IA" },
+            { "id": "C", "text": "S3 Glacier" },
+            { "id": "D", "text": "S3 One Zone-IA" }
           ],
-          "explanation": "Glacier is designed for data archiving with long retrieval times.",
+          "explanation": "S3 Glacier is for data archiving with long retrieval times.",
           "difficulty": "EASY",
           "order": 1,
+          "points": 1
+        },
+        {
+          "id": "cl7xxxxxxxxxxxxxxxxxx",
+          "title": "AWS Lambda Triggers",
+          "content": "Select all services that can trigger Lambda:",
+          "type": "MULTI_SELECT",
+          "options": [
+            { "id": "A", "text": "Amazon S3" },
+            { "id": "B", "text": "Amazon DynamoDB" },
+            { "id": "C", "text": "Amazon EC2" },
+            { "id": "D", "text": "Amazon Kinesis" },
+            { "id": "E", "text": "Amazon SNS" }
+          ],
+          "explanation": "Lambda can be triggered by S3, DynamoDB, Kinesis, SNS, and more.",
+          "difficulty": "MEDIUM",
+          "order": 2,
+          "points": 2
+        },
+        {
+          "id": "cl7xxxxxxxxxxxxxxxxxx",
+          "title": "EC2 Instance Types",
+          "content": "T family instances are designed for burstable workloads.",
+          "type": "TRUE_FALSE",
+          "options": [
+            { "id": "A", "text": "True" },
+            { "id": "B", "text": "False" }
+          ],
+          "explanation": "T family provides burstable CPU performance.",
+          "difficulty": "MEDIUM",
+          "order": 3,
+          "points": 1
+        },
+        {
+          "id": "cl7xxxxxxxxxxxxxxxxxx",
+          "title": "VPC Subnets",
+          "content": "You can launch ____ resources into a subnet.",
+          "type": "FILL_IN_BLANK",
+          "options": [],
+          "explanation": "You can launch EC2 instances and RDS databases into subnets.",
+          "difficulty": "EASY",
+          "order": 4,
           "points": 1
         }
       ]
     },
     "timeRemaining": 1800,
-    "startedAt": "2024-01-15T14:00:00Z",
-    "answers": {}
+    "startedAt": "2024-01-15T14:00:00.000Z",
+    "answers": {
+      "cl7xxxxxxxxxxxxxxxxxx": "C",
+      "cl7xxxxxxxxxxxxxxxxxx": "[\"A\",\"B\",\"D\"]"
+    }
   }
 }
 ```
 
-**Question Types:**
-- `MULTIPLE_CHOICE` - Single correct answer
-- `MULTI_SELECT` - Multiple correct answers
-- `TRUE_FALSE` - True or False
-- `FILL_IN_BLANK` - Text input
+#### Response Fields
+
+| Field | Type | Description |
+|--------|------|-------------|
+| attemptId | string | Unique attempt ID (save for submission) |
+| quiz.id | string | Quiz ID |
+| quiz.title | string | Quiz title |
+| quiz.description | string | Quiz description |
+| quiz.timeLimit | number | Time limit in minutes |
+| quiz.showAnswers | boolean | Show detailed answers after submission |
+| quiz.checkAnswerEnabled | boolean | Real-time answer checking enabled |
+| quiz.negativeMarking | boolean | Negative marking applied for wrong answers |
+| quiz.negativePoints | number | Points to deduct per wrong answer |
+| quiz.questions[] | array | Array of question objects |
+| timeRemaining | number | Seconds remaining in quiz |
+| startedAt | string | ISO 8601 - Attempt start time |
+| answers | object | Map of questionId -> saved answer |
 
 ---
 
-### Submit Quiz
-**Endpoint:** `POST /api/mobile/quiz/:id/submit`
+### 3.3 Save Quiz Answers
 
-**Description:** Submit quiz answers for grading.
+**Endpoint:** `POST /api/mobile/quiz/:id/save`
+
+**Description:** Saves quiz answers without submitting. Use for auto-saving progress during quiz. Supports partial saves.
+
+#### Request
 
 **Headers:**
 ```
-Authorization: Bearer <token>
+Authorization: Bearer <jwt_token>
+Content-Type: application/json
 ```
 
-**Path Parameters:**
-- `id` - Quiz ID
-
-**Request Body:**
+**Body:**
 ```json
 {
-  "attemptId": "clxxxxxx",
+  "attemptId": "cl7xxxxxxxxxxxxxxxxxx",
   "answers": {
-    "question_id_1": "option_A",
-    "question_id_2": ["option_A", "option_B"],
-    "question_id_3": "true",
-    "question_id_4": "answer text"
+    "cl7xxxxxxxxxxxxxxxxxx": "C",
+    "cl7xxxxxxxxxxxxxxxxxx": "[\"A\",\"B\",\"D\"]",
+    "cl7xxxxxxxxxxxxxxxxxx": "A"
   }
 }
 ```
 
-**Answer Format:**
-- `MULTIPLE_CHOICE`: String (e.g., "option_A")
-- `MULTI_SELECT`: JSON string or Array (e.g., `["option_A", "option_B"]`)
-- `TRUE_FALSE`: String (e.g., "true" or "false")
-- `FILL_IN_BLANK`: String (e.g., "answer text")
+#### Success Response (200 OK)
 
-**Response:**
+```json
+{
+  "success": true,
+  "message": "Answers saved successfully",
+  "data": {
+    "attemptId": "cl7xxxxxxxxxxxxxxxxxx",
+    "saved": 2,
+    "updated": 1,
+    "total": 3,
+    "savedAt": "2024-01-15T14:15:30.000Z"
+  }
+}
+```
+
+#### Behavior
+
+- **Partial Saves**: Can save any subset of questions
+- **Upsert Logic**: Creates new answers or updates existing ones
+- **Validation**: Only saves valid question IDs from the quiz
+- **Progress Tracking**: Returns count of saved vs updated answers
+
+---
+
+### 3.4 Submit Quiz
+
+**Endpoint:** `POST /api/mobile/quiz/:id/submit`
+
+**Description:** Submits all answers for grading. Calculates scores based on question type, applies negative marking if enabled, and returns final results.
+
+#### Request
+
+**Headers:**
+```
+Authorization: Bearer <jwt_token>
+Content-Type: application/json
+```
+
+**Body:**
+```json
+{
+  "attemptId": "cl7xxxxxxxxxxxxxxxxxx",
+  "answers": {
+    "cl7xxxxxxxxxxxxxxxxxx": "C",
+    "cl7xxxxxxxxxxxxxxxxxx": "[\"A\",\"B\",\"D\"]",
+    "cl7xxxxxxxxxxxxxxxxxx": "A",
+    "cl7xxxxxxxxxxxxxxxxxx": "EC2 instances",
+    "cl7xxxxxxxxxxxxxxxxxx": "7"
+  }
+}
+```
+
+#### Success Response (200 OK)
+
 ```json
 {
   "success": true,
   "message": "Quiz submitted successfully",
   "data": {
-    "attemptId": "clxxxxxx",
-    "score": 85.5,
-    "totalPoints": 10,
-    "timeTaken": 1200,
-    "submittedAt": "2024-01-15T14:30:00Z",
+    "attemptId": "cl7xxxxxxxxxxxxxxxxxx",
+    "score": 85.71,
+    "totalPoints": 7,
+    "timeTaken": 1250,
+    "submittedAt": "2024-01-15T14:20:50.000Z",
     "quiz": {
-      "id": "clxxxxxx",
+      "id": "cl7xxxxxxxxxxxxxxxxxx",
       "title": "AWS Fundamentals Quiz"
     }
   }
@@ -227,59 +389,224 @@ Authorization: Bearer <token>
 
 ---
 
-## 3. Profile Management
+### 3.5 Get Quiz Results
 
-### View Profile
-**Endpoint:** `GET /api/mobile/profile`
+**Endpoint:** `GET /api/mobile/quiz/:id/result?attemptId={attemptId}`
 
-**Description:** Get current user's profile and statistics.
+**Description:** Retrieves detailed results for a submitted quiz attempt. Shows question-by-question breakdown with correct answers and explanations if `showAnswers` is enabled.
+
+#### Request
 
 **Headers:**
 ```
-Authorization: Bearer <token>
+Authorization: Bearer <jwt_token>
 ```
 
-**Response:**
+#### Query Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| attemptId | string | Yes | The attempt ID to view results for |
+
+#### Success Response (200 OK)
+
 ```json
 {
   "success": true,
   "data": {
-    "user": {
-      "id": "clxxxxxx",
-      "email": "user@example.com",
-      "name": "John Doe",
-      "uoid": "",
-      "phone": "+1234567890",
-      "avatar": "https://example.com/avatar.jpg",
-      "role": "USER",
-      "section": "A",
-      "createdAt": "2024-01-01T00:00:00Z",
-      "department": {
-        "id": "clxxxxxx",
-        "name": "Computer Science"
+    "attemptId": "cl7xxxxxxxxxxxxxxxxxx",
+    "quiz": {
+      "id": "cl7xxxxxxxxxxxxxxxxxx",
+      "title": "AWS Fundamentals Quiz",
+      "description": "Test your AWS knowledge",
+      "timeLimit": 30,
+      "negativeMarking": false,
+      "negativePoints": null
+    },
+    "attempt": {
+      "score": 85.71,
+      "totalPoints": 7,
+      "timeTaken": 1250,
+      "startedAt": "2024-01-15T14:00:00.000Z",
+      "submittedAt": "2024-01-15T14:20:50.000Z",
+      "isAutoSubmitted": false
+    },
+    "showAnswers": true,
+    "questions": [
+      {
+        "id": "cl7xxxxxxxxxxxxxxxxxx",
+        "title": "Amazon S3 Storage Classes",
+        "content": "Which S3 class is for rarely accessed data?",
+        "type": "MULTIPLE_CHOICE",
+        "options": [
+          { "id": "A", "text": "S3 Standard" },
+          { "id": "B", "text": "S3 Standard-IA" },
+          { "id": "C", "text": "S3 Glacier" },
+          { "id": "D", "text": "S3 One Zone-IA" }
+        ],
+        "explanation": "S3 Glacier is for data archiving with long retrieval times.",
+        "difficulty": "EASY",
+        "order": 1,
+        "points": 1,
+        "correctAnswer": "C",
+        "userAnswer": "C",
+        "isCorrect": true,
+        "pointsEarned": 1
       },
-      "batch": {
-        "id": "clxxxxxx",
-        "name": "2022-2026"
+      {
+        "id": "cl7xxxxxxxxxxxxxxxxxx",
+        "title": "AWS Lambda Triggers",
+        "content": "Select all services that can trigger Lambda:",
+        "type": "MULTI_SELECT",
+        "options": [
+          { "id": "A", "text": "Amazon S3" },
+          { "id": "B", "text": "Amazon DynamoDB" },
+          { "id": "C", "text": "Amazon EC2" },
+          { "id": "D", "text": "Amazon Kinesis" },
+          { "id": "E", "text": "Amazon SNS" }
+        ],
+        "explanation": "Lambda can be triggered by S3, DynamoDB, Kinesis, SNS, and more.",
+        "difficulty": "MEDIUM",
+        "order": 2,
+        "points": 2,
+        "correctAnswer": ["A", "B", "D", "E"],
+        "userAnswer": ["A", "B", "D"],
+        "isCorrect": false,
+        "pointsEarned": 0
       },
-      "campus": {
-        "id": "clxxxxxx",
-        "name": "Test Seed Organization",
-        "shortName": "TSO"
+      {
+        "id": "cl7xxxxxxxxxxxxxxxxxx",
+        "title": "EC2 Instance Types",
+        "content": "T family instances are designed for burstable workloads.",
+        "type": "TRUE_FALSE",
+        "options": [
+          { "id": "A", "text": "True" },
+          { "id": "B", "text": "False" }
+        ],
+        "explanation": "T family provides burstable CPU performance.",
+        "difficulty": "MEDIUM",
+        "order": 3,
+        "points": 1,
+        "correctAnswer": "A",
+        "userAnswer": "A",
+        "isCorrect": true,
+        "pointsEarned": 1
+      },
+      {
+        "id": "cl7xxxxxxxxxxxxxxxxxx",
+        "title": "VPC Subnets",
+        "content": "You can launch ____ resources into a subnet.",
+        "type": "FILL_IN_BLANK",
+        "options": [],
+        "explanation": "You can launch EC2 instances and RDS databases into subnets.",
+        "difficulty": "EASY",
+        "order": 4,
+        "points": 1,
+        "correctAnswer": "EC2 instances",
+        "userAnswer": "EC2 instances",
+        "isCorrect": true,
+        "pointsEarned": 1
       }
+    ]
+  }
+}
+```
+
+#### Restricted Mode Response
+
+If `showAnswers` is `false`, response only includes summary:
+
+```json
+{
+  "success": true,
+  "data": {
+    "attemptId": "cl7xxxxxxxxxxxxxxxxxx",
+    "quizId": "cl7xxxxxxxxxxxxxxxxxx",
+    "quizTitle": "AWS Fundamentals Quiz",
+    "score": 85.71,
+    "totalPoints": 7,
+    "timeTaken": 1250,
+    "startedAt": "2024-01-15T14:00:00.000Z",
+    "submittedAt": "2024-01-15T14:20:50.000Z",
+    "showAnswers": false
+  }
+}
+```
+
+---
+
+### 3.6 Get Quiz History
+
+**Endpoint:** `GET /api/mobile/quiz/:id/history`
+
+**Description:** Retrieves complete attempt history for a specific quiz with statistics.
+
+#### Request
+
+**Headers:**
+```
+Authorization: Bearer <jwt_token>
+```
+
+#### Success Response (200 OK)
+
+```json
+{
+  "success": true,
+  "data": {
+    "quiz": {
+      "id": "cl7xxxxxxxxxxxxxxxxxx",
+      "title": "AWS Fundamentals Quiz",
+      "description": "Test your AWS knowledge",
+      "timeLimit": 30,
+      "maxAttempts": 3,
+      "showAnswers": true
     },
     "stats": {
-      "totalQuizAttempts": 5,
-      "completedQuizzes": 4,
-      "bestScore": 95.0
+      "totalAttempts": 3,
+      "completedAttempts": 2,
+      "inProgressAttempts": 1,
+      "bestScore": 92.0,
+      "averageScore": 84.35,
+      "totalTimeTaken": 3200,
+      "remainingAttempts": 1
     },
-    "recentActivity": [
+    "attempts": [
       {
-        "id": "clxxxxxx",
-        "quizId": "clxxxxxx",
-        "quizTitle": "AWS Fundamentals Quiz",
-        "score": 85.5,
-        "submittedAt": "2024-01-15T14:30:00Z"
+        "id": "cl7xxxxxxxxxxxxxxxxxx",
+        "status": "SUBMITTED",
+        "score": 92.0,
+        "totalPoints": 7,
+        "timeTaken": 1800,
+        "startedAt": "2024-01-15T10:00:00.000Z",
+        "submittedAt": "2024-01-15T10:30:00.000Z",
+        "createdAt": "2024-01-15T10:00:00.000Z",
+        "isAutoSubmitted": false,
+        "canViewResults": true
+      },
+      {
+        "id": "cl7xxxxxxxxxxxxxxxxxx",
+        "status": "SUBMITTED",
+        "score": 76.7,
+        "totalPoints": 7,
+        "timeTaken": 1400,
+        "startedAt": "2024-01-15T14:00:00.000Z",
+        "submittedAt": "2024-01-15T14:23:20.000Z",
+        "createdAt": "2024-01-15T14:00:00.000Z",
+        "isAutoSubmitted": false,
+        "canViewResults": true
+      },
+      {
+        "id": "cl7xxxxxxxxxxxxxxxxxx",
+        "status": "IN_PROGRESS",
+        "score": null,
+        "totalPoints": null,
+        "timeTaken": null,
+        "startedAt": "2024-01-15T16:00:00.000Z",
+        "submittedAt": null,
+        "createdAt": "2024-01-15T16:00:00.000Z",
+        "isAutoSubmitted": false,
+        "canViewResults": false
       }
     ]
   }
@@ -288,166 +615,586 @@ Authorization: Bearer <token>
 
 ---
 
-### Edit Profile
-**Endpoint:** `PUT /api/mobile/profile`
+## Profile Management
 
-**Description:** Update current user's profile information.
+### 4.1 View Profile
+
+**Endpoint:** `GET /api/mobile/profile`
+
+**Description:** Retrieves complete user profile with statistics and recent activity.
+
+#### Request
 
 **Headers:**
 ```
-Authorization: Bearer <token>
+Authorization: Bearer <jwt_token>
 ```
 
-**Request Body:**
-```json
-{
-  "name": "John Updated",
-  "phone": "+9876543210",
-  "avatar": "https://example.com/new-avatar.jpg"
-}
-```
+#### Success Response (200 OK)
 
-**Note:** All fields are optional. Include only the fields you want to update.
-
-**Response:**
 ```json
 {
   "success": true,
-  "message": "Profile updated successfully",
   "data": {
-    "id": "clxxxxxx",
-    "email": "user@example.com",
-    "name": "John Updated",
-    "uoid": "",
-    "phone": "+9876543210",
-    "avatar": "https://example.com/new-avatar.jpg",
-    "role": "USER",
-    "section": "A",
-    "createdAt": "2024-01-01T00:00:00Z",
-    "department": {
-      "id": "clxxxxxx",
-      "name": "Computer Science"
+    "user": {
+      "id": "cl7xxxxxxxxxxxxxxxxxx",
+      "email": "user@example.com",
+      "name": "John Doe",
+      "uoid": "STU-2024-001",
+      "phone": "+1 (555) 123-4567",
+      "avatar": "https://example.com/avatar.jpg",
+      "role": "USER",
+      "section": "A",
+      "createdAt": "2024-01-10T08:30:00.000Z",
+      "department": {
+        "id": "cl7xxxxxxxxxxxxx",
+        "name": "Computer Science & Engineering"
+      },
+      "batch": {
+        "id": "cl7xxxxxxxxxxxxx",
+        "name": "2022-2026"
+      },
+      "campus": {
+        "id": "cl7xxxxxxxxxxxxx",
+        "name": "Massachusetts Institute of Technology",
+        "shortName": "MIT"
+      }
     },
-    "batch": {
-      "id": "clxxxxxx",
-      "name": "2022-2026"
+    "stats": {
+      "totalQuizAttempts": 15,
+      "completedQuizzes": 12,
+      "bestScore": 96.5
     },
-    "campus": {
-      "id": "clxxxxxx",
-      "name": "Test Seed Organization",
-      "shortName": "TSO"
-    }
+    "recentActivity": [
+      {
+        "id": "cl7xxxxxxxxxxxxxxxxxx",
+        "quizId": "cl7xxxxxxxxxxxxxxxxxx",
+        "quizTitle": "AWS Fundamentals Quiz",
+        "score": 85.71,
+        "submittedAt": "2024-01-15T14:20:50.000Z"
+      }
+    ]
   }
 }
 ```
 
+### 4.2 Update Profile
+
+**Endpoint:** `PUT /api/mobile/profile`
+
+**Description:** Updates user profile fields. Supports partial updates.
+
+#### Request
+
+**Headers:**
+```
+Authorization: Bearer <jwt_token>
+Content-Type: application/json
+```
+
+**Body Examples:**
+
+```json
+{
+  "name": "Johnathan Doe",
+  "phone": "+1 (555) 987-6543",
+  "avatar": "https://example.com/new-avatar.jpg"
+}
+```
+
+#### Success Response (200 OK)
+
+Returns the complete updated user object (same structure as View Profile).
+
 ---
 
-## Error Response Format
+## Question Types & Answer Matching
 
-All error responses follow this format:
+The Atom Q platform supports four question types, each with its own answer validation logic implemented identically in both web and mobile applications.
+
+### 1. Multiple Choice (MULTIPLE_CHOICE)
+
+**Description**: Single correct answer from multiple options.
+
+**Question Structure**:
+```json
+{
+  "type": "MULTIPLE_CHOICE",
+  "options": [
+    { "id": "A", "text": "Option A" },
+    { "id": "B", "text": "Option B" },
+    { "id": "C", "text": "Option C" },
+    { "id": "D", "text": "Option D" }
+  ]
+}
+```
+
+**Correct Answer Storage**: Single option ID (e.g., `"C"`)
+
+**User Answer Format**: String with option ID (e.g., `"C"`)
+
+**Answer Matching Logic**:
+```typescript
+// Exact string match
+isCorrect = (userAnswer === correctAnswer)
+
+// Example:
+// correctAnswer = "C"
+// userAnswer = "C"
+// isCorrect = true
+```
+
+**Scoring**:
+- Correct: Award full points
+- Wrong: 0 points (or negative marking if enabled)
+
+### 2. Multi-Select (MULTI_SELECT)
+
+**Description**: Multiple correct answers. User must select ALL correct options.
+
+**Question Structure**:
+```json
+{
+  "type": "MULTI_SELECT",
+  "options": [
+    { "id": "A", "text": "Amazon S3" },
+    { "id": "B", "text": "Amazon DynamoDB" },
+    { "id": "C", "text": "Amazon EC2" },
+    { "id": "D", "text": "Amazon Kinesis" },
+    { "id": "E", "text": "Amazon SNS" }
+  ]
+}
+```
+
+**Correct Answer Storage**: JSON array of option IDs
+```json
+["A", "B", "D", "E"]
+```
+
+**User Answer Format**: JSON string or Array
+```json
+// As string (stored in database):
+"[\"A\",\"B\",\"D\",\"E\"]"
+
+// As array (can be sent from client):
+["A", "B", "D", "E"]
+```
+
+**Answer Matching Logic**:
+```typescript
+// Parse answers if stored as strings
+const userArr = typeof userAnswer === 'string'
+  ? JSON.parse(userAnswer)
+  : userAnswer;
+
+const correctArr = typeof correctAnswer === 'string'
+  ? JSON.parse(correctAnswer)
+  : correctAnswer;
+
+// Sort both arrays for order-independent comparison
+const userSorted = [...userArr].sort();
+const correctSorted = [...correctArr].sort();
+
+// Compare sorted arrays as JSON strings
+isCorrect = (JSON.stringify(userSorted) === JSON.stringify(correctSorted));
+
+// Example:
+// correctAnswer = ["A", "B", "D", "E"]
+// userAnswer = ["A", "D", "B", "E"]
+// userSorted = ["A", "B", "D", "E"]
+// correctSorted = ["A", "B", "D", "E"]
+// isCorrect = true (order doesn't matter, but all must be selected)
+
+// Partial match example:
+// userAnswer = ["A", "B", "D"]
+// isCorrect = false (missing "E")
+```
+
+**Important Rules**:
+- **All correct options must be selected**
+- **No wrong options allowed**
+- **Order doesn't matter** (A,B,D = B,A,D = D,A,B)
+- **Partial credit NOT awarded** - must be exact match
+
+**Scoring**:
+- All correct: Award full points
+- Any wrong or missing: 0 points (or negative marking if enabled)
+
+### 3. True/False (TRUE_FALSE)
+
+**Description**: Boolean question with two options.
+
+**Question Structure**:
+```json
+{
+  "type": "TRUE_FALSE",
+  "options": [
+    { "id": "A", "text": "True" },
+    { "id": "B", "text": "False" }
+  ]
+}
+```
+
+**Correct Answer Storage**: Option ID ("A" for True, "B" for False)
+
+**User Answer Format**: String with option ID
+
+**Answer Matching Logic**:
+```typescript
+// Exact string match
+isCorrect = (userAnswer === correctAnswer)
+
+// Example:
+// correctAnswer = "A" (True)
+// userAnswer = "A"
+// isCorrect = true
+```
+
+**Scoring**:
+- Correct: Award full points
+- Wrong: 0 points (or negative marking if enabled)
+
+### 4. Fill-in-the-Blank (FILL_IN_BLANK)
+
+**Description**: Text input question where user types their answer.
+
+**Question Structure**:
+```json
+{
+  "type": "FILL_IN_BLANK",
+  "content": "You can launch ____ resources into a subnet.",
+  "options": []
+}
+```
+
+**Correct Answer Storage**: String with correct text (e.g., `"EC2 instances"`)
+
+**User Answer Format**: String with user's input
+
+**Answer Matching Logic**:
+```typescript
+// Case-insensitive comparison
+// Trim leading/trailing whitespace
+isCorrect = (userAnswer.toLowerCase().trim() === correctAnswer.toLowerCase().trim());
+
+// Example:
+// correctAnswer = "EC2 instances"
+// userAnswer = "EC2 Instances"
+// isCorrect = true (case ignored)
+
+// Example 2:
+// correctAnswer = "EC2 instances"
+// userAnswer = "  ec2 instances  "
+// isCorrect = true (whitespace trimmed)
+
+// Example 3:
+// correctAnswer = "EC2 instances"
+// userAnswer = "EC2 Instance"
+// isCorrect = false (typo detected)
+```
+
+**Important Rules**:
+- **Case-insensitive**: "EC2" = "ec2" = "Ec2"
+- **Whitespace trimmed**: Leading/trailing spaces ignored
+- **Exact match required**: No partial credit, must match exactly
+
+**Scoring**:
+- Correct: Award full points
+- Wrong: 0 points (or negative marking if enabled)
+
+---
+
+## Quiz Settings Explained
+
+### Core Settings
+
+| Setting | Type | Description | Default |
+|----------|------|-------------|----------|
+| `timeLimit` | number (minutes) | Maximum time allowed for quiz | null (unlimited) |
+| `maxAttempts` | number | Maximum attempts per user | null (unlimited) |
+| `showAnswers` | boolean | Show detailed answers after submission | false |
+| `checkAnswerEnabled` | boolean | Allow real-time answer checking | false |
+| `negativeMarking` | boolean | Deduct points for wrong answers | false |
+| `negativePoints` | number | Points to deduct per wrong answer | null |
+| `randomOrder` | boolean | Shuffle question order | false |
+| `startTime` | DateTime | Quiz availability start | null |
+| `endTime` | DateTime | Quiz availability end | null |
+
+### Settings Behavior
+
+#### timeLimit
+
+- **Value**: Minutes (e.g., 30 = 30 minutes)
+- **null**: Unlimited time
+- **Implementation**:
+  - Server sends `timeRemaining` in seconds
+  - Mobile app counts down from this value
+  - When reaches 0, auto-submit or warn user
+  - Server calculates: `timeRemaining = max(0, (timeLimit * 60) - timeElapsed)`
+
+#### showAnswers
+
+- **false**: Results API only shows score (no question details)
+- **true**: Results API shows:
+  - Each question's correct answer
+  - User's answer
+  - Whether correct/incorrect
+  - Explanation text
+  - Points earned
+
+#### checkAnswerEnabled
+
+- **false**: No real-time feedback during quiz
+- **true**: Mobile app can implement instant feedback
+  - API doesn't validate during quiz
+  - Client-side optional feature
+  - Must calculate answer matching client-side
+
+#### negativeMarking
+
+- **false**: Wrong answers = 0 points
+- **true**: Wrong answers = -`negativePoints`
+- **Example**:
+  ```
+  Question: 2 points
+  Correct answer: Award +2 points
+  Wrong answer: Deduct -0.5 points (if negativePoints = 0.5)
+  ```
+
+#### maxAttempts
+
+- **null**: Unlimited retakes allowed
+- **3**: User can attempt quiz 3 times
+- **Enforcement**:
+  - Checked before creating new attempt
+  - Server returns error if: `completedAttempts >= maxAttempts`
+  - Includes SUBMITTED attempts only
+
+#### randomOrder
+
+- **false**: Questions returned in database order
+- **true**: Questions shuffled server-side
+- **Note**: Question `order` field indicates display position
+
+---
+
+## Scoring Mechanism
+
+### Score Calculation Process
+
+```
+1. For each question:
+   a. Get question points (default: 1.0)
+   b. Get user's answer
+   c. Get correct answer
+   d. Match answers based on question type
+   e. If correct:
+      - Add question points to totalScore
+      - pointsEarned = questionPoints
+   f. If wrong AND negativeMarking = true:
+      - Subtract negativePoints from totalScore
+      - pointsEarned = -negativePoints
+   g. If wrong AND negativeMarking = false:
+      - pointsEarned = 0
+
+2. Calculate total possible points:
+   totalPossiblePoints = sum of all question points
+
+3. Calculate percentage score:
+   finalScore = (totalScore / totalPossiblePoints) * 100
+
+4. Store results:
+   - Save attempt with final score
+   - Save each answer with isCorrect and pointsEarned
+   - Record timeTaken (submittedAt - startedAt)
+```
+
+### Example Scoring
+
+**Quiz Configuration**:
+```
+Question 1: MULTIPLE_CHOICE, 1 point
+Question 2: MULTI_SELECT, 2 points
+Question 3: TRUE_FALSE, 1 point
+Question 4: FILL_IN_BLANK, 1 point
+Total possible: 5 points
+Negative marking: false
+```
+
+**User Answers**:
+```
+Question 1: Correct → +1 point
+Question 2: Partial (missing 1 option) → 0 points
+Question 3: Correct → +1 point
+Question 4: Wrong → 0 points
+```
+
+**Score Calculation**:
+```
+totalScore = 1 + 0 + 1 + 0 = 2
+totalPossiblePoints = 5
+finalScore = (2 / 5) * 100 = 40.0%
+```
+
+**With Negative Marking** (negativePoints = 0.5):
+```
+Question 1: Correct → +1.0
+Question 2: Wrong → -0.5
+Question 3: Correct → +1.0
+Question 4: Wrong → -0.5
+
+totalScore = 1.0 + (-0.5) + 1.0 + (-0.5) = 1.0
+totalPossiblePoints = 5
+finalScore = (1.0 / 5) * 100 = 20.0%
+```
+
+---
+
+## Error Handling
+
+### Standard Error Format
+
+All errors follow this structure:
 
 ```json
 {
   "success": false,
-  "message": "Error message here"
+  "message": "Descriptive error message"
 }
 ```
 
-**Common HTTP Status Codes:**
-- `200` - Success
-- `400` - Bad Request
-- `401` - Unauthorized (invalid or missing token)
-- `403` - Forbidden (no access)
-- `404` - Not Found
-- `500` - Internal Server Error
+### HTTP Status Codes
+
+| Code | Name | Description |
+|------|-------|-------------|
+| 200 | OK | Request successful |
+| 400 | Bad Request | Invalid input, validation failed |
+| 401 | Unauthorized | Missing/invalid/expired token |
+| 403 | Forbidden | Access denied |
+| 404 | Not Found | Resource doesn't exist |
+| 500 | Internal Server Error | Server error |
+
+### Common Errors & Solutions
+
+| Error | Message | Solution |
+|--------|----------|----------|
+| Invalid or expired token | "Invalid or expired token" | Re-login |
+| Quiz has not started yet | "Quiz has not started yet" | Wait until startTime |
+| Quiz has expired | "Quiz has expired" | Quiz window closed |
+| Maximum attempts reached | "Maximum attempts reached" | Show attempt history |
+| Attempt not found | "Attempt not found" | Start new attempt |
+| Quiz has already been submitted | "Quiz has already been submitted" | View results |
 
 ---
 
-## Testing the APIs
+## Integration Examples
 
-### Using cURL
+### Mobile App Quiz Flow
 
-**Login:**
-```bash
-curl -X POST http://localhost:3000/api/mobile/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "user@example.com",
-    "password": "userpassword"
-  }'
+```
+1. Login
+   POST /api/mobile/auth/login
+   → Save token securely
+   → Cache user data
+
+2. Get Quiz List
+   GET /api/mobile/quiz
+   → Display available quizzes
+   → Show attempt status
+
+3. Start Quiz
+   GET /api/mobile/quiz/:id
+   → Save attemptId
+   → Cache questions locally
+   → Start countdown timer
+
+4. Take Quiz
+   → Display questions
+   → Auto-save every 2 minutes:
+      POST /api/mobile/quiz/:id/save
+   → Update timer
+
+5. Submit Quiz
+   POST /api/mobile/quiz/:id/submit
+   → Display score immediately
+
+6. View Results
+   GET /api/mobile/quiz/:id/result?attemptId=xxx
+   → Show question breakdown
+   → Display explanations
+
+7. View History
+   GET /api/mobile/quiz/:id/history
+   → Show all attempts
+   → Compare performance
 ```
 
-**Get Quiz List:**
-```bash
-curl http://localhost:3000/api/mobile/quiz \
-  -H "Authorization: Bearer <your_token>"
+### Auto-Save Implementation
+
+```typescript
+// Save answers periodically
+const autoSaveInterval = setInterval(async () => {
+  const response = await fetch('/api/mobile/quiz/:id/save', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      attemptId: currentAttemptId,
+      answers: currentAnswers
+    })
+  });
+
+  const result = await response.json();
+  console.log(`Saved ${result.data.total} answers`);
+}, 120000); // Every 2 minutes
+
+// Clear on submit
+clearInterval(autoSaveInterval);
 ```
 
-**Take Quiz:**
-```bash
-curl http://localhost:3000/api/mobile/quiz/<quiz_id> \
-  -H "Authorization: Bearer <your_token>"
-```
+### Timer Implementation
 
-**Submit Quiz:**
-```bash
-curl -X POST http://localhost:3000/api/mobile/quiz/<quiz_id>/submit \
-  -H "Authorization: Bearer <your_token>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "attemptId": "<attempt_id>",
-    "answers": {
-      "question_id_1": "option_A"
-    }
-  }'
-```
+```typescript
+// Countdown timer
+let timeRemaining = quizData.timeRemaining;
 
-**View Profile:**
-```bash
-curl http://localhost:3000/api/mobile/profile \
-  -H "Authorization: Bearer <your_token>"
-```
+const timer = setInterval(() => {
+  timeRemaining--;
 
-**Edit Profile:**
-```bash
-curl -X PUT http://localhost:3000/api/mobile/profile \
-  -H "Authorization: Bearer <your_token>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "Updated Name",
-    "phone": "+1234567890"
-  }'
+  if (timeRemaining <= 0) {
+    // Auto-submit
+    submitQuiz();
+    clearInterval(timer);
+  } else if (timeRemaining <= 60) {
+    // Show warning at 1 minute
+    showWarning("1 minute remaining!");
+  }
+
+  updateTimerDisplay(timeRemaining);
+}, 1000);
 ```
 
 ---
 
-## Mobile App Integration Tips
+## API Endpoint Summary
 
-1. **Token Storage:** Store the JWT token securely on the device (e.g., using Keychain on iOS or Keystore on Android)
-
-2. **Token Refresh:** The token is valid for 60 days. Implement a mechanism to refresh the token or re-login when expired.
-
-3. **Auto-refresh:** When taking a quiz, periodically call the GET quiz endpoint to get updated time remaining.
-
-4. **Offline Mode:** Consider caching quiz data locally and syncing answers when the connection is restored.
-
-5. **Error Handling:** Implement proper error handling for all API calls, especially for network issues and expired tokens.
-
-6. **Quiz Timer:** Implement a client-side timer based on the `timeRemaining` field from the quiz API.
-
-7. **Progress Saving:** The quiz API preserves partial answers, so users can continue their quiz later.
+| Endpoint | Method | Purpose |
+|----------|---------|---------|
+| `/api/mobile/auth/login` | POST | User authentication |
+| `/api/mobile/profile` | GET | Get user profile & stats |
+| `/api/mobile/profile` | PUT | Update user profile |
+| `/api/mobile/quiz` | GET | List assigned quizzes |
+| `/api/mobile/quiz/:id` | GET | Start/resume quiz |
+| `/api/mobile/quiz/:id/save` | POST | Save quiz answers |
+| `/api/mobile/quiz/:id/submit` | POST | Submit quiz |
+| `/api/mobile/quiz/:id/result` | GET | View quiz results |
+| `/api/mobile/quiz/:id/history` | GET | View attempt history |
 
 ---
 
-## Sample Test Credentials
-
-Based on the seeded data:
-
-**Admin User:**
-- Email: `admin@atomcode.dev`
-- Password: `admin@atomcode.dev`
-
-**Sample Users:**
-- Email: `seedtestuser1@test.org` to `seedtestuser20@test.org`
-- Password: `testuser123`
+**Document Version:** 2.0.0
+**Last Updated:** 2024-01-20
+**Platform:** Atom Q v4
+**Compatibility:** iOS 12+, Android 8+

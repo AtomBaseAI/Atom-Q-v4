@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Generate JWT token
+    // Generate JWT token (60 days for mobile apps)
     const token = jwt.sign(
       {
         id: user.id,
@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
         role: user.role,
       },
       JWT_SECRET,
-      { expiresIn: "24h" }
+      { expiresIn: "60d" }
     )
 
     // Return user data without password
