@@ -75,60 +75,68 @@ export function ColophonSection() {
     >
       {/* Section header */}
       <div ref={headerRef} className="mb-16">
-        <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-accent">04 / Colophon</span>
-        <h2 className="mt-4 font-[var(--font-bebas)] text-5xl md:text-7xl tracking-tight">CREDITS</h2>
+        <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-accent">05 / Contact</span>
+        <h2 className="mt-4 font-[var(--font-bebas)] text-5xl md:text-7xl tracking-tight">GET IN TOUCH</h2>
       </div>
 
       {/* Multi-column layout */}
       <div ref={gridRef} className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-8 md:gap-12">
-        {/* Design */}
+        {/* Certifications */}
         <div className="col-span-1">
-          <h4 className="font-mono text-[9px] uppercase tracking-[0.3em] text-muted-foreground mb-4">Design</h4>
+          <h4 className="font-mono text-[9px] uppercase tracking-[0.3em] text-muted-foreground mb-4">AWS</h4>
           <ul className="space-y-2">
-            <li className="font-mono text-xs text-foreground/80">Signal Studio</li>
-            <li className="font-mono text-xs text-foreground/80">Interface Lab</li>
+            <li className="font-mono text-xs text-foreground/80">Cloud Practitioner</li>
+            <li className="font-mono text-xs text-foreground/80">Solutions Architect</li>
+            <li className="font-mono text-xs text-foreground/80">Developer Associate</li>
+            <li className="font-mono text-xs text-foreground/80">AI Practitioner</li>
+            <li className="font-mono text-xs text-foreground/80">Machine Learning</li>
           </ul>
         </div>
 
-        {/* Stack */}
+        {/* Cloud Platforms */}
         <div className="col-span-1">
-          <h4 className="font-mono text-[9px] uppercase tracking-[0.3em] text-muted-foreground mb-4">Stack</h4>
+          <h4 className="font-mono text-[9px] uppercase tracking-[0.3em] text-muted-foreground mb-4">Cloud Platforms</h4>
           <ul className="space-y-2">
-            <li className="font-mono text-xs text-foreground/80">Next.js</li>
-            <li className="font-mono text-xs text-foreground/80">Tailwind CSS</li>
-            <li className="font-mono text-xs text-foreground/80">Vercel</li>
+            <li className="font-mono text-xs text-foreground/80">Microsoft Azure</li>
+            <li className="font-mono text-xs text-foreground/80">Google Cloud (GCP)</li>
+            <li className="font-mono text-xs text-foreground/80">Oracle Cloud (OCI)</li>
+            <li className="font-mono text-xs text-foreground/80">IBM Cloud</li>
           </ul>
         </div>
 
-        {/* Typography */}
+        {/* Business Intelligence */}
         <div className="col-span-1">
-          <h4 className="font-mono text-[9px] uppercase tracking-[0.3em] text-muted-foreground mb-4">Typography</h4>
+          <h4 className="font-mono text-[9px] uppercase tracking-[0.3em] text-muted-foreground mb-4">Business Intelligence</h4>
           <ul className="space-y-2">
-            <li className="font-mono text-xs text-foreground/80">Bebas Neue</li>
-            <li className="font-mono text-xs text-foreground/80">Inter</li>
-            <li className="font-mono text-xs text-foreground/80">Geist Mono</li>
+            <li className="font-mono text-xs text-foreground/80">Power BI Desktop</li>
+            <li className="font-mono text-xs text-foreground/80">Power BI Service</li>
+            <li className="font-mono text-xs text-foreground/80">Fabric Analytics</li>
+            <li className="font-mono text-xs text-foreground/80">Tableau</li>
           </ul>
         </div>
 
-        {/* Location */}
+        {/* Solutions */}
         <div className="col-span-1">
-          <h4 className="font-mono text-[9px] uppercase tracking-[0.3em] text-muted-foreground mb-4">Location</h4>
+          <h4 className="font-mono text-[9px] uppercase tracking-[0.3em] text-muted-foreground mb-4">Solutions</h4>
           <ul className="space-y-2">
-            <li className="font-mono text-xs text-foreground/80">Remote</li>
-            <li className="font-mono text-xs text-foreground/80">Everywhere</li>
+            <li className="font-mono text-xs text-foreground/80">Training Companies</li>
+            <li className="font-mono text-xs text-foreground/80">Enterprise L&D</li>
+            <li className="font-mono text-xs text-foreground/80">Universities</li>
+            <li className="font-mono text-xs text-foreground/80">Bootcamps</li>
           </ul>
         </div>
 
-        {/* Contact */}
+        {/* Resources */}
         <div className="col-span-1">
-          <h4 className="font-mono text-[9px] uppercase tracking-[0.3em] text-muted-foreground mb-4">Contact</h4>
+          <h4 className="font-mono text-[9px] uppercase tracking-[0.3em] text-muted-foreground mb-4">Resources</h4>
           <ul className="space-y-2">
             <li>
               <a
-                href="mailto:hello@signal.studio"
+                href="/MOBILE_API.md"
+                target="_blank"
                 className="font-mono text-xs text-foreground/80 hover:text-accent transition-colors duration-200"
               >
-                Email
+                API Documentation
               </a>
             </li>
             <li>
@@ -136,18 +144,49 @@ export function ColophonSection() {
                 href="#"
                 className="font-mono text-xs text-foreground/80 hover:text-accent transition-colors duration-200"
               >
-                Twitter/X
+                Integration Guide
+              </a>
+            </li>
+            <li>
+              <a
+                href="#"
+                className="font-mono text-xs text-foreground/80 hover:text-accent transition-colors duration-200"
+              >
+                Case Studies
               </a>
             </li>
           </ul>
         </div>
 
-        {/* Year */}
+        {/* Contact */}
         <div className="col-span-1">
-          <h4 className="font-mono text-[9px] uppercase tracking-[0.3em] text-muted-foreground mb-4">Year</h4>
+          <h4 className="font-mono text-[9px] uppercase tracking-[0.3em] text-muted-foreground mb-4">Enterprise Sales</h4>
           <ul className="space-y-2">
-            <li className="font-mono text-xs text-foreground/80">2025</li>
-            <li className="font-mono text-xs text-foreground/80">Ongoing</li>
+            <li>
+              <a
+                href="mailto:enterprise@atomq.com"
+                className="font-mono text-xs text-foreground/80 hover:text-accent transition-colors duration-200"
+              >
+                Contact Sales
+              </a>
+            </li>
+            <li>
+              <a
+                href="#"
+                className="font-mono text-xs text-foreground/80 hover:text-accent transition-colors duration-200"
+              >
+                Request Demo
+              </a>
+            </li>
+            <li>
+              <a
+                href="https://github.com/AtomBaseAI/Atom-Q-v4"
+                target="_blank"
+                className="font-mono text-xs text-foreground/80 hover:text-accent transition-colors duration-200"
+              >
+                GitHub
+              </a>
+            </li>
           </ul>
         </div>
       </div>
@@ -158,9 +197,9 @@ export function ColophonSection() {
         className="mt-24 pt-8 border-t border-border/20 flex flex-col md:flex-row md:items-center md:justify-between gap-4"
       >
         <p className="font-mono text-[10px] text-muted-foreground uppercase tracking-widest">
-          © 2026 ATOM Q. All rights reserved.
+          © 2026 ATOM Q. Enterprise Certification Platform. All rights reserved.
         </p>
-        <p className="font-mono text-[10px] text-muted-foreground">Designed by <span className="font-bold text-blue-500">ATOM LABS</span></p>
+        <p className="font-mono text-[10px] text-muted-foreground">Enterprise solution by <span className="font-bold text-accent">AtomBaseAI</span></p>
       </div>
     </section>
   )

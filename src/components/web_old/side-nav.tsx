@@ -5,11 +5,10 @@ import { cn } from "@/lib/utils"
 
 const navItems = [
   { id: "hero", label: "Index" },
-  { id: "signals", label: "Updates" },
-  { id: "work", label: "Features" },
-  { id: "principles", label: "How It Works" },
-  { id: "pricing", label: "Pricing" },
-  { id: "colophon", label: "Credits" },
+  { id: "signals", label: "Signals" },
+  { id: "work", label: "Experiments" },
+  { id: "principles", label: "Principles" },
+  { id: "colophon", label: "Colophon" },
 ]
 
 export function SideNav() {

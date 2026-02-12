@@ -10,53 +10,51 @@ gsap.registerPlugin(ScrollTrigger)
 
 const pricingPlans = [
   {
-    name: "Training Center",
-    description: "Ideal for small to mid-sized training companies and bootcamps",
-    price: "$299",
-    period: "per month",
+    name: "Starter",
+    description: "Perfect for small teams getting started with Atom Q",
+    price: "Free",
+    period: "forever",
     features: [
-      "Up to 500 trainees",
-      "All cloud certifications",
-      "Unlimited practice tests",
-      "Exam simulation mode",
-      "Performance analytics",
-      "Email support",
+      "Up to 50 students",
+      "1 campus",
+      "5 quiz assessments",
+      "Basic analytics",
+      "Community support",
     ],
     highlighted: false,
-    cta: "Start Trial",
+    cta: "Get Started",
+  },
+  {
+    name: "Professional",
+    description: "For growing educational institutions and teams",
+    price: "$49",
+    period: "per month",
+    features: [
+      "Up to 500 students",
+      "Unlimited campuses",
+      "Unlimited quiz assessments",
+      "Advanced analytics & reports",
+      "Priority email support",
+      "Custom branding",
+      "API access",
+    ],
+    highlighted: true,
+    cta: "Start Free Trial",
   },
   {
     name: "Enterprise",
-    description: "For corporations and large educational institutions",
-    price: "$899",
-    period: "per month",
-    features: [
-      "Up to 5,000 employees",
-      "All certification tracks",
-      "Custom question banks",
-      "Skill gap analysis",
-      "LMS integration",
-      "Mobile app access",
-      "SSO & advanced security",
-      "Dedicated support",
-    ],
-    highlighted: true,
-    cta: "Request Demo",
-  },
-  {
-    name: "Unlimited",
-    description: "For large-scale training providers and universities",
+    description: "For large-scale organizations with advanced needs",
     price: "Custom",
-    period: "enterprise",
+    period: "pricing",
     features: [
-      "Unlimited users",
-      "White-label platform",
-      "Custom certifications",
-      "API & webhooks",
-      "Dedicated account team",
+      "Unlimited students",
+      "Unlimited everything",
+      "White-label solution",
+      "Dedicated account manager",
       "24/7 phone support",
+      "Custom integrations",
       "SLA guarantee",
-      "On-premise option",
+      "On-premise deployment",
     ],
     highlighted: false,
     cta: "Contact Sales",
@@ -92,10 +90,11 @@ export function PricingSection() {
           04 / Pricing
         </span>
         <h2 className="mt-4 font-[var(--font-bebas)] text-5xl md:text-7xl tracking-tight">
-          ENTERPRISE PRICING
+          SIMPLE TRANSPARENT PRICING
         </h2>
         <p className="mt-6 font-mono text-sm text-muted-foreground max-w-xl leading-relaxed">
-          Scale your certification training programs. Plans designed for training centers, corporations, and educational institutions.
+          Choose the plan that fits your needs. All plans include core features and
+          scale with your institution.
         </p>
       </div>
 
@@ -116,11 +115,11 @@ export function PricingSection() {
       {/* Bottom note */}
       <div className="mt-16 pt-8 border-t border-border/40">
         <p className="font-mono text-xs text-muted-foreground text-center leading-relaxed">
-          All plans include full access to all certification tracks. 14-day free trial for new customers.
+          All plans include a 14-day free trial. No credit card required.
           <br />
-          Need a custom solution for your organization?{" "}
-          <a href="mailto:enterprise@atomq.com" className="text-accent hover:underline">
-            Contact our enterprise sales team
+          Need help deciding?{" "}
+          <a href="#contact" className="text-accent hover:underline">
+            Contact our team
           </a>
         </p>
       </div>

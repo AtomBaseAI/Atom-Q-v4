@@ -9,39 +9,39 @@ gsap.registerPlugin(ScrollTrigger)
 
 const experiments = [
   {
-    title: "AWS Certifications",
-    medium: "Certification Track",
-    description: "Comprehensive practice tests for Cloud Practitioner, Solutions Architect, and AI/ML certifications aligned with official exam patterns.",
+    title: "Project Lattice",
+    medium: "Interface Study",
+    description: "Structural framework for adaptive layouts in dynamic content systems.",
     span: "col-span-2 row-span-2",
   },
   {
-    title: "Azure Tracks",
-    medium: "Microsoft Cloud",
-    description: "Full certification paths from Fundamentals to Expert level with role-based assessments.",
+    title: "Signal Field",
+    medium: "Agent Orchestration",
+    description: "Autonomous coordination layer for multi-agent environments.",
     span: "col-span-1 row-span-1",
   },
   {
-    title: "GCP Certifications",
-    medium: "Google Cloud",
-    description: "Associate and Professional level practice exams covering Google Cloud architecture, data engineering, and machine learning.",
+    title: "Silent Agent",
+    medium: "Visual System",
+    description: "Non-intrusive interface patterns for ambient computing.",
     span: "col-span-1 row-span-2",
   },
   {
-    title: "Power BI Training",
-    medium: "Business Intelligence",
-    description: "Data modeling, DAX, visualization, and Power Platform assessment suite for analysts and developers.",
+    title: "Noir Grid",
+    medium: "Typography",
+    description: "High-contrast typographic system for editorial interfaces.",
     span: "col-span-1 row-span-1",
   },
   {
-    title: "Oracle Cloud",
-    medium: "OCI Platform",
-    description: "Foundational, Associate, and Professional certification assessments for Oracle Cloud Infrastructure.",
+    title: "Echo Chamber",
+    medium: "Audio-Visual",
+    description: "Generative soundscapes mapped to interface interactions.",
     span: "col-span-2 row-span-1",
   },
   {
-    title: "Enterprise Portal",
-    medium: "B2B Platform",
-    description: "Multi-tenant management for training companies, educational institutions, and enterprise L&D teams.",
+    title: "Void Protocol",
+    medium: "Experimental",
+    description: "Negative space as primary interaction medium.",
     span: "col-span-1 row-span-1",
   },
 ]
@@ -98,11 +98,11 @@ export function WorkSection() {
       {/* Section header */}
       <div ref={headerRef} className="mb-16 flex items-end justify-between">
         <div>
-          <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-accent">02 / Certifications</span>
-          <h2 className="mt-4 font-[var(--font-bebas)] text-5xl md:text-7xl tracking-tight">CLOUD CERTIFICATIONS</h2>
+          <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-accent">02 / Experiments</span>
+          <h2 className="mt-4 font-[var(--font-bebas)] text-5xl md:text-7xl tracking-tight">SELECTED WORK</h2>
         </div>
         <p className="hidden md:block max-w-xs font-mono text-xs text-muted-foreground text-right leading-relaxed">
-          Industry-leading certification practice tests across major cloud platforms and business intelligence tools.
+          Studies across interface design, agent systems, and visual computation.
         </p>
       </div>
 

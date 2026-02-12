@@ -16,37 +16,37 @@ export function PrinciplesSection() {
     {
       number: "01",
       titleParts: [
-        { text: "ALIGNED", highlight: true },
-        { text: " WITH EXAMS", highlight: false },
+        { text: "INTERFACE", highlight: true },
+        { text: " MINIMALISM", highlight: false },
       ],
-      description: "All assessments match official certification exam patterns and difficulty levels. Real exam simulation experience.",
+      description: "Reduce until only the essential remains. Every element earns its place.",
       align: "left",
     },
     {
       number: "02",
       titleParts: [
-        { text: "ENTERPRISE", highlight: true },
-        { text: " SCALE", highlight: false },
+        { text: "SYSTEMS", highlight: true },
+        { text: " OVER SCREENS", highlight: false },
       ],
-      description: "Support thousands of concurrent users. Multi-campus management for training providers and corporations.",
+      description: "Design behaviors, not just layouts. Build logic that scales.",
       align: "right",
     },
     {
       number: "03",
       titleParts: [
-        { text: "DETAILED ", highlight: false },
-        { text: "ANALYTICS", highlight: true },
+        { text: "CONTROLLED ", highlight: false },
+        { text: "TENSION", highlight: true },
       ],
-      description: "Track certification readiness, identify skill gaps, and measure training ROI with comprehensive reporting.",
+      description: "Balance between restraint and expression. Confidence without excess.",
       align: "left",
     },
     {
       number: "04",
       titleParts: [
-        { text: "MULTI ", highlight: false },
-        { text: "PLATFORM", highlight: true },
+        { text: "SIGNAL ", highlight: false },
+        { text: "CLARITY", highlight: true },
       ],
-      description: "One platform for all your cloud certification training needs. AWS, Azure, GCP, Oracle, and Power BI.",
+      description: "Communication that cuts through noise. Precision in every interaction.",
       align: "right",
     },
   ]
@@ -93,8 +93,8 @@ export function PrinciplesSection() {
     <section ref={sectionRef} id="principles" className="relative py-32 pl-6 md:pl-28 pr-6 md:pr-12">
       {/* Section header */}
       <div ref={headerRef} className="mb-24">
-        <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-accent">03 / Platform</span>
-        <h2 className="mt-4 font-[var(--font-bebas)] text-5xl md:text-7xl tracking-tight">WHY CHOOSE US</h2>
+        <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-accent">03 / Principles</span>
+        <h2 className="mt-4 font-[var(--font-bebas)] text-5xl md:text-7xl tracking-tight">HOW WE WORK</h2>
       </div>
 
       {/* Staggered principles */}

@@ -9,29 +9,29 @@ gsap.registerPlugin(ScrollTrigger)
 
 const signals = [
   {
-    date: "2025.01.20",
-    title: "AWS AI Practitioner",
-    note: "New certification practice tests with machine learning and generative AI questions.",
+    date: "2025.06.10",
+    title: "Signal Field",
+    note: "New interface paradigm for ambient computing environments.",
   },
   {
-    date: "2025.01.15",
-    title: "Azure Administrator",
-    note: "Comprehensive assessment pool covering AZ-104 certification requirements.",
+    date: "2025.05.28",
+    title: "Silent Agent",
+    note: "Orchestration layer for autonomous design systems.",
   },
   {
-    date: "2025.01.10",
-    title: "Power BI Desktop",
-    note: "Data visualization and business intelligence certification assessments.",
+    date: "2025.05.15",
+    title: "Noir Grid",
+    note: "Typographic system for editorial interfaces.",
   },
   {
-    date: "2025.01.05",
-    title: "GCP Cloud Architect",
-    note: "Professional Cloud Architect practice exams with real-world scenarios.",
+    date: "2025.04.30",
+    title: "Project Lattice",
+    note: "Structural framework for adaptive layouts.",
   },
   {
-    date: "2025.01.01",
-    title: "Oracle Cloud",
- note: "OCI Foundations and Associate level certification assessments.",
+    date: "2025.04.12",
+    title: "Echo Chamber",
+    note: "Audio-visual synthesis in browser environments.",
   },
 ]
 
@@ -135,8 +135,8 @@ export function SignalsSection() {
 
       {/* Section header */}
       <div ref={headerRef} className="mb-16 pr-6 md:pr-12">
-        <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-accent">01 / Certifications</span>
-        <h2 className="mt-4 font-[var(--font-bebas)] text-5xl md:text-7xl tracking-tight">NEW ASSESSMENTS</h2>
+        <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-accent">01 / Signals</span>
+        <h2 className="mt-4 font-[var(--font-bebas)] text-5xl md:text-7xl tracking-tight">WHAT&apos;S NEW</h2>
       </div>
 
       {/* Horizontal scroll container */}
