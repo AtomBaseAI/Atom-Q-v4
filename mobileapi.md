@@ -1,7 +1,7 @@
 # Mobile API Documentation
 
 **Version:** 1.0.0
-**Base URL:** `http://localhost:3000/api/mobile`
+**Base URL:** `https://atom-q-beta-v12-demo-gani.vercel.app/api/mobile`
 
 ---
 
