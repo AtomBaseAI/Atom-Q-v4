@@ -273,21 +273,29 @@ export async function GET(
           }
         }
 
+        // Parse correct answer if it's a JSON string
+        let correctAnswer = qq.question.correctAnswer
+        if (correctAnswer) {
+          try {
+            // Try to parse as JSON (for MULTI_SELECT)
+            const parsed = JSON.parse(correctAnswer)
+            correctAnswer = parsed
+          } catch {
+            // Not JSON, keep as string
+          }
+        }
+
         const questionData: any = {
           id: qq.question.id,
           title: qq.question.title || `Question ${originalIndex + 1}`,
           content: qq.question.content,
           type: qq.question.type,
           options: Array.isArray(options) ? options : [],
+          correctAnswer: correctAnswer,
           explanation: qq.question.explanation || '',
           difficulty: qq.question.difficulty,
           order: qq.order,
           points: qq.points
-        }
-
-        // Include correct answer only if check answer is enabled
-        if (attempt.quiz.checkAnswerEnabled && qq.question.correctAnswer) {
-          questionData.correctAnswer = qq.question.correctAnswer
         }
 
         return questionData
