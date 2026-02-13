@@ -54,6 +54,58 @@ export interface QuizListItem {
 }
 
 /**
+ * Quiz Metadata - additional info before starting a quiz
+ */
+export interface QuizMetadata {
+  quiz: {
+    id: string;
+    title: string;
+    description: string;
+    timeLimit: number | null;
+    difficulty: string;
+    startTime: string;
+    endTime: string;
+    maxAttempts: number | null;
+    showAnswers: boolean;
+    checkAnswerEnabled: boolean;
+    negativeMarking: boolean;
+    negativePoints: number | null;
+    randomOrder: boolean;
+    questionCount: number;
+    campus?: {
+      id: string;
+      name: string;
+      shortName: string;
+    };
+  };
+  enrollment: {
+    isEnrolled: boolean;
+  };
+  attempt: {
+    hasExistingAttempt: boolean;
+    existingAttemptId: string;
+    completedAttemptsCount: number;
+    canAttempt: boolean;
+    timeStatus: 'available' | 'not_started' | 'expired';
+    reason: string;
+  };
+  tabSwitches: {
+    count: number;
+  };
+}
+
+/**
+ * Tab Switch Tracking
+ */
+export interface TabSwitchRecord {
+  currentSwitches: number;
+  maxSwitches: number;
+  switchesRemaining: number;
+  shouldAutoSubmit: boolean;
+  recordedAt?: string;
+}
+
+/**
  * Question Types
  */
 export type QuestionType = "MULTIPLE_CHOICE" | "MULTI_SELECT" | "TRUE_FALSE" | "FILL_IN_BLANK";
@@ -305,6 +357,24 @@ export const api = {
   },
 
   /**
+   * Get quiz metadata without starting an attempt
+   * GET /quiz/:id/metadata
+   *
+   * Use this to check:
+   * - Enrollment status
+   * - Time constraints (start/end windows)
+   * - Attempt limits
+   * - Existing in-progress attempt
+   * - Tab switch count
+   *
+   * @param quizId - Quiz ID
+   * @returns QuizMetadata object
+   */
+  async getQuizMetadata(quizId: string): Promise<ApiResponse<QuizMetadata>> {
+    return apiRequest<QuizMetadata>(`/quiz/${quizId}/metadata`);
+  },
+
+  /**
    * Save quiz answers without submitting
    * POST /quiz/:id/save
    *
@@ -384,6 +454,33 @@ export const api = {
    */
   async getQuizHistory(quizId: string) {
     return apiRequest<any>(`/quiz/${quizId}/history`);
+  },
+
+  /**
+   * Record a tab switch during quiz attempt
+   * POST /quiz/:id/tab-switch
+   *
+   * @param quizId - Quiz ID
+   * @param attemptId - Current attempt ID
+   * @returns Tab switch record
+   */
+  async recordTabSwitch(quizId: string, attemptId: string) {
+    return apiRequest<TabSwitchRecord>(`/quiz/${quizId}/tab-switch`, {
+      method: "POST",
+      body: JSON.stringify({ attemptId }),
+    });
+  },
+
+  /**
+   * Get tab switch history for an attempt
+   * GET /quiz/:id/tab-switch?attemptId={attemptId}
+   *
+   * @param quizId - Quiz ID
+   * @param attemptId - Attempt ID to get tab switch history for
+   * @returns Tab switch history
+   */
+  async getTabSwitchHistory(quizId: string, attemptId: string) {
+    return apiRequest<TabSwitchRecord>(`/quiz/${quizId}/tab-switch?attemptId=${attemptId}`);
   },
 
   // ==================== PROFILE MANAGEMENT ====================

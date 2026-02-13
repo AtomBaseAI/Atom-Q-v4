@@ -1,8 +1,8 @@
 # Atom Q Mobile API Documentation
 
-**Version:** 2.0.0
+**Version:** 2.1.0
 **Base URL:** `http://localhost:3000/api/mobile`
-**Last Updated:** 2024-01-20
+**Last Updated:** 2025-01-20
 
 ---
 
@@ -12,11 +12,13 @@
 2. [Authentication](#authentication)
 3. [Quiz Management](#quiz-management)
    - [Quiz List](#31-get-quiz-list)
-   - [Quiz Details (Take Quiz)](#32-get-quiz-details)
-   - [Save Quiz Answers](#33-save-quiz-answers)
-   - [Submit Quiz](#34-submit-quiz)
-   - [Quiz Results](#35-get-quiz-results)
-   - [Quiz History](#36-get-quiz-history)
+   - [Quiz Metadata](#32-get-quiz-metadata)
+   - [Quiz Details (Take Quiz)](#33-get-quiz-details-take-quiz)
+   - [Save Quiz Answers](#34-save-quiz-answers)
+   - [Submit Quiz](#35-submit-quiz)
+   - [Quiz Results](#36-get-quiz-results)
+   - [Quiz History](#37-get-quiz-history)
+   - [Track Tab Switch](#38-track-tab-switch)
 4. [Profile Management](#profile-management)
 5. [Question Types & Answer Matching](#question-types--answer-matching)
 6. [Quiz Settings Explained](#quiz-settings-explained)
@@ -39,6 +41,7 @@ The Atom Q Mobile API provides comprehensive functionality for mobile applicatio
 - **Answer Validation**: Sophisticated matching algorithms for each question type
 - **Negative Marking**: Configurable penalty system for wrong answers
 - **Quiz Constraints**: Time limits, max attempts, availability windows
+- **Tab Switch Tracking**: Monitor and limit tab switches during quiz attempts
 
 ---
 
@@ -168,7 +171,101 @@ Authorization: Bearer <jwt_token>
 
 ---
 
-### 3.2 Get Quiz Details (Take Quiz)
+### 3.2 Get Quiz Metadata
+
+**Endpoint:** `GET /api/mobile/quiz/:id/metadata`
+
+**Description:** Retrieves quiz metadata without starting an attempt. Use this to check enrollment status, time constraints, attempt limits, and existing attempt information before starting a quiz.
+
+#### Request
+
+**Headers:**
+```
+Authorization: Bearer <jwt_token>
+```
+
+#### Success Response (200 OK)
+
+```json
+{
+  "success": true,
+  "data": {
+    "quiz": {
+      "id": "cl7xxxxxxxxxxxxxxxxxx",
+      "title": "AWS Fundamentals Quiz",
+      "description": "Test your AWS knowledge",
+      "timeLimit": 30,
+      "difficulty": "MEDIUM",
+      "startTime": "2024-01-01T10:00:00.000Z",
+      "endTime": "2024-12-31T23:59:59.000Z",
+      "maxAttempts": 3,
+      "showAnswers": true,
+      "checkAnswerEnabled": false,
+      "negativeMarking": false,
+      "negativePoints": null,
+      "randomOrder": false,
+      "questionCount": 10,
+      "campus": {
+        "id": "cl7xxxxxxxxxxxxx",
+        "name": "Massachusetts Institute of Technology",
+        "shortName": "MIT"
+      }
+    },
+    "enrollment": {
+      "isEnrolled": true
+    },
+    "attempt": {
+      "hasExistingAttempt": false,
+      "existingAttemptId": "",
+      "completedAttemptsCount": 2,
+      "canAttempt": true,
+      "timeStatus": "available",
+      "reason": "Ready to attempt"
+    },
+    "tabSwitches": {
+      "count": 0
+    }
+  }
+}
+```
+
+#### Response Fields
+
+| Field | Type | Description |
+|--------|------|-------------|
+| quiz.id | string | Quiz unique identifier |
+| quiz.title | string | Quiz title |
+| quiz.description | string | Quiz description |
+| quiz.timeLimit | number | Time limit in minutes (null = unlimited) |
+| quiz.difficulty | string | EASY, MEDIUM, or HARD |
+| quiz.startTime | string | ISO 8601 - Quiz availability start |
+| quiz.endTime | string | ISO 8601 - Quiz availability end |
+| quiz.maxAttempts | number | Maximum allowed attempts (null = unlimited) |
+| quiz.showAnswers | boolean | Show detailed answers after submission |
+| quiz.checkAnswerEnabled | boolean | Real-time answer checking enabled |
+| quiz.negativeMarking | boolean | Negative marking applied for wrong answers |
+| quiz.negativePoints | number | Points to deduct per wrong answer |
+| quiz.randomOrder | boolean | Questions are shuffled if true |
+| quiz.questionCount | number | Total questions in quiz |
+| enrollment.isEnrolled | boolean | User is enrolled in this quiz |
+| attempt.hasExistingAttempt | boolean | In-progress attempt exists |
+| attempt.existingAttemptId | string | ID of existing attempt or empty string |
+| attempt.completedAttemptsCount | number | Number of completed attempts |
+| attempt.canAttempt | boolean | Whether user can start the quiz |
+| attempt.timeStatus | string | available, not_started, or expired |
+| attempt.reason | string | Explanation of canAttempt status |
+| tabSwitches.count | number | Tab switches for existing attempt |
+
+#### Use Cases
+
+1. **Pre-quiz validation**: Check if user can attempt quiz before loading questions
+2. **Time window checks**: Display countdown until quiz becomes available
+3. **Attempt limits**: Show remaining attempts to user
+4. **Resume detection**: Check if there's an in-progress attempt to resume
+
+---
+
+### 3.3 Get Quiz Details (Take Quiz)
 
 **Endpoint:** `GET /api/mobile/quiz/:id`
 
@@ -281,6 +378,7 @@ Authorization: Bearer <jwt_token>
 | quiz.checkAnswerEnabled | boolean | Real-time answer checking enabled |
 | quiz.negativeMarking | boolean | Negative marking applied for wrong answers |
 | quiz.negativePoints | number | Points to deduct per wrong answer |
+| quiz.randomOrder | boolean | Questions shuffled if enabled |
 | quiz.questions[] | array | Array of question objects |
 | timeRemaining | number | Seconds remaining in quiz |
 | startedAt | string | ISO 8601 - Attempt start time |
@@ -288,7 +386,7 @@ Authorization: Bearer <jwt_token>
 
 ---
 
-### 3.3 Save Quiz Answers
+### 3.4 Save Quiz Answers
 
 **Endpoint:** `POST /api/mobile/quiz/:id/save`
 
@@ -339,7 +437,7 @@ Content-Type: application/json
 
 ---
 
-### 3.4 Submit Quiz
+### 3.5 Submit Quiz
 
 **Endpoint:** `POST /api/mobile/quiz/:id/submit`
 
@@ -389,7 +487,7 @@ Content-Type: application/json
 
 ---
 
-### 3.5 Get Quiz Results
+### 3.6 Get Quiz Results
 
 **Endpoint:** `GET /api/mobile/quiz/:id/result?attemptId={attemptId}`
 
@@ -535,7 +633,7 @@ If `showAnswers` is `false`, response only includes summary:
 
 ---
 
-### 3.6 Get Quiz History
+### 3.7 Get Quiz History
 
 **Endpoint:** `GET /api/mobile/quiz/:id/history`
 
@@ -611,6 +709,149 @@ Authorization: Bearer <jwt_token>
     ]
   }
 }
+```
+
+---
+
+### 3.8 Track Tab Switch
+
+**Endpoint:** `POST /api/mobile/quiz/:id/tab-switch`
+
+**Description:** Records a tab switch event during quiz attempt. Tracks user tab switches and enforces maximum limit. When max tabs reached, quiz should be auto-submitted.
+
+#### Request
+
+**Headers:**
+```
+Authorization: Bearer <jwt_token>
+Content-Type: application/json
+```
+
+**Body:**
+```json
+{
+  "attemptId": "cl7xxxxxxxxxxxxxxxxxx"
+}
+```
+
+#### Success Response (200 OK)
+
+```json
+{
+  "success": true,
+  "message": "Tab switch recorded",
+  "data": {
+    "currentSwitches": 1,
+    "maxSwitches": 3,
+    "switchesRemaining": 2,
+    "shouldAutoSubmit": false,
+    "recordedAt": "2024-01-15T14:15:30.000Z"
+  }
+}
+```
+
+#### Max Limit Reached Response (400 Bad Request)
+
+```json
+{
+  "success": false,
+  "message": "Maximum tab switches reached",
+  "data": {
+    "currentSwitches": 3,
+    "maxSwitches": 3,
+    "shouldAutoSubmit": true
+  }
+}
+```
+
+#### Response Fields
+
+| Field | Type | Description |
+|--------|------|-------------|
+| currentSwitches | number | Current count of tab switches |
+| maxSwitches | number | Maximum allowed tab switches (default: 3) |
+| switchesRemaining | number | Remaining tab switches allowed |
+| shouldAutoSubmit | boolean | Auto-submit quiz when true |
+| recordedAt | string | ISO 8601 timestamp of tab switch |
+
+#### Get Tab Switch History
+
+**Endpoint:** `GET /api/mobile/quiz/:id/tab-switch?attemptId={attemptId}`
+
+**Description:** Retrieves tab switch history for an attempt.
+
+#### Success Response (200 OK)
+
+```json
+{
+  "success": true,
+  "data": {
+    "attemptId": "cl7xxxxxxxxxxxxxxxxxx",
+    "quizId": "cl7xxxxxxxxxxxxxxxxxx",
+    "currentSwitches": 2,
+    "maxSwitches": 3,
+    "switchesRemaining": 1,
+    "shouldAutoSubmit": false,
+    "tabSwitches": [
+      {
+        "id": "cl7xxxxxxxxxxxxxxxxxx",
+        "timestamp": "2024-01-15T14:05:00.000Z"
+      },
+      {
+        "id": "cl7xxxxxxxxxxxxxxxxxx",
+        "timestamp": "2024-01-15T14:10:30.000Z"
+      }
+    ]
+  }
+}
+```
+
+#### Implementation Guidelines
+
+1. **Detect tab switches**: Use visibility API or focus/blur events
+2. **Throttle recording**: Don't record rapid switches (debounce for 2-3 seconds)
+3. **Warn user**: Show warning when approaching limit (e.g., 1 remaining)
+4. **Auto-submit**: When `shouldAutoSubmit` is true, submit quiz immediately
+5. **Display count**: Show tab switch count to user during quiz
+
+#### Example Implementation
+
+```typescript
+// Track tab visibility changes
+let lastSwitchTime = 0;
+const SWITCH_DEBOUNCE = 2000; // 2 seconds
+
+document.addEventListener('visibilitychange', async () => {
+  if (document.visibilityState === 'hidden') {
+    const now = Date.now();
+    
+    // Debounce rapid switches
+    if (now - lastSwitchTime > SWITCH_DEBOUNCE) {
+      lastSwitchTime = now;
+      
+      const response = await fetch(`/api/mobile/quiz/${quizId}/tab-switch`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          attemptId: currentAttemptId
+        })
+      });
+      
+      const result = await response.json();
+      
+      if (result.data?.shouldAutoSubmit) {
+        // Auto-submit quiz
+        await submitQuiz();
+      } else if (result.data?.switchesRemaining <= 1) {
+        // Show warning
+        showWarning(`Only ${result.data.switchesRemaining} tab switch(es) remaining!`);
+      }
+    }
+  }
+});
 ```
 
 ---
@@ -912,6 +1153,7 @@ isCorrect = (userAnswer.toLowerCase().trim() === correctAnswer.toLowerCase().tri
 |----------|------|-------------|----------|
 | `timeLimit` | number (minutes) | Maximum time allowed for quiz | null (unlimited) |
 | `maxAttempts` | number | Maximum attempts per user | null (unlimited) |
+| `maxTabs` | number | Maximum tab switches allowed during quiz | 3 |
 | `showAnswers` | boolean | Show detailed answers after submission | false |
 | `checkAnswerEnabled` | boolean | Allow real-time answer checking | false |
 | `negativeMarking` | boolean | Deduct points for wrong answers | false |
@@ -975,6 +1217,16 @@ isCorrect = (userAnswer.toLowerCase().trim() === correctAnswer.toLowerCase().tri
 - **false**: Questions returned in database order
 - **true**: Questions shuffled server-side
 - **Note**: Question `order` field indicates display position
+
+#### maxTabs
+
+- **3**: Default maximum tab switches allowed
+- **0**: Unlimited tab switches (disabled)
+- **Enforcement**:
+  - Track tab switches via visibility API or focus/blur events
+  - Server returns `shouldAutoSubmit: true` when limit reached
+  - Mobile app should auto-submit quiz when limit reached
+  - Debounce rapid switches (recommended: 2-3 seconds)
 
 ---
 
@@ -1102,28 +1354,37 @@ All errors follow this structure:
    → Display available quizzes
    → Show attempt status
 
-3. Start Quiz
+3. Get Quiz Metadata (Optional)
+   GET /api/mobile/quiz/:id/metadata
+   → Check enrollment status
+   → Verify time constraints
+   → Check attempt limits
+   → Check for in-progress attempt
+
+4. Start Quiz
    GET /api/mobile/quiz/:id
    → Save attemptId
    → Cache questions locally
    → Start countdown timer
 
-4. Take Quiz
+5. Take Quiz
    → Display questions
+   → Track tab switches:
+      POST /api/mobile/quiz/:id/tab-switch
    → Auto-save every 2 minutes:
       POST /api/mobile/quiz/:id/save
    → Update timer
 
-5. Submit Quiz
+6. Submit Quiz
    POST /api/mobile/quiz/:id/submit
    → Display score immediately
 
-6. View Results
+7. View Results
    GET /api/mobile/quiz/:id/result?attemptId=xxx
    → Show question breakdown
    → Display explanations
 
-7. View History
+8. View History
    GET /api/mobile/quiz/:id/history
    → Show all attempts
    → Compare performance
@@ -1186,15 +1447,18 @@ const timer = setInterval(() => {
 | `/api/mobile/profile` | GET | Get user profile & stats |
 | `/api/mobile/profile` | PUT | Update user profile |
 | `/api/mobile/quiz` | GET | List assigned quizzes |
+| `/api/mobile/quiz/:id/metadata` | GET | Get quiz metadata (before starting) |
 | `/api/mobile/quiz/:id` | GET | Start/resume quiz |
 | `/api/mobile/quiz/:id/save` | POST | Save quiz answers |
 | `/api/mobile/quiz/:id/submit` | POST | Submit quiz |
 | `/api/mobile/quiz/:id/result` | GET | View quiz results |
 | `/api/mobile/quiz/:id/history` | GET | View attempt history |
+| `/api/mobile/quiz/:id/tab-switch` | POST | Record tab switch |
+| `/api/mobile/quiz/:id/tab-switch` | GET | Get tab switch history |
 
 ---
 
-**Document Version:** 2.0.0
-**Last Updated:** 2024-01-20
+**Document Version:** 2.1.0
+**Last Updated:** 2025-01-20
 **Platform:** Atom Q v4
 **Compatibility:** iOS 12+, Android 8+

@@ -269,6 +269,7 @@ function getSingleCorrectAnswerText(answer: any, options: Option[]): string {
 
 /**
  * Check if the user's answer is correct
+ * Handles all question types and various answer formats
  */
 function isAnswerCorrect(
   question: Question,
@@ -280,9 +281,6 @@ function isAnswerCorrect(
   if (correctAnswer == null) return false;
 
   const options = normalizeOptions(question.options);
-  const parsedCorrectAnswer = parseCorrectAnswer(correctAnswer);
-
-  if (!parsedCorrectAnswer) return false;
 
   // Handle MULTI_SELECT questions
   if (question.type === "MULTI_SELECT") {
@@ -293,21 +291,41 @@ function isAnswerCorrect(
       userSelected = userAnswer.split("|").map((s) => s.trim()).filter(Boolean);
     }
 
-    const correctArray = Array.isArray(parsedCorrectAnswer)
-      ? parsedCorrectAnswer.map(String)
-      : [String(parsedCorrectAnswer)];
+    // Parse correct answer - can be JSON string or plain string
+    let correctArray: string[] = [];
+    if (typeof correctAnswer === "string") {
+      try {
+        const parsed = JSON.parse(correctAnswer);
+        correctArray = Array.isArray(parsed) ? parsed.map(String) : [String(parsed)];
+      } catch {
+        // Not JSON, treat as single value
+        correctArray = [String(correctAnswer)];
+      }
+    } else if (Array.isArray(correctAnswer)) {
+      correctArray = correctAnswer.map(String);
+    } else {
+      correctArray = [String(correctAnswer)];
+    }
 
-    // Convert user selection to option texts
-    const userTexts = userSelected
+    // Method 1: Compare by IDs (most reliable)
+    // Convert user selected texts to IDs
+    const userIds = userSelected
       .map((sel) => {
-        const opt = options.find((o) => o.id === sel || o.text === sel);
-        return opt?.text || sel;
+        const opt = options.find((o) => o.text === sel);
+        return opt?.id;
       })
-      .filter(Boolean)
-      .sort();
+      .filter(Boolean);
 
-    // Convert correct answers to option texts
-    const correctTexts = correctArray
+    const sortedUserIds = [...userIds].sort();
+    const sortedCorrectIds = [...correctArray].sort();
+
+    const idsMatch = JSON.stringify(sortedUserIds) === JSON.stringify(sortedCorrectIds);
+
+    if (idsMatch) return true;
+
+    // Method 2: Compare by texts (fallback when IDs don't match)
+    const sortedUserTexts = [...userSelected].sort();
+    const sortedCorrectTexts = correctArray
       .map((corr) => {
         const opt = options.find((o) => o.id === corr || o.text === corr);
         return opt?.text || corr;
@@ -315,40 +333,94 @@ function isAnswerCorrect(
       .filter(Boolean)
       .sort();
 
-    // Compare arrays as JSON strings for deep equality
-    return JSON.stringify(userTexts) === JSON.stringify(correctTexts);
+    return JSON.stringify(sortedUserTexts) === JSON.stringify(sortedCorrectTexts);
   }
 
   // Handle FILL_IN_BLANK questions
   if (question.type === "FILL_IN_BLANK") {
-    const correct = Array.isArray(parsedCorrectAnswer)
-      ? parsedCorrectAnswer[0]
-      : parsedCorrectAnswer;
-    const correctStr = String(correct || "").trim().toLowerCase();
+    // Parse correct answer - can be JSON string or plain string
+    let correctStr: string;
+    if (typeof correctAnswer === "string") {
+      try {
+        const parsed = JSON.parse(correctAnswer);
+        correctStr = Array.isArray(parsed) ? parsed[0] : parsed;
+      } catch {
+        correctStr = correctAnswer;
+      }
+    } else if (Array.isArray(correctAnswer)) {
+      correctStr = correctAnswer[0];
+    } else {
+      correctStr = String(correctAnswer);
+    }
+
+    const correctLower = correctStr.trim().toLowerCase();
     const userStr = userAnswer.trim().toLowerCase();
-    return userStr === correctStr;
+    return userStr === correctLower;
   }
 
   // Handle TRUE_FALSE questions
   if (question.type === "TRUE_FALSE") {
-    const correctStr = String(parsedCorrectAnswer).toLowerCase();
+    let correctStr: string;
+    if (typeof correctAnswer === "string") {
+      try {
+        const parsed = JSON.parse(correctAnswer);
+        correctStr = String(parsed);
+      } catch {
+        correctStr = correctAnswer;
+      }
+    } else if (Array.isArray(correctAnswer)) {
+      correctStr = correctAnswer[0];
+    } else {
+      correctStr = String(correctAnswer);
+    }
+
+    const correctLower = correctStr.trim().toLowerCase();
     const userStr = userAnswer.trim().toLowerCase();
 
-    // Normalize to "true" or "false"
-    const normalizedCorrect = correctStr === "true" ? "true" : "false";
+    // Normalize both to "true" or "false"
+    const normalizedCorrect = correctLower === "true" ? "true" : "false";
     const normalizedUser = userStr === "true" ? "true" : "false";
 
     return normalizedUser === normalizedCorrect;
   }
 
   // Handle MULTIPLE_CHOICE questions
-  const correctText = getSingleCorrectAnswerText(parsedCorrectAnswer, options);
-  const userOption = options.find(
-    (opt) => opt.id === userAnswer || opt.text === userAnswer
-  );
-  const userText = userOption?.text || userAnswer;
+  // For single choice, we compare either by ID or text, depending on what the correctAnswer contains
 
-  return userText.toLowerCase() === correctText.toLowerCase();
+  let correctIdOrText: string;
+  if (typeof correctAnswer === "string") {
+    try {
+      const parsed = JSON.parse(correctAnswer);
+      correctIdOrText = Array.isArray(parsed) ? parsed[0] : parsed;
+    } catch {
+      correctIdOrText = correctAnswer;
+    }
+  } else if (Array.isArray(correctAnswer)) {
+    correctIdOrText = correctAnswer[0];
+  } else {
+    correctIdOrText = String(correctAnswer);
+  }
+
+  // Try matching by ID first (most reliable)
+  const userOptionById = options.find(
+    (opt) => opt.id === userAnswer
+  );
+
+  if (userOptionById) {
+    return userOptionById.id === correctIdOrText;
+  }
+
+  // Fallback: Try matching by text
+  const userOptionByText = options.find(
+    (opt) => opt.text === userAnswer
+  );
+
+  if (userOptionByText) {
+    return userOptionByText.text.toLowerCase() === correctIdOrText.toLowerCase();
+  }
+
+  // Final fallback: Direct comparison
+  return userAnswer.toLowerCase().trim() === correctIdOrText.toLowerCase().trim();
 }
 
 /**
@@ -391,9 +463,43 @@ function prepareAnswersForSubmit(
 
       result[qId] = JSON.stringify(selectedIds);
     } else if (q.type === "TRUE_FALSE") {
-      // For true/false, normalize to "true" or "false"
+      // For true/false, normalize to "true" or "false" based on what the backend expects
       const normalized = answer.trim().toLowerCase();
-      result[qId] = normalized === "true" ? "true" : "false";
+
+      // Check if correctAnswer is stored as "true"/"false" or as an ID like "A"/"B"
+      // If the question has "True" and "False" text options, submit as "true"/"false"
+      const trueOption = options.find((o) => o.text.toLowerCase() === "true");
+      const falseOption = options.find((o) => o.text.toLowerCase() === "false");
+
+      if (trueOption && falseOption) {
+        // Question has True/False text options
+        result[qId] = normalized === "true" ? "true" : "false";
+      } else {
+        // Question uses IDs like "A" for True, "B" for False
+        // Check what the correctAnswer looks like
+        let correctValue: string;
+        if (typeof q.correctAnswer === "string") {
+          try {
+            const parsed = JSON.parse(q.correctAnswer);
+            correctValue = Array.isArray(parsed) ? parsed[0] : parsed;
+          } catch {
+            correctValue = q.correctAnswer;
+          }
+        } else if (Array.isArray(q.correctAnswer)) {
+          correctValue = q.correctAnswer[0];
+        } else {
+          correctValue = String(q.correctAnswer);
+        }
+
+        // If correctAnswer is "true" or "false", submit as such
+        if (correctValue === "true" || correctValue === "false") {
+          result[qId] = normalized === "true" ? "true" : "false";
+        } else {
+          // Otherwise submit the selected option's ID
+          const selectedOpt = options.find((o) => o.text === answer || o.id === answer);
+          result[qId] = selectedOpt?.id || answer;
+        }
+      }
     } else {
       // For multiple choice, submit the option ID
       const opt = options.find((o) => o.text === answer || o.id === answer);
