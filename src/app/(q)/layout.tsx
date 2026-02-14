@@ -19,10 +19,42 @@ export const metadata: Metadata = {
   },
 }
 
+function ThemeScript() {
+  return (
+    <script
+      dangerouslySetInnerHTML={{
+        __html: `
+          (function() {
+            try {
+              const savedTheme = localStorage.getItem('theme');
+              const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+              
+              if (savedTheme === 'dark' || (!savedTheme && systemTheme === 'dark')) {
+                document.documentElement.classList.add('dark');
+                document.documentElement.style.colorScheme = 'dark';
+              } else {
+                document.documentElement.classList.remove('dark');
+                document.documentElement.style.colorScheme = 'light';
+              }
+            } catch (e) {
+              console.error('Theme initialization failed:', e);
+            }
+          })();
+        `,
+      }}
+    />
+  )
+}
+
 export default function QLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  return <ClientLayout>{children}</ClientLayout>
+  return (
+    <>
+      <ThemeScript />
+      <ClientLayout>{children}</ClientLayout>
+    </>
+  )
 }

@@ -54,7 +54,8 @@ import {
   ArrowUpDown,
   Loader2,
   Key,
-  Copy
+  Copy,
+  CheckCircle2 as CheckCircle,
 } from "lucide-react"
 import { toasts } from "@/lib/toasts"
 import { DifficultyLevel, QuizStatus } from "@prisma/client"
@@ -64,6 +65,12 @@ import { ColumnDef } from "@tanstack/react-table"
 import HexagonLoader from "@/components/Loader/Loading"
 import { LoadingButton } from "@/components/ui/laodaing-button"
 import { DateTimePicker } from "@/components/ui/datetime-picker"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 
 // Helper function to generate a 6-digit alphanumeric access key (format: 1a-2b-3c)
 const generateAccessKey = () => {
@@ -163,6 +170,26 @@ export default function AssessmentsPage() {
   const [deleteConfirmation, setDeleteConfirmation] = useState("")
   const [submitLoading, setSubmitLoading] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState<string | null>(null)
+
+  // Deletion tracking state
+  const [deleteInfo, setDeleteInfo] = useState<{
+    assessment: { id: string; title: string }
+    counts: {
+      questions: number
+      users: number
+      attempts: number
+      tabSwitches: number
+    }
+  } | null>(null)
+  const [deletionStatus, setDeletionStatus] = useState<{
+    submissions: 'pending' | 'deleting' | 'deleted'
+    users: 'pending' | 'deleting' | 'deleted'
+    questions: 'pending' | 'deleting' | 'deleted'
+  }>({
+    submissions: 'pending',
+    users: 'pending',
+    questions: 'pending'
+  })
 
   // Separate form states for create and edit
   const [createFormData, setCreateFormData] = useState<CreateFormData>({
@@ -488,8 +515,32 @@ export default function AssessmentsPage() {
   }
 
   const handleDeleteAssessment = async (assessmentId: string) => {
-    if (deleteConfirmation !== "CONFIRM DELETE") {
+    if (!assessmentToDelete || deleteConfirmation !== "CONFIRM DELETE") {
       toasts.error('Please type "CONFIRM DELETE" to confirm deletion')
+      return
+    }
+
+    // Check if all steps are completed in correct order
+    const hasAttempts = (deleteInfo?.counts.attempts || 0) > 0
+    const hasTabSwitches = (deleteInfo?.counts.tabSwitches || 0) > 0
+    const hasQuestions = (deleteInfo?.counts.questions || 0) > 0
+    const hasUsers = (deleteInfo?.counts.users || 0) > 0
+
+    // Check submissions step (attempts and tab switches)
+    if ((hasAttempts || hasTabSwitches) && deletionStatus.submissions !== 'deleted') {
+      toasts.error('Please delete assessment submissions first')
+      return
+    }
+
+    // Check users step
+    if (hasUsers && deletionStatus.users !== 'deleted') {
+      toasts.error('Please unenroll users first')
+      return
+    }
+
+    // Check questions step
+    if (hasQuestions && deletionStatus.questions !== 'deleted') {
+      toasts.error('Please unenroll questions first')
       return
     }
 
@@ -500,16 +551,19 @@ export default function AssessmentsPage() {
       })
 
       if (response.ok) {
-        const assessment = assessments.find(a => a.id === assessmentId)
-        toasts.success(`${assessment?.title || "Assessment"} deleted successfully`)
+        toasts.success(`${assessmentToDelete?.title || "Assessment"} deleted successfully`)
         setAssessments(assessments.filter(assessment => assessment.id !== assessmentId))
         setIsDeleteDialogOpen(false)
         setAssessmentToDelete(null)
+        setDeleteInfo(null)
         setDeleteConfirmation("")
+        setDeletionStatus({ submissions: 'pending', users: 'pending', questions: 'pending' })
       } else {
-        toasts.actionFailed("Assessment deletion")
+        const error = await response.json()
+        toasts.error(error.message || "Assessment deletion failed")
       }
     } catch (error) {
+      console.error("Error deleting assessment:", error)
       toasts.actionFailed("Assessment deletion")
     } finally {
       setDeleteLoading(null)
@@ -549,10 +603,130 @@ export default function AssessmentsPage() {
     setIsEditDialogOpen(true)
   }
 
-  const openDeleteDialog = (assessment: Assessment) => {
+  const openDeleteDialog = async (assessment: Assessment) => {
     setAssessmentToDelete(assessment)
     setDeleteConfirmation("")
+    setDeletionStatus({ submissions: 'pending', users: 'pending', questions: 'pending' })
     setIsDeleteDialogOpen(true)
+
+    // Fetch detailed deletion info
+    try {
+      const response = await fetch(`/api/admin/assessments/${assessment.id}/delete-info`)
+      if (response.ok) {
+        const data = await response.json()
+        setDeleteInfo(data)
+      }
+    } catch (error) {
+      console.error("Error fetching delete info:", error)
+      toasts.error("Failed to fetch assessment data")
+    }
+  }
+
+  const handleDeleteSubmissions = async () => {
+    if (!assessmentToDelete) return
+
+    try {
+      setDeletionStatus(prev => ({ ...prev, submissions: 'deleting' }))
+      const response = await fetch(`/api/admin/assessments/${assessmentToDelete.id}/delete-submissions`, {
+        method: 'DELETE'
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        toasts.success(`${data.count.attempts || 0} submission(s) and ${data.count.tabSwitches || 0} tab switch(es) deleted successfully`)
+        setDeletionStatus(prev => ({ ...prev, submissions: 'deleted' }))
+
+        // Refresh delete info to update counts
+        const refreshResponse = await fetch(`/api/admin/assessments/${assessmentToDelete.id}/delete-info`)
+        if (refreshResponse.ok) {
+          const refreshData = await refreshResponse.json()
+          setDeleteInfo(refreshData)
+        }
+      } else {
+        toasts.actionFailed("Assessment submissions deletion")
+        setDeletionStatus(prev => ({ ...prev, submissions: 'pending' }))
+      }
+    } catch (error) {
+      console.error("Error deleting assessment submissions:", error)
+      toasts.actionFailed("Assessment submissions deletion")
+      setDeletionStatus(prev => ({ ...prev, submissions: 'pending' }))
+    }
+  }
+
+  const handleUnenrollUsers = async () => {
+    if (!assessmentToDelete) return
+
+    // Check if submissions deletion is needed first
+    const hasAttempts = (deleteInfo?.counts.attempts || 0) > 0
+    const hasTabSwitches = (deleteInfo?.counts.tabSwitches || 0) > 0
+    if ((hasAttempts || hasTabSwitches) && deletionStatus.submissions !== 'deleted') {
+      toasts.error('Please delete assessment submissions first')
+      return
+    }
+
+    try {
+      setDeletionStatus(prev => ({ ...prev, users: 'deleting' }))
+      const response = await fetch(`/api/admin/assessments/${assessmentToDelete.id}/unenroll-users`, {
+        method: 'DELETE'
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        toasts.success(`${data.count.users || 0} user(s) unenrolled successfully`)
+        setDeletionStatus(prev => ({ ...prev, users: 'deleted' }))
+
+        // Refresh delete info to update counts
+        const refreshResponse = await fetch(`/api/admin/assessments/${assessmentToDelete.id}/delete-info`)
+        if (refreshResponse.ok) {
+          const refreshData = await refreshResponse.json()
+          setDeleteInfo(refreshData)
+        }
+      } else {
+        toasts.actionFailed("User unenrollment")
+        setDeletionStatus(prev => ({ ...prev, users: 'pending' }))
+      }
+    } catch (error) {
+      console.error("Error unenrolling users:", error)
+      toasts.actionFailed("User unenrollment")
+      setDeletionStatus(prev => ({ ...prev, users: 'pending' }))
+    }
+  }
+
+  const handleUnenrollQuestions = async () => {
+    if (!assessmentToDelete) return
+
+    // Check if users unenrollment is needed first
+    if ((deleteInfo?.counts.users || 0) > 0 && deletionStatus.users !== 'deleted') {
+      toasts.error('Please unenroll users first')
+      return
+    }
+
+    try {
+      setDeletionStatus(prev => ({ ...prev, questions: 'deleting' }))
+      const response = await fetch(`/api/admin/assessments/${assessmentToDelete.id}/unenroll-questions`, {
+        method: 'DELETE'
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        toasts.success(`${data.count.questions || 0} question(s) unenrolled successfully`)
+        setDeletionStatus(prev => ({ ...prev, questions: 'deleted' }))
+
+        // Refresh delete info to update counts
+        const refreshResponse = await fetch(`/api/admin/assessments/${assessmentToDelete.id}/delete-info`)
+        if (refreshResponse.ok) {
+          const refreshData = await refreshResponse.json()
+          setDeleteInfo(refreshData)
+        }
+      } else {
+        toasts.actionFailed("Question unenrollment")
+        setDeletionStatus(prev => ({ ...prev, questions: 'pending' }))
+      }
+    } catch (error) {
+      console.error("Error unenrolling questions:", error)
+      toasts.actionFailed("Question unenrollment")
+      setDeletionStatus(prev => ({ ...prev, questions: 'pending' }))
+    }
   }
 
   const resetCreateForm = () => {
@@ -1046,14 +1220,171 @@ export default function AssessmentsPage() {
 
       {/* Delete Assessment Dialog */}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <AlertDialogContent>
+        <AlertDialogContent className="max-w-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Assessment</AlertDialogTitle>
+            <AlertDialogTitle>Delete Assessment: {assessmentToDelete?.title}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{assessmentToDelete?.title}"? This action cannot be undone and will also delete all associated questions, enrollments, and submissions.
+              This action cannot be undone. Please delete all associated data before deleting assessment.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="mt-4 space-y-2">
+
+          <TooltipProvider>
+          <div className="mt-4 space-y-4">
+            {deleteInfo ? (
+              <div className="space-y-3">
+                {/* Step 1: Delete Submissions */}
+                {((deleteInfo.counts.attempts || 0) > 0 || (deleteInfo.counts.tabSwitches || 0) > 0) && (
+                  <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/30">
+                    <div className="flex items-center gap-3">
+                      <FileQuestion className="w-5 h-5 text-orange-600" />
+                      <div>
+                        <p className="font-medium">Submissions</p>
+                        <p className="text-sm text-muted-foreground">
+                          {deleteInfo.counts.attempts || 0} submission(s) + {deleteInfo.counts.tabSwitches || 0} tab switch(es)
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {deletionStatus.submissions === 'deleted' && (
+                        <CheckCircle className="w-5 h-5 text-green-600" />
+                      )}
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            onClick={handleDeleteSubmissions}
+                            disabled={deletionStatus.submissions === 'deleted' || deletionStatus.submissions === 'deleting'}
+                            variant={deletionStatus.submissions === 'deleted' ? 'outline' : 'destructive'}
+                            size="icon"
+                          >
+                            {deletionStatus.submissions === 'deleting' ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : deletionStatus.submissions === 'deleted' ? (
+                              <CheckCircle className="h-4 w-4" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {deletionStatus.submissions === 'deleted' ? 'Submissions deleted' : deletionStatus.submissions === 'deleting' ? 'Deleting...' : 'Delete submissions'}
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </div>
+                )}
+
+                {/* Step 2: Unenroll Users */}
+                {deleteInfo.counts.users > 0 && (
+                  <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/30">
+                    <div className="flex items-center gap-3">
+                      <Users className="w-5 h-5 text-purple-600" />
+                      <div>
+                        <p className="font-medium">Users</p>
+                        <p className="text-sm text-muted-foreground">
+                          {deleteInfo.counts.users} user{deleteInfo.counts.users !== 1 ? 's' : ''} enrolled
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {deletionStatus.users === 'deleted' && (
+                        <CheckCircle className="w-5 h-5 text-green-600" />
+                      )}
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            onClick={handleUnenrollUsers}
+                            disabled={
+                              deletionStatus.users === 'deleted' ||
+                              deletionStatus.users === 'deleting' ||
+                              (((deleteInfo.counts.attempts || 0) > 0 || (deleteInfo.counts.tabSwitches || 0) > 0) && deletionStatus.submissions !== 'deleted')
+                            }
+                            variant={deletionStatus.users === 'deleted' ? 'outline' : 'destructive'}
+                            size="icon"
+                          >
+                            {deletionStatus.users === 'deleting' ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : deletionStatus.users === 'deleted' ? (
+                              <CheckCircle className="h-4 w-4" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {deletionStatus.users === 'deleted' ? 'Users unenrolled' : deletionStatus.users === 'deleting' ? 'Unenrolling...' : 'Unenroll users'}
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </div>
+                )}
+
+                {/* Step 3: Unenroll Questions */}
+                {deleteInfo.counts.questions > 0 && (
+                  <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/30">
+                    <div className="flex items-center gap-3">
+                      <FileQuestion className="w-5 h-5 text-blue-600" />
+                      <div>
+                        <p className="font-medium">Questions</p>
+                        <p className="text-sm text-muted-foreground">
+                          {deleteInfo.counts.questions} question{deleteInfo.counts.questions !== 1 ? 's' : ''} enrolled
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {deletionStatus.questions === 'deleted' && (
+                        <CheckCircle className="w-5 h-5 text-green-600" />
+                      )}
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            onClick={handleUnenrollQuestions}
+                            disabled={
+                              deletionStatus.questions === 'deleted' ||
+                              deletionStatus.questions === 'deleting' ||
+                              ((deleteInfo?.counts.users || 0) > 0 && deletionStatus.users !== 'deleted')
+                            }
+                            variant={deletionStatus.questions === 'deleted' ? 'outline' : 'destructive'}
+                            size="icon"
+                          >
+                            {deletionStatus.questions === 'deleting' ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : deletionStatus.questions === 'deleted' ? (
+                              <CheckCircle className="h-4 w-4" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {deletionStatus.questions === 'deleted' ? 'Questions unenrolled' : deletionStatus.questions === 'deleting' ? 'Unenrolling...' : 'Unenroll questions'}
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </div>
+                )}
+
+                {/* Empty State - Ready to delete */}
+                {deleteInfo.counts.questions === 0 &&
+                 deleteInfo.counts.users === 0 &&
+                 deleteInfo.counts.attempts === 0 &&
+                 deleteInfo.counts.tabSwitches === 0 && (
+                  <div className="p-4 border rounded-lg bg-green-50 border-green-200">
+                    <p className="text-green-800 text-sm font-medium">
+                      ✓ All critical data removed. Ready to delete assessment.
+                    </p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center justify-center p-8">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            )}
+          </div>
+          </TooltipProvider>
+
+          {/* Final Confirmation Input */}
+          <div className="mt-4 pt-4 border-t space-y-2">
             <Label htmlFor="delete-confirmation">
               <span className="font-semibold text-destructive">CONFIRM DELETE</span> to proceed:
             </Label>
@@ -1066,22 +1397,34 @@ export default function AssessmentsPage() {
               className="uppercase"
             />
           </div>
+
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => {
               setIsDeleteDialogOpen(false)
               setAssessmentToDelete(null)
+              setDeleteInfo(null)
               setDeleteConfirmation("")
+              setDeletionStatus({ submissions: 'pending', users: 'pending', questions: 'pending' })
             }}>
               Cancel
             </AlertDialogCancel>
-            <LoadingButton
+            <AlertDialogAction
               onClick={() => assessmentToDelete && handleDeleteAssessment(assessmentToDelete.id)}
-              isLoading={deleteLoading === assessmentToDelete?.id}
-              variant="destructive"
-              disabled={deleteConfirmation !== "CONFIRM DELETE"}
+              className="bg-red-600 hover:bg-red-700"
+              disabled={
+                deleteLoading !== null ||
+                deleteConfirmation !== "CONFIRM DELETE"
+              }
             >
-              Delete
-            </LoadingButton>
+              {deleteLoading === assessmentToDelete?.id ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete Assessment"
+              )}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

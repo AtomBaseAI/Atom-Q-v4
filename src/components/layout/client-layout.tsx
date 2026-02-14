@@ -23,6 +23,8 @@ export default function ClientLayout({
         defaultTheme="system"
         enableSystem
         disableTransitionOnChange
+        enableColorScheme
+        suppressHydrationWarning
       >
         <AccentColorProvider>
           <SettingsProvider>
