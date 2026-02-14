@@ -34,6 +34,12 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
+import {
   MoreHorizontal,
   Plus,
   Download,
@@ -43,7 +49,10 @@ import {
   Eye,
   TriangleAlert,
   ArrowUpDown,
-  Loader2
+  Loader2,
+  FileQuestion,
+  BookOpen,
+  CheckCircle2 as CheckCircle,
 } from "lucide-react"
 import { toasts } from "@/lib/toasts"
 import { DataTable } from "@/components/ui/data-table"
@@ -100,6 +109,26 @@ export default function QuestionGroupsPage() {
     name: "",
     description: "",
     isActive: true,
+  })
+
+  // Deletion tracking state
+  const [deleteInfo, setDeleteInfo] = useState<{
+    questionGroup: { id: string; name: string }
+    counts: {
+      questions: number
+      quizQuestions: number
+      assessmentQuestions: number
+      reportedQuestions: number
+      quizzes: number
+      assessments: number
+    }
+  } | null>(null)
+  const [deletionStatus, setDeletionStatus] = useState<{
+    unassign: 'pending' | 'deleting' | 'deleted'
+    questions: 'pending' | 'deleting' | 'deleted'
+  }>({
+    unassign: 'pending',
+    questions: 'pending'
   })
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -273,8 +302,24 @@ export default function QuestionGroupsPage() {
   }
 
   const handleDeleteGroup = async (groupId: string) => {
-    if (deleteConfirmation !== "CONFIRM DELETE") {
+    if (!groupToDelete || deleteConfirmation !== "CONFIRM DELETE") {
       toasts.error('Please type "CONFIRM DELETE" to confirm deletion')
+      return
+    }
+
+    // Check if all steps are completed in the correct order
+    const hasAssignments = (deleteInfo?.counts.quizQuestions || 0) > 0 || (deleteInfo?.counts.assessmentQuestions || 0) > 0
+    const hasQuestions = (deleteInfo?.counts.questions || 0) > 0
+
+    // Check unassign step if needed
+    if (hasAssignments && deletionStatus.unassign !== 'deleted') {
+      toasts.error('Please unassign questions from quizzes and assessments first')
+      return
+    }
+
+    // Check questions step
+    if (hasQuestions && deletionStatus.questions !== 'deleted') {
+      toasts.error('Please delete all questions first')
       return
     }
 
@@ -285,16 +330,19 @@ export default function QuestionGroupsPage() {
       })
 
       if (response.ok) {
-        const group = questionGroups.find(g => g.id === groupId)
-        toasts.success(`${group?.name || "Question group"} deleted successfully`)
+        toasts.success(`${groupToDelete?.name || "Question group"} deleted successfully`)
         setQuestionGroups(questionGroups.filter(group => group.id !== groupId))
         setIsDeleteDialogOpen(false)
         setGroupToDelete(null)
+        setDeleteInfo(null)
         setDeleteConfirmation("")
+        setDeletionStatus({ unassign: 'pending', questions: 'pending' })
       } else {
-        toasts.actionFailed("Question group deletion")
+        const error = await response.json()
+        toasts.error(error.message || "Question group deletion failed")
       }
     } catch (error) {
+      console.error("Error deleting question group:", error)
       toasts.actionFailed("Question group deletion")
     } finally {
       setDeleteLoading(null)
@@ -311,10 +359,92 @@ export default function QuestionGroupsPage() {
     setIsEditDialogOpen(true)
   }
 
-  const openDeleteDialog = (group: QuestionGroup) => {
+  const openDeleteDialog = async (group: QuestionGroup) => {
     setGroupToDelete(group)
     setDeleteConfirmation("")
+    setDeletionStatus({ unassign: 'pending', questions: 'pending' })
     setIsDeleteDialogOpen(true)
+
+    // Fetch detailed deletion info
+    try {
+      const response = await fetch(`/api/admin/question-groups/${group.id}/delete-info`)
+      if (response.ok) {
+        const data = await response.json()
+        setDeleteInfo(data)
+      }
+    } catch (error) {
+      console.error("Error fetching delete info:", error)
+      toasts.error("Failed to fetch question group data")
+    }
+  }
+
+  const handleUnassignQuestions = async () => {
+    if (!groupToDelete) return
+
+    try {
+      setDeletionStatus(prev => ({ ...prev, unassign: 'deleting' }))
+      const response = await fetch(`/api/admin/question-groups/${groupToDelete.id}/unassign-questions`, {
+        method: 'DELETE'
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        toasts.success(`Questions unassigned from ${data.count.quizQuestions || 0} quiz(es) and ${data.count.assessmentQuestions || 0} assessment(s)`)
+        setDeletionStatus(prev => ({ ...prev, unassign: 'deleted' }))
+
+        // Refresh delete info to update counts
+        const refreshResponse = await fetch(`/api/admin/question-groups/${groupToDelete.id}/delete-info`)
+        if (refreshResponse.ok) {
+          const refreshData = await refreshResponse.json()
+          setDeleteInfo(refreshData)
+        }
+      } else {
+        toasts.actionFailed("Question unassignment")
+        setDeletionStatus(prev => ({ ...prev, unassign: 'pending' }))
+      }
+    } catch (error) {
+      console.error("Error unassigning questions:", error)
+      toasts.actionFailed("Question unassignment")
+      setDeletionStatus(prev => ({ ...prev, unassign: 'pending' }))
+    }
+  }
+
+  const handleDeleteQuestions = async () => {
+    if (!groupToDelete) return
+
+    // Check if unassign is needed first
+    const hasAssignments = (deleteInfo?.counts.quizQuestions || 0) > 0 || (deleteInfo?.counts.assessmentQuestions || 0) > 0
+    if (hasAssignments && deletionStatus.unassign !== 'deleted') {
+      toasts.error('Please unassign questions from quizzes and assessments first')
+      return
+    }
+
+    try {
+      setDeletionStatus(prev => ({ ...prev, questions: 'deleting' }))
+      const response = await fetch(`/api/admin/question-groups/${groupToDelete.id}/delete-questions`, {
+        method: 'DELETE'
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        toasts.success(`${data.count.questions} question(s) and ${data.count.reportedQuestions || 0} reported question(s) deleted successfully`)
+        setDeletionStatus(prev => ({ ...prev, questions: 'deleted' }))
+
+        // Refresh delete info to update counts
+        const refreshResponse = await fetch(`/api/admin/question-groups/${groupToDelete.id}/delete-info`)
+        if (refreshResponse.ok) {
+          const refreshData = await refreshResponse.json()
+          setDeleteInfo(refreshData)
+        }
+      } else {
+        toasts.actionFailed("Question deletion")
+        setDeletionStatus(prev => ({ ...prev, questions: 'pending' }))
+      }
+    } catch (error) {
+      console.error("Error deleting questions:", error)
+      toasts.actionFailed("Question deletion")
+      setDeletionStatus(prev => ({ ...prev, questions: 'pending' }))
+    }
   }
 
   const resetForm = () => {
@@ -542,14 +672,133 @@ export default function QuestionGroupsPage() {
 
       {/* Delete Question Group Dialog */}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <AlertDialogContent>
+        <AlertDialogContent className="max-w-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Question Group</AlertDialogTitle>
+            <AlertDialogTitle>Delete Question Group: {groupToDelete?.name}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{groupToDelete?.name}"? This action cannot be undone and will also delete all questions in this group.
+              This action cannot be undone. Please delete all associated data before deleting the question group.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="mt-4 space-y-2">
+
+          <TooltipProvider>
+          <div className="mt-4 space-y-4">
+            {deleteInfo ? (
+              <div className="space-y-3">
+                {/* Step 1: Unassign Questions from Quizzes/Assessments */}
+                {((deleteInfo.counts.quizQuestions || 0) > 0 || (deleteInfo.counts.assessmentQuestions || 0) > 0) && (
+                  <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/30">
+                    <div className="flex items-center gap-3">
+                      <FileQuestion className="w-5 h-5 text-orange-600" />
+                      <div>
+                        <p className="font-medium">Quiz/Assessment Assignments</p>
+                        <p className="text-sm text-muted-foreground">
+                          {deleteInfo.counts.quizQuestions || 0} quiz question(s) + {deleteInfo.counts.assessmentQuestions || 0} assessment question(s)
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          in {deleteInfo.counts.quizzes || 0} quiz/zes and {deleteInfo.counts.assessments || 0} assessment(s)
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {deletionStatus.unassign === 'deleted' && (
+                        <CheckCircle className="w-5 h-5 text-green-600" />
+                      )}
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            onClick={handleUnassignQuestions}
+                            disabled={deletionStatus.unassign === 'deleted' || deletionStatus.unassign === 'deleting'}
+                            variant={deletionStatus.unassign === 'deleted' ? 'outline' : 'destructive'}
+                            size="icon"
+                          >
+                            {deletionStatus.unassign === 'deleting' ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : deletionStatus.unassign === 'deleted' ? (
+                              <CheckCircle className="h-4 w-4" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {deletionStatus.unassign === 'deleted' ? 'Questions unassigned' : deletionStatus.unassign === 'deleting' ? 'Unassigning...' : 'Unassign questions'}
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </div>
+                )}
+
+                {/* Step 2: Delete Questions */}
+                {deleteInfo.counts.questions > 0 && (
+                  <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/30">
+                    <div className="flex items-center gap-3">
+                      <BookOpen className="w-5 h-5 text-blue-600" />
+                      <div>
+                        <p className="font-medium">Questions</p>
+                        <p className="text-sm text-muted-foreground">
+                          {deleteInfo.counts.questions} question{deleteInfo.counts.questions !== 1 ? 's' : ''} in this group
+                        </p>
+                        {deleteInfo.counts.reportedQuestions > 0 && (
+                          <p className="text-xs text-yellow-600">
+                            Includes {deleteInfo.counts.reportedQuestions} reported question(s)
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {deletionStatus.questions === 'deleted' && (
+                        <CheckCircle className="w-5 h-5 text-green-600" />
+                      )}
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            onClick={handleDeleteQuestions}
+                            disabled={
+                              deletionStatus.questions === 'deleted' ||
+                              deletionStatus.questions === 'deleting' ||
+                              (((deleteInfo.counts.quizQuestions || 0) > 0 || (deleteInfo.counts.assessmentQuestions || 0) > 0) && deletionStatus.unassign !== 'deleted')
+                            }
+                            variant={deletionStatus.questions === 'deleted' ? 'outline' : 'destructive'}
+                            size="icon"
+                          >
+                            {deletionStatus.questions === 'deleting' ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : deletionStatus.questions === 'deleted' ? (
+                              <CheckCircle className="h-4 w-4" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {deletionStatus.questions === 'deleted' ? 'Questions deleted' : deletionStatus.questions === 'deleting' ? 'Deleting...' : 'Delete questions'}
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </div>
+                )}
+
+                {/* Empty State - Ready to delete */}
+                {deleteInfo.counts.questions === 0 &&
+                 (deleteInfo.counts.quizQuestions || 0) === 0 &&
+                 (deleteInfo.counts.assessmentQuestions || 0) === 0 && (
+                  <div className="p-4 border rounded-lg bg-green-50 border-green-200">
+                    <p className="text-green-800 text-sm font-medium">
+                      ✓ All critical data removed. Ready to delete question group.
+                    </p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center justify-center p-8">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            )}
+          </div>
+          </TooltipProvider>
+
+          {/* Final Confirmation Input */}
+          <div className="mt-4 pt-4 border-t space-y-2">
             <Label htmlFor="delete-confirmation">
               <span className="font-semibold text-destructive">CONFIRM DELETE</span> to proceed:
             </Label>
@@ -562,18 +811,24 @@ export default function QuestionGroupsPage() {
               className="uppercase"
             />
           </div>
+
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => {
               setIsDeleteDialogOpen(false)
               setGroupToDelete(null)
+              setDeleteInfo(null)
               setDeleteConfirmation("")
+              setDeletionStatus({ unassign: 'pending', questions: 'pending' })
             }}>
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={() => groupToDelete && handleDeleteGroup(groupToDelete.id)}
               className="bg-red-600 hover:bg-red-700"
-              disabled={deleteLoading === groupToDelete?.id || deleteConfirmation !== "CONFIRM DELETE"}
+              disabled={
+                deleteLoading !== null ||
+                deleteConfirmation !== "CONFIRM DELETE"
+              }
             >
               {deleteLoading === groupToDelete?.id ? (
                 <>

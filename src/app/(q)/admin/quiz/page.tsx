@@ -33,6 +33,12 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -51,7 +57,8 @@ import {
   Users,
   FileQuestion,
   ArrowUpDown,
-  Loader2
+  Loader2,
+  CheckCircle2 as CheckCircle,
 } from "lucide-react"
 import { toasts } from "@/lib/toasts"
 import { DifficultyLevel, QuizStatus } from "@prisma/client"
@@ -69,6 +76,17 @@ const formatDateDDMMYYYY = (dateString: string) => {
   const month = String(date.getMonth() + 1).padStart(2, '0')
   const year = date.getFullYear()
   return `${day}/${month}/${year}`
+}
+
+// Helper function to format dates and time in dd/mm/yyyy HH:mm format
+const formatDateTime = (dateString: string) => {
+  const date = new Date(dateString)
+  const day = String(date.getDate()).padStart(2, '0')
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const year = date.getFullYear()
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  return `${day}/${month}/${year} ${hours}:${minutes}`
 }
 
 interface Quiz {
@@ -135,6 +153,26 @@ export default function QuizzesPage() {
   const [deleteConfirmation, setDeleteConfirmation] = useState("")
   const [submitLoading, setSubmitLoading] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState<string | null>(null)
+
+  // Deletion tracking state
+  const [deleteInfo, setDeleteInfo] = useState<{
+    quiz: { id: string; title: string }
+    counts: {
+      questions: number
+      users: number
+      attempts: number
+      tabSwitches: number
+    }
+  } | null>(null)
+  const [deletionStatus, setDeletionStatus] = useState<{
+    data: 'pending' | 'deleting' | 'deleted'
+    questions: 'pending' | 'deleting' | 'deleted'
+    users: 'pending' | 'deleting' | 'deleted'
+  }>({
+    data: 'pending',
+    questions: 'pending',
+    users: 'pending'
+  })
 
   // Separate form states for create and edit
   const [createFormData, setCreateFormData] = useState<CreateFormData>({
@@ -246,7 +284,7 @@ export default function QuizzesPage() {
       header: "Start Date",
       cell: ({ row }) => {
         const startTime = row.getValue("startTime") as string
-        return startTime ? formatDateDDMMYYYY(startTime) : "Not set"
+        return startTime ? formatDateTime(startTime) : "Not set"
       },
     },
     {
@@ -254,7 +292,7 @@ export default function QuizzesPage() {
       header: "End Date",
       cell: ({ row }) => {
         const endTime = row.getValue("endTime") as string
-        return endTime ? formatDateDDMMYYYY(endTime) : "Not set"
+        return endTime ? formatDateTime(endTime) : "Not set"
       },
     },
     {
@@ -443,8 +481,32 @@ export default function QuizzesPage() {
   }
 
   const handleDeleteQuiz = async (quizId: string) => {
-    if (deleteConfirmation !== "CONFIRM DELETE") {
+    if (!quizToDelete || deleteConfirmation !== "CONFIRM DELETE") {
       toasts.error('Please type "CONFIRM DELETE" to confirm deletion')
+      return
+    }
+
+    // Check if all steps are completed in correct order
+    const hasAttempts = (deleteInfo?.counts.attempts || 0) > 0
+    const hasTabSwitches = (deleteInfo?.counts.tabSwitches || 0) > 0
+    const hasQuestions = (deleteInfo?.counts.questions || 0) > 0
+    const hasUsers = (deleteInfo?.counts.users || 0) > 0
+
+    // Check data step (attempts and tab switches)
+    if ((hasAttempts || hasTabSwitches) && deletionStatus.data !== 'deleted') {
+      toasts.error('Please delete quiz data first')
+      return
+    }
+
+    // Check questions step
+    if (hasQuestions && deletionStatus.questions !== 'deleted') {
+      toasts.error('Please unenroll questions first')
+      return
+    }
+
+    // Check users step
+    if (hasUsers && deletionStatus.users !== 'deleted') {
+      toasts.error('Please unenroll users first')
       return
     }
 
@@ -455,16 +517,19 @@ export default function QuizzesPage() {
       })
 
       if (response.ok) {
-        const quiz = quizzes.find(q => q.id === quizId)
-        toasts.quizDeleted(quiz?.title || "Quiz")
+        toasts.success(`${quizToDelete?.title || "Quiz"} deleted successfully`)
         setQuizzes(quizzes.filter(quiz => quiz.id !== quizId))
         setIsDeleteDialogOpen(false)
         setQuizToDelete(null)
+        setDeleteInfo(null)
         setDeleteConfirmation("")
+        setDeletionStatus({ data: 'pending', questions: 'pending', users: 'pending' })
       } else {
-        toasts.actionFailed("Quiz deletion")
+        const error = await response.json()
+        toasts.error(error.message || "Quiz deletion failed")
       }
     } catch (error) {
+      console.error("Error deleting quiz:", error)
       toasts.actionFailed("Quiz deletion")
     } finally {
       setDeleteLoading(null)
@@ -503,10 +568,130 @@ export default function QuizzesPage() {
     setIsEditDialogOpen(true)
   }
 
-  const openDeleteDialog = (quiz: Quiz) => {
+  const openDeleteDialog = async (quiz: Quiz) => {
     setQuizToDelete(quiz)
     setDeleteConfirmation("")
+    setDeletionStatus({ data: 'pending', questions: 'pending', users: 'pending' })
     setIsDeleteDialogOpen(true)
+
+    // Fetch detailed deletion info
+    try {
+      const response = await fetch(`/api/admin/quiz/${quiz.id}/delete-info`)
+      if (response.ok) {
+        const data = await response.json()
+        setDeleteInfo(data)
+      }
+    } catch (error) {
+      console.error("Error fetching delete info:", error)
+      toasts.error("Failed to fetch quiz data")
+    }
+  }
+
+  const handleDeleteQuizData = async () => {
+    if (!quizToDelete) return
+
+    try {
+      setDeletionStatus(prev => ({ ...prev, data: 'deleting' }))
+      const response = await fetch(`/api/admin/quiz/${quizToDelete.id}/delete-data`, {
+        method: 'DELETE'
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        toasts.success(`${data.count.attempts || 0} attempt(s) and ${data.count.tabSwitches || 0} tab switch(es) deleted successfully`)
+        setDeletionStatus(prev => ({ ...prev, data: 'deleted' }))
+
+        // Refresh delete info to update counts
+        const refreshResponse = await fetch(`/api/admin/quiz/${quizToDelete.id}/delete-info`)
+        if (refreshResponse.ok) {
+          const refreshData = await refreshResponse.json()
+          setDeleteInfo(refreshData)
+        }
+      } else {
+        toasts.actionFailed("Quiz data deletion")
+        setDeletionStatus(prev => ({ ...prev, data: 'pending' }))
+      }
+    } catch (error) {
+      console.error("Error deleting quiz data:", error)
+      toasts.actionFailed("Quiz data deletion")
+      setDeletionStatus(prev => ({ ...prev, data: 'pending' }))
+    }
+  }
+
+  const handleUnenrollQuestions = async () => {
+    if (!quizToDelete) return
+
+    // Check if data deletion is needed first
+    const hasAttempts = (deleteInfo?.counts.attempts || 0) > 0
+    const hasTabSwitches = (deleteInfo?.counts.tabSwitches || 0) > 0
+    if ((hasAttempts || hasTabSwitches) && deletionStatus.data !== 'deleted') {
+      toasts.error('Please delete quiz data first')
+      return
+    }
+
+    try {
+      setDeletionStatus(prev => ({ ...prev, questions: 'deleting' }))
+      const response = await fetch(`/api/admin/quiz/${quizToDelete.id}/unenroll-questions`, {
+        method: 'DELETE'
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        toasts.success(`${data.count.questions || 0} question(s) unenrolled successfully`)
+        setDeletionStatus(prev => ({ ...prev, questions: 'deleted' }))
+
+        // Refresh delete info to update counts
+        const refreshResponse = await fetch(`/api/admin/quiz/${quizToDelete.id}/delete-info`)
+        if (refreshResponse.ok) {
+          const refreshData = await refreshResponse.json()
+          setDeleteInfo(refreshData)
+        }
+      } else {
+        toasts.actionFailed("Question unenrollment")
+        setDeletionStatus(prev => ({ ...prev, questions: 'pending' }))
+      }
+    } catch (error) {
+      console.error("Error unenrolling questions:", error)
+      toasts.actionFailed("Question unenrollment")
+      setDeletionStatus(prev => ({ ...prev, questions: 'pending' }))
+    }
+  }
+
+  const handleUnenrollUsers = async () => {
+    if (!quizToDelete) return
+
+    // Check if questions unenrollment is needed first
+    if ((deleteInfo?.counts.questions || 0) > 0 && deletionStatus.questions !== 'deleted') {
+      toasts.error('Please unenroll questions first')
+      return
+    }
+
+    try {
+      setDeletionStatus(prev => ({ ...prev, users: 'deleting' }))
+      const response = await fetch(`/api/admin/quiz/${quizToDelete.id}/unenroll-users`, {
+        method: 'DELETE'
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        toasts.success(`${data.count.users || 0} user(s) unenrolled successfully`)
+        setDeletionStatus(prev => ({ ...prev, users: 'deleted' }))
+
+        // Refresh delete info to update counts
+        const refreshResponse = await fetch(`/api/admin/quiz/${quizToDelete.id}/delete-info`)
+        if (refreshResponse.ok) {
+          const refreshData = await refreshResponse.json()
+          setDeleteInfo(refreshData)
+        }
+      } else {
+        toasts.actionFailed("User unenrollment")
+        setDeletionStatus(prev => ({ ...prev, users: 'pending' }))
+      }
+    } catch (error) {
+      console.error("Error unenrolling users:", error)
+      toasts.actionFailed("User unenrollment")
+      setDeletionStatus(prev => ({ ...prev, users: 'pending' }))
+    }
   }
 
   const resetCreateForm = () => {
@@ -1021,16 +1206,173 @@ export default function QuizzesPage() {
         </SheetContent>
       </Sheet>
 
-      {/* Delete Confirmation Dialog */}
+      {/* Delete Quiz Dialog */}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <AlertDialogContent>
+        <AlertDialogContent className="max-w-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle>Confirm Deletion</AlertDialogTitle>
+            <AlertDialogTitle>Delete Quiz: {quizToDelete?.title}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{quizToDelete?.title}"? This action cannot be undone and will remove all associated questions and results.
+              This action cannot be undone. Please delete all associated data before deleting quiz.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="mt-4 space-y-2">
+
+          <TooltipProvider>
+          <div className="mt-4 space-y-4">
+            {deleteInfo ? (
+              <div className="space-y-3">
+                {/* Step 1: Delete Quiz Data */}
+                {((deleteInfo.counts.attempts || 0) > 0 || (deleteInfo.counts.tabSwitches || 0) > 0) && (
+                  <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/30">
+                    <div className="flex items-center gap-3">
+                      <FileQuestion className="w-5 h-5 text-orange-600" />
+                      <div>
+                        <p className="font-medium">Quiz Data</p>
+                        <p className="text-sm text-muted-foreground">
+                          {deleteInfo.counts.attempts || 0} quiz attempt(s) + {deleteInfo.counts.tabSwitches || 0} tab switch(es)
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {deletionStatus.data === 'deleted' && (
+                        <CheckCircle className="w-5 h-5 text-green-600" />
+                      )}
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            onClick={handleDeleteQuizData}
+                            disabled={deletionStatus.data === 'deleted' || deletionStatus.data === 'deleting'}
+                            variant={deletionStatus.data === 'deleted' ? 'outline' : 'destructive'}
+                            size="icon"
+                          >
+                            {deletionStatus.data === 'deleting' ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : deletionStatus.data === 'deleted' ? (
+                              <CheckCircle className="h-4 w-4" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {deletionStatus.data === 'deleted' ? 'Quiz data deleted' : deletionStatus.data === 'deleting' ? 'Deleting...' : 'Delete quiz data'}
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </div>
+                )}
+
+                {/* Step 2: Unenroll Questions */}
+                {deleteInfo.counts.questions > 0 && (
+                  <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/30">
+                    <div className="flex items-center gap-3">
+                      <FileQuestion className="w-5 h-5 text-blue-600" />
+                      <div>
+                        <p className="font-medium">Questions</p>
+                        <p className="text-sm text-muted-foreground">
+                          {deleteInfo.counts.questions} question{deleteInfo.counts.questions !== 1 ? 's' : ''} enrolled
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {deletionStatus.questions === 'deleted' && (
+                        <CheckCircle className="w-5 h-5 text-green-600" />
+                      )}
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            onClick={handleUnenrollQuestions}
+                            disabled={
+                              deletionStatus.questions === 'deleted' ||
+                              deletionStatus.questions === 'deleting' ||
+                              (((deleteInfo.counts.attempts || 0) > 0 || (deleteInfo.counts.tabSwitches || 0) > 0) && deletionStatus.data !== 'deleted')
+                            }
+                            variant={deletionStatus.questions === 'deleted' ? 'outline' : 'destructive'}
+                            size="icon"
+                          >
+                            {deletionStatus.questions === 'deleting' ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : deletionStatus.questions === 'deleted' ? (
+                              <CheckCircle className="h-4 w-4" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {deletionStatus.questions === 'deleted' ? 'Questions unenrolled' : deletionStatus.questions === 'deleting' ? 'Unenrolling...' : 'Unenroll questions'}
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </div>
+                )}
+
+                {/* Step 3: Unenroll Users */}
+                {deleteInfo.counts.users > 0 && (
+                  <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/30">
+                    <div className="flex items-center gap-3">
+                      <Users className="w-5 h-5 text-purple-600" />
+                      <div>
+                        <p className="font-medium">Users</p>
+                        <p className="text-sm text-muted-foreground">
+                          {deleteInfo.counts.users} user{deleteInfo.counts.users !== 1 ? 's' : ''} enrolled
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {deletionStatus.users === 'deleted' && (
+                        <CheckCircle className="w-5 h-5 text-green-600" />
+                      )}
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            onClick={handleUnenrollUsers}
+                            disabled={
+                              deletionStatus.users === 'deleted' ||
+                              deletionStatus.users === 'deleting' ||
+                              ((deleteInfo?.counts.questions || 0) > 0 && deletionStatus.questions !== 'deleted')
+                            }
+                            variant={deletionStatus.users === 'deleted' ? 'outline' : 'destructive'}
+                            size="icon"
+                          >
+                            {deletionStatus.users === 'deleting' ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : deletionStatus.users === 'deleted' ? (
+                              <CheckCircle className="h-4 w-4" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {deletionStatus.users === 'deleted' ? 'Users unenrolled' : deletionStatus.users === 'deleting' ? 'Unenrolling...' : 'Unenroll users'}
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </div>
+                )}
+
+                {/* Empty State - Ready to delete */}
+                {deleteInfo.counts.questions === 0 &&
+                 deleteInfo.counts.users === 0 &&
+                 deleteInfo.counts.attempts === 0 &&
+                 deleteInfo.counts.tabSwitches === 0 && (
+                  <div className="p-4 border rounded-lg bg-green-50 border-green-200">
+                    <p className="text-green-800 text-sm font-medium">
+                      ✓ All critical data removed. Ready to delete quiz.
+                    </p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center justify-center p-8">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            )}
+          </div>
+          </TooltipProvider>
+
+          {/* Final Confirmation Input */}
+          <div className="mt-4 pt-4 border-t space-y-2">
             <Label htmlFor="delete-confirmation">
               <span className="font-semibold text-destructive">CONFIRM DELETE</span> to proceed:
             </Label>
@@ -1043,18 +1385,24 @@ export default function QuizzesPage() {
               className="uppercase"
             />
           </div>
+
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => {
               setIsDeleteDialogOpen(false)
               setQuizToDelete(null)
+              setDeleteInfo(null)
               setDeleteConfirmation("")
+              setDeletionStatus({ data: 'pending', questions: 'pending', users: 'pending' })
             }}>
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={() => quizToDelete && handleDeleteQuiz(quizToDelete.id)}
               className="bg-red-600 hover:bg-red-700"
-              disabled={deleteLoading === quizToDelete?.id || deleteConfirmation !== "CONFIRM DELETE"}
+              disabled={
+                deleteLoading !== null ||
+                deleteConfirmation !== "CONFIRM DELETE"
+              }
             >
               {deleteLoading === quizToDelete?.id ? (
                 <>
