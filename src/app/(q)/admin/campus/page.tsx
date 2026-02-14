@@ -36,6 +36,12 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -166,10 +172,14 @@ export default function CampusPage() {
     }
   } | null>(null)
   const [deletionStatus, setDeletionStatus] = useState<{
+    unassign: 'pending' | 'deleting' | 'deleted'
     students: 'pending' | 'deleting' | 'deleted'
+    batches: 'pending' | 'deleting' | 'deleted'
     data: 'pending' | 'deleting' | 'deleted'
   }>({
+    unassign: 'pending',
     students: 'pending',
+    batches: 'pending',
     data: 'pending'
   })
 
@@ -364,20 +374,33 @@ export default function CampusPage() {
       return
     }
 
-    // Check if all steps are completed
+    // Check if all steps are completed in the correct order
+    const hasQuizAttempts = (deleteInfo?.counts.quizAttempts || 0) > 0 || (deleteInfo?.counts.assessmentAttempts || 0) > 0
     const hasStudents = (deleteInfo?.counts.students || 0) > 0
-    const hasData = (deleteInfo?.counts.departments || 0) > 0 ||
-                  (deleteInfo?.counts.batches || 0) > 0 ||
-                  (deleteInfo?.counts.quizzes || 0) > 0 ||
-                  (deleteInfo?.counts.assessments || 0) > 0
+    const hasBatches = (deleteInfo?.counts.batches || 0) > 0
+    const hasOtherData = (deleteInfo?.counts.departments || 0) > 0 || (deleteInfo?.counts.quizzes || 0) > 0 || (deleteInfo?.counts.assessments || 0) > 0
 
+    // Check unassign step if needed
+    if (hasQuizAttempts && deletionStatus.unassign !== 'deleted') {
+      toasts.error('Please remove quiz/assessment enrollments first')
+      return
+    }
+
+    // Check students step
     if (hasStudents && deletionStatus.students !== 'deleted') {
       toasts.error('Please delete all students first')
       return
     }
 
-    if (hasData && deletionStatus.data !== 'deleted') {
-      toasts.error('Please delete all associated data (departments, batches, quizzes, assessments) first')
+    // Check batches step
+    if (hasBatches && deletionStatus.batches !== 'deleted') {
+      toasts.error('Please delete all batches first')
+      return
+    }
+
+    // Check data step (departments, quizzes, assessments)
+    if (hasOtherData && deletionStatus.data !== 'deleted') {
+      toasts.error('Please delete all departments, quizzes, and assessments first')
       return
     }
 
@@ -394,7 +417,7 @@ export default function CampusPage() {
         setCampusToDelete(null)
         setDeleteInfo(null)
         setDeleteConfirmation("")
-        setDeletionStatus({ students: 'pending', data: 'pending' })
+        setDeletionStatus({ unassign: 'pending', students: 'pending', batches: 'pending', data: 'pending' })
       } else {
         const error = await response.json()
         toasts.error(error.error || "Campus deletion failed")
@@ -424,7 +447,7 @@ export default function CampusPage() {
   const openDeleteDialog = async (campus: Campus) => {
     setCampusToDelete(campus)
     setDeleteConfirmation("")
-    setDeletionStatus({ students: 'pending', data: 'pending' })
+    setDeletionStatus({ unassign: 'pending', students: 'pending', batches: 'pending', data: 'pending' })
     setIsDeleteDialogOpen(true)
 
     // Fetch detailed deletion info
@@ -440,8 +463,50 @@ export default function CampusPage() {
     }
   }
 
+  const handleUnassignStudents = async () => {
+    if (!campusToDelete) return
+
+    try {
+      setDeletionStatus(prev => ({ ...prev, unassign: 'deleting' }))
+      const response = await fetch(`/api/admin/campus/${campusToDelete.id}/delete-students`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ unassignOnly: true })
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        toasts.success(`Quiz & assessment enrollments removed successfully`)
+        setDeletionStatus(prev => ({ ...prev, unassign: 'deleted' }))
+
+        // Refresh delete info to update counts
+        const refreshResponse = await fetch(`/api/admin/campus/${campusToDelete.id}/delete-info`)
+        if (refreshResponse.ok) {
+          const refreshData = await refreshResponse.json()
+          setDeleteInfo(refreshData)
+        }
+      } else {
+        toasts.actionFailed("Enrollment removal")
+        setDeletionStatus(prev => ({ ...prev, unassign: 'pending' }))
+      }
+    } catch (error) {
+      console.error("Error removing enrollments:", error)
+      toasts.actionFailed("Enrollment removal")
+      setDeletionStatus(prev => ({ ...prev, unassign: 'pending' }))
+    }
+  }
+
   const handleDeleteStudents = async () => {
     if (!campusToDelete) return
+
+    // Check if unassign is needed first
+    const hasQuizAttempts = (deleteInfo?.counts.quizAttempts || 0) > 0 || (deleteInfo?.counts.assessmentAttempts || 0) > 0
+    if (hasQuizAttempts && deletionStatus.unassign !== 'deleted') {
+      toasts.error('Please remove quiz/assessment enrollments first')
+      return
+    }
 
     try {
       setDeletionStatus(prev => ({ ...prev, students: 'deleting' }))
@@ -471,17 +536,74 @@ export default function CampusPage() {
     }
   }
 
+  const handleDeleteBatches = async () => {
+    if (!campusToDelete) return
+
+    // Check if students are deleted first
+    if (deleteInfo?.counts.students > 0 && deletionStatus.students !== 'deleted') {
+      toasts.error('Please delete all students first')
+      return
+    }
+
+    try {
+      setDeletionStatus(prev => ({ ...prev, batches: 'deleting' }))
+      const response = await fetch(`/api/admin/campus/${campusToDelete.id}/delete-data`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ deleteBatchesOnly: true })
+      })
+
+      if (response.ok) {
+        toasts.success("Batches deleted successfully")
+        setDeletionStatus(prev => ({ ...prev, batches: 'deleted' }))
+
+        // Refresh delete info to update counts
+        const refreshResponse = await fetch(`/api/admin/campus/${campusToDelete.id}/delete-info`)
+        if (refreshResponse.ok) {
+          const refreshData = await refreshResponse.json()
+          setDeleteInfo(refreshData)
+        }
+      } else {
+        const error = await response.json()
+        toasts.error(error.error || "Failed to delete batches")
+        setDeletionStatus(prev => ({ ...prev, batches: 'pending' }))
+      }
+    } catch (error) {
+      console.error("Error deleting batches:", error)
+      toasts.actionFailed("Batch deletion")
+      setDeletionStatus(prev => ({ ...prev, batches: 'pending' }))
+    }
+  }
+
   const handleDeleteCampusData = async () => {
     if (!campusToDelete) return
+
+    // Check if batches are deleted first
+    if (deleteInfo?.counts.batches > 0 && deletionStatus.batches !== 'deleted') {
+      toasts.error('Please delete all batches first')
+      return
+    }
+
+    // Check if students are deleted first
+    if (deleteInfo?.counts.students > 0 && deletionStatus.students !== 'deleted') {
+      toasts.error('Please delete all students first')
+      return
+    }
 
     try {
       setDeletionStatus(prev => ({ ...prev, data: 'deleting' }))
       const response = await fetch(`/api/admin/campus/${campusToDelete.id}/delete-data`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ skipBatches: true })
       })
 
       if (response.ok) {
-        toasts.success("Departments, batches, quizzes & assessments deleted successfully")
+        toasts.success("Departments, quizzes & assessments deleted successfully")
         setDeletionStatus(prev => ({ ...prev, data: 'deleted' }))
 
         // Refresh delete info to update counts
@@ -1316,10 +1438,52 @@ export default function CampusPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
 
+          <TooltipProvider>
           <div className="mt-4 space-y-4">
             {deleteInfo ? (
               <div className="space-y-3">
-                {/* Students Section */}
+                {/* Step 1: Unassign Students (if quiz/assessment attempts exist) */}
+                {((deleteInfo.counts.quizAttempts || 0) > 0 || (deleteInfo.counts.assessmentAttempts || 0) > 0) && (
+                  <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/30">
+                    <div className="flex items-center gap-3">
+                      <FileQuestion className="w-5 h-5 text-orange-600" />
+                      <div>
+                        <p className="font-medium">Quiz/Assessment Enrollments</p>
+                        <p className="text-sm text-muted-foreground">
+                          {deleteInfo.counts.quizAttempts || 0} quiz enrollment(s) + {deleteInfo.counts.assessmentAttempts || 0} assessment enrollment(s)
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {deletionStatus.unassign === 'deleted' && (
+                        <CheckCircle className="w-5 h-5 text-green-600" />
+                      )}
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            onClick={handleUnassignStudents}
+                            disabled={deletionStatus.unassign === 'deleted' || deletionStatus.unassign === 'deleting'}
+                            variant={deletionStatus.unassign === 'deleted' ? 'outline' : 'destructive'}
+                            size="icon"
+                          >
+                            {deletionStatus.unassign === 'deleting' ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : deletionStatus.unassign === 'deleted' ? (
+                              <CheckCircle className="h-4 w-4" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {deletionStatus.unassign === 'deleted' ? 'Enrollments removed' : deletionStatus.unassign === 'deleting' ? 'Removing...' : 'Remove enrollments'}
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </div>
+                )}
+
+                {/* Step 2: Delete Students */}
                 {deleteInfo.counts.students > 0 && (
                   <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/30">
                     <div className="flex items-center gap-3">
@@ -1335,41 +1499,88 @@ export default function CampusPage() {
                       {deletionStatus.students === 'deleted' && (
                         <CheckCircle className="w-5 h-5 text-green-600" />
                       )}
-                      <Button
-                        onClick={handleDeleteStudents}
-                        disabled={deletionStatus.students === 'deleted' || deletionStatus.students === 'deleting'}
-                        variant={deletionStatus.students === 'deleted' ? 'outline' : 'destructive'}
-                        className="min-w-[160px]"
-                      >
-                        {deletionStatus.students === 'deleting' ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Deleting...
-                          </>
-                        ) : deletionStatus.students === 'deleted' ? (
-                          'Deleted'
-                        ) : (
-                          'Delete Students'
-                        )}
-                      </Button>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            onClick={handleDeleteStudents}
+                            disabled={
+                              deletionStatus.students === 'deleted' ||
+                              deletionStatus.students === 'deleting' ||
+                              (((deleteInfo.counts.quizAttempts || 0) > 0 || (deleteInfo.counts.assessmentAttempts || 0) > 0) && deletionStatus.unassign !== 'deleted')
+                            }
+                            variant={deletionStatus.students === 'deleted' ? 'outline' : 'destructive'}
+                            size="icon"
+                          >
+                            {deletionStatus.students === 'deleting' ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : deletionStatus.students === 'deleted' ? (
+                              <CheckCircle className="h-4 w-4" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {deletionStatus.students === 'deleted' ? 'Students deleted' : deletionStatus.students === 'deleting' ? 'Deleting...' : 'Delete students'}
+                        </TooltipContent>
+                      </Tooltip>
                     </div>
                   </div>
                 )}
 
-                {/* Data Section - Departments, Batches, Quizzes, Assessments */}
-                {(deleteInfo.counts.departments > 0 ||
-                  deleteInfo.counts.batches > 0 ||
-                  deleteInfo.counts.quizzes > 0 ||
-                  deleteInfo.counts.assessments > 0) && (
+                {/* Step 3: Delete Batches */}
+                {deleteInfo.counts.batches > 0 && (
+                  <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/30">
+                    <div className="flex items-center gap-3">
+                      <BookOpen className="w-5 h-5 text-purple-600" />
+                      <div>
+                        <p className="font-medium">Batches</p>
+                        <p className="text-sm text-muted-foreground">
+                          {deleteInfo.counts.batches} batch{deleteInfo.counts.batches !== 1 ? 'es' : ''}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {deletionStatus.batches === 'deleted' && (
+                        <CheckCircle className="w-5 h-5 text-green-600" />
+                      )}
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            onClick={handleDeleteBatches}
+                            disabled={
+                              deletionStatus.batches === 'deleted' ||
+                              deletionStatus.batches === 'deleting' ||
+                              (deleteInfo.counts.students > 0 && deletionStatus.students !== 'deleted')
+                            }
+                            variant={deletionStatus.batches === 'deleted' ? 'outline' : 'destructive'}
+                            size="icon"
+                          >
+                            {deletionStatus.batches === 'deleting' ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : deletionStatus.batches === 'deleted' ? (
+                              <CheckCircle className="h-4 w-4" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {deletionStatus.batches === 'deleted' ? 'Batches deleted' : deletionStatus.batches === 'deleting' ? 'Deleting...' : 'Delete batches'}
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </div>
+                )}
+
+                {/* Step 4: Delete Departments, Quizzes, and Assessments */}
+                {(deleteInfo.counts.departments > 0 || deleteInfo.counts.quizzes > 0 || deleteInfo.counts.assessments > 0) && (
                   <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/30">
                     <div>
                       <p className="font-medium">Campus Data</p>
                       <div className="text-sm text-muted-foreground space-y-1 mt-1">
                         {deleteInfo.counts.departments > 0 && (
                           <p>• {deleteInfo.counts.departments} department{deleteInfo.counts.departments !== 1 ? 's' : ''}</p>
-                        )}
-                        {deleteInfo.counts.batches > 0 && (
-                          <p>• {deleteInfo.counts.batches} batch{deleteInfo.counts.batches !== 1 ? 'es' : ''}</p>
                         )}
                         {deleteInfo.counts.quizzes > 0 && (
                           <p>• {deleteInfo.counts.quizzes} quiz{deleteInfo.counts.quizzes !== 1 ? 'zes' : 'z'}</p>
@@ -1383,40 +1594,46 @@ export default function CampusPage() {
                       {deletionStatus.data === 'deleted' && (
                         <CheckCircle className="w-5 h-5 text-green-600" />
                       )}
-                      <Button
-                        onClick={handleDeleteCampusData}
-                        disabled={
-                          deletionStatus.data === 'deleted' ||
-                          deletionStatus.data === 'deleting' ||
-                          deletionStatus.students !== 'deleted'
-                        }
-                        variant={deletionStatus.data === 'deleted' ? 'outline' : 'destructive'}
-                        className="min-w-[200px]"
-                      >
-                        {deletionStatus.data === 'deleting' ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Deleting...
-                          </>
-                        ) : deletionStatus.data === 'deleted' ? (
-                          'Deleted'
-                        ) : (
-                          'Delete Campus Data'
-                        )}
-                      </Button>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            onClick={handleDeleteCampusData}
+                            disabled={
+                              deletionStatus.data === 'deleted' ||
+                              deletionStatus.data === 'deleting' ||
+                              (deleteInfo.counts.batches > 0 && deletionStatus.batches !== 'deleted')
+                            }
+                            variant={deletionStatus.data === 'deleted' ? 'outline' : 'destructive'}
+                            size="icon"
+                          >
+                            {deletionStatus.data === 'deleting' ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : deletionStatus.data === 'deleted' ? (
+                              <CheckCircle className="h-4 w-4" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {deletionStatus.data === 'deleted' ? 'Data deleted' : deletionStatus.data === 'deleting' ? 'Deleting...' : 'Delete data'}
+                        </TooltipContent>
+                      </Tooltip>
                     </div>
                   </div>
                 )}
 
-                {/* Empty State */}
+                {/* Empty State - Ready to delete */}
                 {deleteInfo.counts.students === 0 &&
-                 deleteInfo.counts.departments === 0 &&
                  deleteInfo.counts.batches === 0 &&
+                 deleteInfo.counts.departments === 0 &&
                  deleteInfo.counts.quizzes === 0 &&
-                 deleteInfo.counts.assessments === 0 && (
+                 deleteInfo.counts.assessments === 0 &&
+                 (deleteInfo.counts.quizAttempts || 0) === 0 &&
+                 (deleteInfo.counts.assessmentAttempts || 0) === 0 && (
                   <div className="p-4 border rounded-lg bg-green-50 border-green-200">
                     <p className="text-green-800 text-sm font-medium">
-                      ✓ No associated data found. This campus can be safely deleted.
+                      ✓ All critical data removed. Ready to delete campus.
                     </p>
                   </div>
                 )}
@@ -1427,27 +1644,22 @@ export default function CampusPage() {
               </div>
             )}
           </div>
+          </TooltipProvider>
 
-          {/* Final Confirmation Input - Only show if there's no data to delete */}
-          {(deleteInfo?.counts.students === 0 &&
-           deleteInfo?.counts.departments === 0 &&
-           deleteInfo?.counts.batches === 0 &&
-           deleteInfo?.counts.quizzes === 0 &&
-           deleteInfo?.counts.assessments === 0) && (
-            <div className="mt-4 pt-4 border-t space-y-2">
-              <Label htmlFor="delete-confirmation">
-                <span className="font-semibold text-destructive">CONFIRM DELETE</span> to proceed:
-              </Label>
-              <Input
-                id="delete-confirmation"
-                value={deleteConfirmation}
-                onChange={(e) => setDeleteConfirmation(e.target.value)}
-                placeholder="CONFIRM DELETE"
-                autoComplete="off"
-                className="uppercase"
-              />
-            </div>
-          )}
+          {/* Final Confirmation Input */}
+          <div className="mt-4 pt-4 border-t space-y-2">
+            <Label htmlFor="delete-confirmation">
+              <span className="font-semibold text-destructive">CONFIRM DELETE</span> to proceed:
+            </Label>
+            <Input
+              id="delete-confirmation"
+              value={deleteConfirmation}
+              onChange={(e) => setDeleteConfirmation(e.target.value)}
+              placeholder="CONFIRM DELETE"
+              autoComplete="off"
+              className="uppercase"
+            />
+          </div>
 
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => {
@@ -1455,7 +1667,7 @@ export default function CampusPage() {
               setCampusToDelete(null)
               setDeleteInfo(null)
               setDeleteConfirmation("")
-              setDeletionStatus({ students: 'pending', data: 'pending' })
+              setDeletionStatus({ unassign: 'pending', students: 'pending', batches: 'pending', data: 'pending' })
             }}>
               Cancel
             </AlertDialogCancel>
@@ -1464,13 +1676,7 @@ export default function CampusPage() {
               className="bg-red-600 hover:bg-red-700"
               disabled={
                 deleteLoading !== null ||
-                deleteConfirmation !== "CONFIRM DELETE" ||
-                (deleteInfo?.counts.students === 0 &&
-                 deleteInfo?.counts.departments === 0 &&
-                 deleteInfo?.counts.batches === 0 &&
-                 deleteInfo?.counts.quizzes === 0 &&
-                 deleteInfo?.counts.assessments === 0) ? false :
-                deletionStatus.students !== 'deleted' || deletionStatus.data !== 'deleted'
+                deleteConfirmation !== "CONFIRM DELETE"
               }
             >
               {deleteLoading === campusToDelete?.id ? (

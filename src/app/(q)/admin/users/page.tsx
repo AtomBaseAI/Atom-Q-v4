@@ -46,7 +46,6 @@ import {
   MoreHorizontal,
   UserPlus,
   Download,
-  Upload,
   Edit,
   Trash2,
   ArrowUpDown,
@@ -182,7 +181,6 @@ export default function UsersPage() {
     section: StudentSection.A,
     isActive: true,
   })
-  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Cascading filter states
   const [filterCampusId, setFilterCampusId] = useState<string>('all')
@@ -803,42 +801,6 @@ export default function UsersPage() {
     toasts.success("Users exported successfully")
   }
 
-  const handleImportUsers = () => {
-    fileInputRef.current?.click()
-  }
-
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (file) {
-      Papa.parse(file, {
-        complete: async (results) => {
-          try {
-            const response = await fetch("/api/admin/users", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({ importData: results.data }),
-            })
-
-            if (response.ok) {
-              const result = await response.json()
-              toasts.success(result.message || "Users imported successfully")
-              fetchUsers()
-            } else {
-              const error = await response.json()
-              toasts.error(error.message || "Import failed")
-            }
-          } catch (error) {
-            toasts.actionFailed("User import")
-          }
-        },
-        header: true,
-        skipEmptyLines: true,
-      })
-    }
-  }
-
   useEffect(() => {
     const loadData = async () => {
       if (isAuthenticated && isAdmin) {
@@ -873,17 +835,6 @@ export default function UsersPage() {
             <Download className="mr-2 h-4 w-4" />
             Export
           </Button>
-          <Button variant="outline" onClick={handleImportUsers}>
-            <Upload className="mr-2 h-4 w-4" />
-            Import
-          </Button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".csv"
-            style={{ display: "none" }}
-            onChange={handleFileChange}
-          />
           <Button onClick={() => setIsAddDialogOpen(true)}>
             <UserPlus className="mr-2 h-4 w-4" />
             Add User

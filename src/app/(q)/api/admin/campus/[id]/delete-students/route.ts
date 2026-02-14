@@ -5,9 +5,10 @@ import { authOptions } from "@/lib/auth"
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const session = await getServerSession(authOptions)
 
     if (!session || session.user.role !== "ADMIN") {
@@ -19,7 +20,7 @@ export async function DELETE(
 
     // Check if campus exists
     const campus = await db.campus.findUnique({
-      where: { id: params.id },
+      where: { id },
       select: {
         id: true,
         name: true
@@ -33,26 +34,75 @@ export async function DELETE(
       )
     }
 
-    // Delete all users associated with this campus
-    // This will cascade delete their quiz attempts, assessment attempts, etc.
-    const deleteResult = await db.user.deleteMany({
-      where: {
-        campusId: params.id,
-        role: "USER"
-      }
-    })
+    // Parse request body to check for unassignOnly parameter
+    const body = await request.json().catch(() => ({}))
+    const unassignOnly = body.unassignOnly === true
 
-    return NextResponse.json(
-      {
-        message: "Students deleted successfully",
-        count: deleteResult.count
-      },
-      { status: 200 }
-    )
+    if (unassignOnly) {
+      // Only unassign students from quizzes and assessments (delete attempts and analysis data)
+      // Get all users in this campus
+      const users = await db.user.findMany({
+        where: {
+          campusId: id,
+          role: "USER"
+        },
+        select: {
+          id: true
+        }
+      })
+
+      const userIds = users.map(u => u.id)
+
+      // Delete quiz enrollments and attempts
+      const quizAttemptsDeleted = await db.quizAttempt.deleteMany({
+        where: {
+          userId: {
+            in: userIds
+          }
+        }
+      })
+
+      // Delete assessment enrollments and attempts
+      const assessmentAttemptsDeleted = await db.assessmentAttempt.deleteMany({
+        where: {
+          userId: {
+            in: userIds
+          }
+        }
+      })
+
+      return NextResponse.json(
+        {
+          message: "Quiz and assessment enrollments removed successfully",
+          deleted: {
+            quizAttempts: quizAttemptsDeleted.count,
+            assessmentAttempts: assessmentAttemptsDeleted.count
+          }
+        },
+        { status: 200 }
+      )
+    } else {
+      // Delete all users associated with this campus
+      // This will cascade delete their quiz attempts, assessment attempts, etc.
+      const deleteResult = await db.user.deleteMany({
+        where: {
+          campusId: id,
+          role: "USER"
+        }
+      })
+
+      return NextResponse.json(
+        {
+          message: "Students deleted successfully",
+          count: deleteResult.count
+        },
+        { status: 200 }
+      )
+    }
   } catch (error) {
-    console.error("Error deleting students:", error)
+    console.error("Error in delete students operation:", error)
     return NextResponse.json(
-      { error: "Failed to delete students" },
+      { error: "Failed to perform operation" },
       { status: 500 }
     )
   }
