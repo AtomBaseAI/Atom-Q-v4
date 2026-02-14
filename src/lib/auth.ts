@@ -18,9 +18,9 @@ const MAINTENANCE_CACHE_TTL = 5 * 60 * 1000 // 5 minutes
 
 async function getMaintenanceMode(): Promise<boolean> {
   const now = Date.now()
-  
+
   // Return cached value if still valid
-  if (maintenanceModeCache.value !== null && 
+  if (maintenanceModeCache.value !== null &&
       now - maintenanceModeCache.timestamp < MAINTENANCE_CACHE_TTL) {
     return maintenanceModeCache.value
   }
@@ -29,20 +29,29 @@ async function getMaintenanceMode(): Promise<boolean> {
     const settings = await db.settings.findFirst({
       select: { maintenanceMode: true }
     })
-    
+
     const isMaintenance = settings?.maintenanceMode || false
-    
+
     // Update cache
     maintenanceModeCache = {
       value: isMaintenance,
       timestamp: now
     }
-    
+
     return isMaintenance
   } catch (error) {
     console.error("Error checking maintenance mode:", error)
     // If database fails or settings table doesn't exist, assume no maintenance mode for safety
     return false
+  }
+}
+
+// Export function to clear maintenance mode cache
+// This should be called when settings are updated by admin
+export function clearMaintenanceModeCache() {
+  maintenanceModeCache = {
+    value: null,
+    timestamp: 0
   }
 }
 

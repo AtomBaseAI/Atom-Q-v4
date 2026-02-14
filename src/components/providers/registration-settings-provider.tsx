@@ -3,6 +3,7 @@
 import React, { useEffect, createContext, useContext, useCallback } from "react"
 import { useRegistrationSettingsStore, RegistrationSettings } from "@/stores/settings"
 import { toasts } from "@/lib/toasts"
+import { useSession } from "next-auth/react"
 
 interface RegistrationSettingsContextType {
   registrationSettings: RegistrationSettings
@@ -40,10 +41,15 @@ export function RegistrationSettingsProvider({ children }: RegistrationSettingsP
     fetchRegistrationSettings: fetchStoreSettings
   } = useRegistrationSettingsStore()
 
-  // Fetch registration settings on mount - only once
+  const { status: sessionStatus } = useSession()
+
+  // Fetch registration settings on mount - only after session is authenticated
   useEffect(() => {
-    fetchStoreSettings()
-  }, [])
+    // Only fetch when session is authenticated (not loading and not unauthenticated)
+    if (sessionStatus === 'authenticated') {
+      fetchStoreSettings()
+    }
+  }, [sessionStatus, fetchStoreSettings])
 
   const updateRegistrationSettings = useCallback(async (updates: Partial<RegistrationSettings>) => {
     setLoading(true)

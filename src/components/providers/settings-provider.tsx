@@ -3,7 +3,7 @@
 import React, { useEffect, createContext, useContext, useCallback } from "react"
 import { useSettingsStore, Settings } from "@/stores/settings"
 import { toasts } from "@/lib/toasts"
-import { signOut } from "next-auth/react"
+import { signOut, useSession } from "next-auth/react"
 import { useUserStore } from "@/stores/user"
 
 interface SettingsContextType {
@@ -42,23 +42,33 @@ export function SettingsProvider({ children }: SettingsProviderProps) {
     fetchSettings: fetchStoreSettings
   } = useSettingsStore()
 
+  const { data: session, status: sessionStatus } = useSession()
   const { user } = useUserStore()
 
-  // Fetch settings on mount - only once
+  // Fetch settings on mount - only after session is authenticated
   useEffect(() => {
-    fetchStoreSettings()
-  }, [])
+    // Only fetch when session is authenticated (not loading and not unauthenticated)
+    if (sessionStatus === 'authenticated') {
+      fetchStoreSettings()
+    }
+  }, [sessionStatus, fetchStoreSettings])
 
   // Logout non-admin users when maintenance mode is enabled
+  // Use session for more reliable role check to avoid race conditions
   useEffect(() => {
-    if (settings?.maintenanceMode && user?.role !== 'ADMIN') {
-      // Show toast notification
-      toasts.error('Site is under maintenance. You have been logged out.')
+    if (settings?.maintenanceMode && session?.user) {
+      const userRole = session.user.role || user?.role
 
-      // Sign out the user
-      signOut({ callbackUrl: '/' })
+      // Only logout if user is NOT an admin
+      if (userRole !== 'ADMIN') {
+        // Show toast notification
+        toasts.error('Site is under maintenance. You have been logged out.')
+
+        // Sign out the user
+        signOut({ callbackUrl: '/' })
+      }
     }
-  }, [settings?.maintenanceMode, user?.role])
+  }, [settings?.maintenanceMode, session?.user, session?.user?.role, user?.role])
 
   const updateSettings = useCallback(async (updates: Partial<Settings>) => {
     setLoading(true)

@@ -19,7 +19,9 @@ export async function GET() {
 
     return NextResponse.json(settings, {
       headers: {
-        'Cache-Control': 'public, max-age=300', // Cache for 5 minutes
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+        'Pragma': 'no-cache',
+        'Expires': '0',
       }
     })
   } catch (error) {
@@ -29,7 +31,9 @@ export async function GET() {
       maintenanceMode: false,
     }, {
       headers: {
-        'Cache-Control': 'public, max-age=300',
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+        'Pragma': 'no-cache',
+        'Expires': '0',
       }
     })
   }

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/auth"
+import { authOptions, clearMaintenanceModeCache } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { UserRole } from "@prisma/client"
 
@@ -29,8 +29,9 @@ export async function GET() {
 
     return NextResponse.json(settings, {
       headers: {
-        'Cache-Control': 'public, max-age=300', // Cache for 5 minutes
-        'CDN-Cache-Control': 'public, max-age=300',
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+        'Pragma': 'no-cache',
+        'Expires': '0',
       }
     })
   } catch (error) {
@@ -75,10 +76,14 @@ export async function PUT(request: Request) {
       })
     }
 
+    // Clear maintenance mode cache so it reflects immediately
+    clearMaintenanceModeCache()
+
     return NextResponse.json(settings, {
       headers: {
-        'Cache-Control': 'public, max-age=300', // Cache for 5 minutes
-        'CDN-Cache-Control': 'public, max-age=300',
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+        'Pragma': 'no-cache',
+        'Expires': '0',
       }
     })
   } catch (error) {

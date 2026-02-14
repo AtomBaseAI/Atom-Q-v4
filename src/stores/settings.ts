@@ -67,8 +67,8 @@ export const useSettingsStore = create<SettingsState>()(
       fetchSettings: async () => {
         const state = get()
 
-        // Don't fetch if already loading or recently updated (within 5 minutes)
-        if (state.isLoading || (state.lastUpdated && Date.now() - state.lastUpdated < 300000)) {
+        // Don't fetch if already loading
+        if (state.isLoading) {
           return
         }
 
@@ -88,13 +88,23 @@ export const useSettingsStore = create<SettingsState>()(
               lastUpdated: Date.now(),
               error: null,
             })
+          } else if (response.status === 401) {
+            // Authentication error - clear lastUpdated to allow retry after session is established
+            set({
+              error: null, // Don't show error for auth issues, will retry
+              isLoading: false,
+            })
           } else {
-            set({ error: 'Failed to fetch settings' })
+            set({
+              error: 'Failed to fetch settings',
+              isLoading: false,
+            })
           }
         } catch (error) {
-          set({ error: 'Network error while fetching settings' })
-        } finally {
-          set({ isLoading: false })
+          set({
+            error: 'Network error while fetching settings',
+            isLoading: false,
+          })
         }
       },
 
@@ -168,8 +178,8 @@ export const useRegistrationSettingsStore = create<RegistrationSettingsState>()(
       fetchRegistrationSettings: async () => {
         const state = get()
 
-        // Don't fetch if already loading or recently updated (within 5 minutes)
-        if (state.isLoading || (state.lastUpdated && Date.now() - state.lastUpdated < 300000)) {
+        // Don't fetch if already loading
+        if (state.isLoading) {
           return
         }
 
@@ -189,13 +199,23 @@ export const useRegistrationSettingsStore = create<RegistrationSettingsState>()(
               lastUpdated: Date.now(),
               error: null,
             })
+          } else if (response.status === 401) {
+            // Authentication error - don't show error, will retry
+            set({
+              error: null,
+              isLoading: false,
+            })
           } else {
-            set({ error: 'Failed to fetch registration settings' })
+            set({
+              error: 'Failed to fetch registration settings',
+              isLoading: false,
+            })
           }
         } catch (error) {
-          set({ error: 'Network error while fetching registration settings' })
-        } finally {
-          set({ isLoading: false })
+          set({
+            error: 'Network error while fetching registration settings',
+            isLoading: false,
+          })
         }
       },
 
