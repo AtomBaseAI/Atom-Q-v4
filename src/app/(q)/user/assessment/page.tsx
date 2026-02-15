@@ -52,11 +52,7 @@ interface Assessment {
   isAutoSubmitted: boolean
 }
 
-enum DifficultyLevel {
-  EASY = "EASY",
-  MEDIUM = "MEDIUM",
-  HARD = "HARD",
-}
+
 
 export default function UserAssessmentsPage() {
   const { data: session, status } = useSession()
@@ -64,7 +60,7 @@ export default function UserAssessmentsPage() {
   const [assessments, setAssessments] = useState<Assessment[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [selectedDifficulty, setSelectedDifficulty] = useState<string>("")
+
 
   useEffect(() => {
     if (status === "loading") return
@@ -206,28 +202,12 @@ export default function UserAssessmentsPage() {
 
   return (
     <div className="container mx-auto py-6 px-4">
-      <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="mb-6">
         <div>
           <h1 className="text-3xl font-bold">Available Assessments</h1>
           <p className="text-muted-foreground">
             Take assessments assigned to you and test your knowledge
           </p>
-        </div>
-        <div className="flex items-center space-x-4">
-          <label htmlFor="difficulty-filter" className="text-muted-foreground">Filter by Difficulty:</label>
-          <select
-            id="difficulty-filter"
-            value={selectedDifficulty}
-            onChange={(e) => setSelectedDifficulty(e.target.value)}
-            className="p-2 border border-gray-300 rounded-md"
-          >
-            <option value="">All Difficulties</option>
-            {Object.values(DifficultyLevel).map((level) => (
-              <option key={level} value={level}>
-                {level.charAt(0) + level.slice(1).toLowerCase()}
-              </option>
-            ))}
-          </select>
         </div>
       </div>
 

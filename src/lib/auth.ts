@@ -104,6 +104,7 @@ export const authOptions: NextAuthOptions = {
               role: true,
               avatar: true,
               phone: true,
+              uoid: true,
               password: true,
               isActive: true
             }
@@ -136,6 +137,7 @@ export const authOptions: NextAuthOptions = {
             role: user.role,
             avatar: user.avatar,
             phone: user.phone,
+            uoid: user.uoid,
           }
         } catch (error) {
           if (error instanceof Error) {
@@ -161,6 +163,7 @@ export const authOptions: NextAuthOptions = {
         token.name = user.name
         token.avatar = user.avatar
         token.phone = user.phone
+        token.uoid = user.uoid
         
         // Update client-side store
         if (typeof window !== 'undefined') {
@@ -170,7 +173,8 @@ export const authOptions: NextAuthOptions = {
             email: user.email,
             role: user.role,
             avatar: user.avatar,
-            phone: user.phone
+            phone: user.phone,
+            uoid: user.uoid
           })
         }
       }
@@ -183,6 +187,7 @@ export const authOptions: NextAuthOptions = {
         session.user.name = token.name as string
         session.user.avatar = token.avatar as string
         session.user.phone = token.phone as string
+        session.user.uoid = token.uoid as string
         
         // Update client-side store
         if (typeof window !== 'undefined') {
@@ -192,7 +197,8 @@ export const authOptions: NextAuthOptions = {
             email: session.user.email,
             role: token.role,
             avatar: token.avatar as string,
-            phone: token.phone as string
+            phone: token.phone as string,
+            uoid: token.uoid as string
           })
         }
       }

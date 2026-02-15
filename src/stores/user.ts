@@ -9,6 +9,7 @@ interface User {
   role: string
   avatar?: string
   phone?: string
+  uoid?: string
 }
 
 interface UserState {

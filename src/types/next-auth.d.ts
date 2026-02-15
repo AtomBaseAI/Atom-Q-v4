@@ -10,6 +10,7 @@ declare module "next-auth" {
       role: UserRole
       avatar?: string | null
       phone?: string | null
+      uoid?: string
     }
   }
 
@@ -20,6 +21,7 @@ declare module "next-auth" {
     role: UserRole
     avatar?: string | null
     phone?: string | null
+    uoid?: string
   }
 }
 
@@ -30,5 +32,6 @@ declare module "next-auth/jwt" {
     name?: string | null
     avatar?: string | null
     phone?: string | null
+    uoid?: string
   }
 }

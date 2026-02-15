@@ -24,7 +24,6 @@ export default function ClientLayout({
         enableSystem
         disableTransitionOnChange
         enableColorScheme
-        suppressHydrationWarning
       >
         <AccentColorProvider>
           <SettingsProvider>

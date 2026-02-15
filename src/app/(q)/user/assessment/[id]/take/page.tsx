@@ -32,7 +32,9 @@ import {
   Lock,
   Calendar,
   Info,
-  Send
+  Send,
+  User,
+  IdCard
 } from "lucide-react"
 import { toasts } from "@/lib/toasts"
 import { QuestionType, DifficultyLevel } from "@prisma/client"
@@ -839,7 +841,23 @@ export default function AssessmentTakingPage() {
                 </Badge>
               )}
             </div>
-            
+
+            {/* Center: User Info */}
+            <div className="flex items-center gap-4">
+              {session?.user?.name && (
+                <div className="flex items-center gap-2 text-sm">
+                  <User className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-medium">{session.user.name}</span>
+                </div>
+              )}
+              {session?.user?.uoid && (
+                <div className="flex items-center gap-2 text-sm">
+                  <IdCard className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-mono font-medium">{session.user.uoid}</span>
+                </div>
+              )}
+            </div>
+
             <div className="flex items-center gap-3">
               {assessment.timeLimit && (
                 <div className="flex items-center gap-2 text-sm">
@@ -849,7 +867,7 @@ export default function AssessmentTakingPage() {
                   </span>
                 </div>
               )}
-              
+
               {assessment.maxTabs && (
                 <div className="flex items-center gap-2 text-sm">
                   <AlertTriangle className={`h-4 w-4 ${switchesRemaining === 0 ? 'text-red-600' : switchesRemaining !== null && switchesRemaining <= 1 ? 'text-orange-600' : ''}`} />
