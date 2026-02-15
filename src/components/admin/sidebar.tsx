@@ -33,6 +33,7 @@ import {
   SunDim,
   Maximize,
   Minimize,
+  Activity,
 } from "lucide-react";
 import { useSidebar } from "@/components/ui/sidebar";
 import { flushSync } from "react-dom";
@@ -63,6 +64,11 @@ const adminNavItems = [
     title: "Assessments",
     href: "/admin/assessments",
     icon: FileCheck,
+  },
+  {
+    title: "Activities",
+    href: "/admin/activity",
+    icon: Activity,
   },
   {
     title: "Questions",

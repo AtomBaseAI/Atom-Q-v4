@@ -21,6 +21,7 @@ model Campus {
   users        User[]
   quizzes      Quiz[]
   assessments  Assessment[]
+  activities   Activity[]
   registrationCodes RegistrationCode[]
 
   @@map("campuses")
@@ -46,6 +47,7 @@ model Department {
   campusId String
   campus   Campus @relation(fields: [campusId], references: [id], onDelete: Cascade)
   users    User[]
+  activities Activity[]
   registrationCodes RegistrationCode[]
 
   @@map("departments")
@@ -80,6 +82,7 @@ model User {
   quizTabSwitches     QuizTabSwitch[]
   createdQuizzes       Quiz[]             @relation("QuizCreator")
   createdAssessments   Assessment[]       @relation("AssessmentCreator")
+  createdActivities    Activity[]         @relation("ActivityCreator")
   questionGroups       QuestionGroup[]
   reportedQuestions    ReportedQuestion[]
 
@@ -114,6 +117,7 @@ model Question {
   updatedAt     DateTime        @updatedAt
   quizQuestions       QuizQuestion[]
   assessmentQuestions AssessmentQuestion[]
+  activityQuestions   ActivityQuestion[]
   groupId             String
   group               QuestionGroup? @relation(fields: [groupId], references: [id])
   reportedQuestions   ReportedQuestion[]
@@ -415,6 +419,41 @@ model QuizTabSwitch {
   attempt        QuizAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
   user          User       @relation(fields: [userId], references: [id])
   quiz          Quiz       @relation(fields: [quizId], references: [id], onDelete: Cascade)
-  
+
   @@map("quiz_tab_switches")
 }
+
+model Activity {
+  id           String          @id @default(cuid())
+  title        String
+  description  String?
+  campusId     String?
+  campus       Campus?         @relation(fields: [campusId], references: [id])
+  departmentId String?
+  department   Department?     @relation(fields: [departmentId], references: [id])
+  section      StudentSection  @default(A)
+  answerTime   Int?            // in seconds
+  maxDuration  Int?            // in minutes
+  accessKey    String          @unique
+  creatorId    String
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  activityQuestions ActivityQuestion[]
+  creator      User            @relation("ActivityCreator", fields: [creatorId], references: [id])
+
+  @@map("activities")
+}
+
+model ActivityQuestion {
+  id         String   @id @default(cuid())
+  activityId String
+  questionId String
+  order      Int
+  points     Float    @default(1.0)
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  activity   Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+
+  @@unique([activityId, questionId])
+  @@map("activity_questions")
+}
+
