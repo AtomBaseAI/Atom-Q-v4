@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
-import { motion, AnimatePresence } from "framer-motion"
+import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
@@ -113,6 +113,7 @@ export default function AssessmentTakingPage() {
   const [accessKeyInput, setAccessKeyInput] = useState("")
   const [isExpired, setIsExpired] = useState(false)
   const [expiredMessage, setExpiredMessage] = useState("")
+  const [hasExistingAttempt, setHasExistingAttempt] = useState(false)
   
   const [tabSwitchCount, setTabSwitchCount] = useState(0)
   const [switchesRemaining, setSwitchesRemaining] = useState<number | null>(null)
@@ -193,6 +194,7 @@ export default function AssessmentTakingPage() {
       hasInitializedRef.current = true
 
       setAssessment(data.assessment)
+      setHasExistingAttempt(data.hasExistingAttempt)
 
       // Always require access key if assessment has one, even for continuing attempts
       if (data.assessment.accessKey) {
@@ -233,10 +235,26 @@ export default function AssessmentTakingPage() {
           setIsExpired(true)
           setExpiredMessage(error.message)
         }
+        
+        // If the attempt already exceeded tab switches or expired, redirect to assessment list
+        if (error.message?.includes("exceeded") || error.message?.includes("expired") || error.message?.includes("no longer available")) {
+          setTimeout(() => {
+            router.push('/user/assessment')
+          }, 1500)
+        }
         return
       }
 
       const data = await response.json()
+      
+      // Check if the attempt should auto-submit (already exceeded tab switches or timeout)
+      if (data.shouldAutoSubmit) {
+        toasts.info("Assessment time has expired. Redirecting...")
+        setTimeout(() => {
+          router.push('/user/assessment')
+        }, 1500)
+        return
+      }
       setAssessment(data.assessment)
       setQuestions(data.questions || [])
       setAttemptId(data.attemptId)
@@ -326,15 +344,30 @@ export default function AssessmentTakingPage() {
           body: JSON.stringify({ attemptId: assessmentAttemptIdRef.current }),
         })
 
-        if (response.ok) {
-          const data = await response.json() as TabSwitchResponse
+        // Try to parse response regardless of status code
+        let data
+        try {
+          data = await response.json() as TabSwitchResponse
+        } catch (e) {
+          console.error("Error parsing fullscreen exit response:", e)
+          return
+        }
+
+        // Update tab switch count from response
+        if (data.currentSwitches !== undefined) {
           setTabSwitchCount(data.currentSwitches)
           tabSwitchCountRef.current = data.currentSwitches
+        }
+        if (data.switchesRemaining !== undefined) {
           setSwitchesRemaining(data.switchesRemaining)
+        }
 
-          if (data.shouldAutoSubmit) {
-            triggerAutoSubmit()
-          } else if (data.switchesRemaining !== null && data.switchesRemaining <= 1) {
+        // Check if we should auto-submit (regardless of response status)
+        if (data.shouldAutoSubmit) {
+          triggerAutoSubmit()
+        } else if (response.ok) {
+          // Only show warnings if the request was successful
+          if (data.switchesRemaining !== null && data.switchesRemaining <= 1) {
             setShowTabSwitchWarning(true)
           } else {
             toasts.warning(`Fullscreen exit detected! Violations: ${data.currentSwitches}/${assessmentRef.current?.maxTabs || 3}`)
@@ -387,23 +420,26 @@ export default function AssessmentTakingPage() {
       })
 
       if (response.ok) {
-        const data = await response.json()
-        if (isAutoSubmitted) {
-          toasts.error(`Assessment auto-submitted due to violations! Score: ${data.score}%`)
-          // Redirect to assessment list instead of result page
-          router.push('/user/assessment')
-        } else {
-          toasts.success(`Assessment submitted! Score: ${data.score}%`)
-          router.push(`/user/assessment/${params.id}/result`)
-        }
+        // Wait 2 seconds before showing toast and redirecting
+        setTimeout(() => {
+          if (isAutoSubmitted) {
+            toasts.success("Assessment submitted successfully!")
+            // Redirect to assessment list after auto-submission
+            router.push('/user/assessment')
+          } else {
+            toasts.success("Assessment submitted successfully!")
+            router.push(`/user/assessment/${params.id}/result`)
+          }
+        }, 2000)
       } else {
         const error = await response.json()
         toasts.error(error.message || "Failed to submit assessment")
+        setSubmitting(false)
+        isSubmittingRef.current = false
       }
     } catch (error) {
       console.error("Error submitting assessment:", error)
       toasts.error("Failed to submit assessment")
-    } finally {
       setSubmitting(false)
       isSubmittingRef.current = false
     }
@@ -443,15 +479,30 @@ export default function AssessmentTakingPage() {
           body: JSON.stringify({ attemptId: assessmentAttemptIdRef.current }),
         })
 
-        if (response.ok) {
-          const data = await response.json() as TabSwitchResponse
+        // Try to parse response regardless of status code
+        let data
+        try {
+          data = await response.json() as TabSwitchResponse
+        } catch (e) {
+          console.error("Error parsing tab switch response:", e)
+          return
+        }
+
+        // Update tab switch count from response
+        if (data.currentSwitches !== undefined) {
           setTabSwitchCount(data.currentSwitches)
           tabSwitchCountRef.current = data.currentSwitches
+        }
+        if (data.switchesRemaining !== undefined) {
           setSwitchesRemaining(data.switchesRemaining)
+        }
 
-          if (data.shouldAutoSubmit) {
-            triggerAutoSubmit()
-          } else if (data.switchesRemaining !== null && data.switchesRemaining <= 1) {
+        // Check if we should auto-submit (regardless of response status)
+        if (data.shouldAutoSubmit) {
+          triggerAutoSubmit()
+        } else if (response.ok) {
+          // Only show warnings if the request was successful
+          if (data.switchesRemaining !== null && data.switchesRemaining <= 1) {
             setShowTabSwitchWarning(true)
           } else {
             toasts.warning(`Tab switch detected! Violations: ${data.currentSwitches}/${assessmentRef.current?.maxTabs || 3}`)
@@ -473,13 +524,9 @@ export default function AssessmentTakingPage() {
 
     setIsAutoSubmitting(true)
     isAutoSubmittingRef.current = true
-    setShowAutoSubmitWarning(true)
 
-    toasts.error("Maximum violations reached! Auto-submitting in 2 seconds...")
-
-    setTimeout(() => {
-      handleSubmit(true) // Pass true for isAutoSubmitted
-    }, AUTO_SUBMIT_DELAY_MS)
+    // Submit immediately without any warning or delay
+    handleSubmit(true) // Pass true for isAutoSubmitted
   }, [handleSubmit])
 
   // ==================== TIMER MANAGEMENT ====================
@@ -495,12 +542,9 @@ export default function AssessmentTakingPage() {
 
             setIsAutoSubmitting(true)
             isAutoSubmittingRef.current = true
-            setShowAutoSubmitWarning(true)
-            toasts.info("Time is up! Auto-submitting...")
 
-            setTimeout(() => {
-              handleSubmit(true) // Time expiry should also be marked as auto-submitted
-            }, AUTO_SUBMIT_DELAY_MS)
+            // Submit immediately without any warning or delay
+            handleSubmit(true) // Time expiry should also be marked as auto-submitted
           }
           return newTime
         })
@@ -548,52 +592,125 @@ export default function AssessmentTakingPage() {
   // ==================== SECURITY FEATURES ====================
 
   const handleContextMenu = useCallback((e: Event) => {
-    if (assessment?.disableCopyPaste) {
-      e.preventDefault()
-    }
-  }, [assessment])
+    // Always disable right-click on assessment take page
+    e.preventDefault()
+  }, [])
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (!assessment?.disableCopyPaste) return
-    
-    const blockedKeys = [
-      'F12',
-      'Ctrl+Shift+I',
-      'Ctrl+Shift+J',
-      'Ctrl+Shift+C',
-      'Ctrl+Shift+U',
-      'Ctrl+U',
-      'Ctrl+Shift+D',
-      'Ctrl+I',
-      'Ctrl+J',
-      'Ctrl+D',
-      'Ctrl+S',
-      'Ctrl+P',
+    // Always block these shortcuts on assessment take page regardless of disableCopyPaste setting
+
+    // Block special keys
+    const specialKeys = ['F12', 'Insert', 'PrintScreen', 'ScrollLock', 'Pause']
+    const key = e.key
+
+    if (specialKeys.includes(key) || key === 'F12') {
+      e.preventDefault()
+      toasts.warning("This action is not allowed during the assessment")
+      return
+    }
+
+    // Get modifier keys
+    const ctrlKey = e.ctrlKey
+    const metaKey = e.metaKey // macOS Command key
+    const shiftKey = e.shiftKey
+    const altKey = e.altKey // Alt key (Windows) / Option key (macOS)
+
+    // Check if any modifier is pressed
+    const hasModifier = ctrlKey || metaKey || shiftKey || altKey
+
+    // Build key combo string (Alt on Windows = Option on macOS)
+    let keyCombo = ''
+    if (ctrlKey) keyCombo += 'Ctrl+'
+    if (metaKey) keyCombo += 'Meta+' // For macOS Command key
+    if (shiftKey) keyCombo += 'Shift+'
+    if (altKey) keyCombo += 'Alt+'
+    keyCombo += key
+
+    // Windows Developer Tools shortcuts
+    const windowsDevToolsShortcuts = [
+      'Ctrl+Shift+I', // Open DevTools
+      'Ctrl+Shift+J', // Open Console
+      'Ctrl+Shift+C', // Inspect Element
+      'Ctrl+Shift+K', // Open Web Console (Firefox)
+      'Ctrl+Shift+L', // Open Console (some browsers)
+      'Ctrl+Shift+M', // Toggle Device Mode
+      'Ctrl+Shift+D', // Open Drawer
+      'Ctrl+Shift+E', // Open Network
+      'Ctrl+I',       // Focus Address Bar (some browsers)
+      'Ctrl+J',       // Open Downloads (some browsers)
+      'Ctrl+U',       // View Source
+      'Ctrl+S',       // Save
+      'Ctrl+P',       // Print
+      'Ctrl+F',       // Find
+      'Ctrl+G',       // Find Next
+      'Ctrl+Shift+G', // Find Previous
+      'Ctrl+Shift+F', // Find in Files
+      'Ctrl+Shift+O', // Open File
+      'Ctrl+G',       // Go to Line
+      'Ctrl+Shift+P', // Command Palette
+      'Ctrl+Shift+N', // New Incognito Window
+      'Ctrl+N',       // New Window
+      'Ctrl+T',       // New Tab
+      'Ctrl+Shift+T', // Reopen Closed Tab
+      'Ctrl+W',       // Close Tab
+      'Ctrl+Tab',     // Next Tab
+      'Ctrl+Shift+Tab', // Previous Tab
+      'Ctrl+R',       // Refresh
+      'Ctrl+Shift+R', // Hard Refresh
+      'Ctrl+F5',      // Hard Refresh
+      'F5',           // Refresh
+      'Shift+F5',     // Hard Refresh
+      'Ctrl+F12',     // Open DevTools (some browsers)
     ]
 
-    const key = e.key
-    const ctrlKey = e.ctrlKey || e.metaKey
-    const shiftKey = e.shiftKey
-    const altKey = e.altKey
+    // macOS Developer Tools shortcuts (Cmd = Meta, Option = Alt)
+    const macDevToolsShortcuts = [
+      'Meta+Alt+I',   // Open DevTools (Cmd+Option+I)
+      'Meta+Alt+J',   // Open Console (Cmd+Option+J)
+      'Meta+Alt+C',   // Inspect Element (Cmd+Option+C)
+      'Meta+Alt+K',   // Open Web Console (Cmd+Option+K)
+      'Meta+Alt+E',   // Open Network (Cmd+Option+E)
+      'Meta+Alt+U',   // View Source (Cmd+Option+U)
+      'Meta+Alt+T',   // Toggle Toolbar (Cmd+Option+T)
+      'Meta+Alt+L',   // Open Console (Cmd+Option+L)
+      'Meta+Shift+C', // Force Click/Inspect (Cmd+Shift+C)
+      'Meta+Shift+I', // Open DevTools (Cmd+Shift+I)
+    ]
 
-    const keyCombo = `${ctrlKey ? 'Ctrl+' : ''}${shiftKey ? 'Shift+' : ''}${altKey ? 'Alt+' : ''}${key}`
+    // Combine all blocked shortcuts
+    const allBlockedShortcuts = [...windowsDevToolsShortcuts, ...macDevToolsShortcuts]
 
-    if (blockedKeys.includes(keyCombo) || key === 'F12') {
+    // Check if current key combo matches any blocked shortcut
+    if (allBlockedShortcuts.includes(keyCombo)) {
+      e.preventDefault()
+      toasts.warning("This action is not allowed during the assessment")
+      return
+    }
+
+    // Also block individual function keys that might be problematic
+    const functionKeys = ['F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'F10', 'F11']
+    if (functionKeys.includes(key) && !hasModifier) {
+      e.preventDefault()
+      toasts.warning("This action is not allowed during the assessment")
+      return
+    }
+
+    // Always block copy/paste/cut on assessment page
+    if ((ctrlKey || metaKey) && ['c', 'v', 'x', 'a'].includes(key.toLowerCase())) {
       e.preventDefault()
       toasts.warning("This action is not allowed during the assessment")
     }
 
-    if ((e.ctrlKey || e.metaKey) && ['c', 'v', 'x'].includes(key.toLowerCase())) {
+    // Block Select All (Ctrl/Cmd + A) to prevent selecting content
+    if ((ctrlKey || metaKey) && key.toLowerCase() === 'a') {
       e.preventDefault()
-      toasts.warning("Copy/Paste is disabled during assessment")
     }
   }, [assessment])
 
   const handleCopyPaste = useCallback((e: Event) => {
-    if (assessment?.disableCopyPaste) {
-      e.preventDefault()
-    }
-  }, [assessment])
+    // Always block copy/paste/cut on assessment take page
+    e.preventDefault()
+  }, [])
 
   // Apply copy-paste restrictions
   useEffect(() => {
@@ -605,8 +722,8 @@ export default function AssessmentTakingPage() {
     document.addEventListener('paste', handleCopyPaste)
     document.addEventListener('cut', handleCopyPaste)
 
-    // Disable text selection
-    document.body.style.userSelect = assessment.disableCopyPaste ? 'none' : 'auto'
+    // Always disable text selection on assessment take page
+    document.body.style.userSelect = 'none'
 
     return () => {
       document.removeEventListener('copy', handleCopyPaste)
@@ -777,7 +894,10 @@ export default function AssessmentTakingPage() {
               <div>
                 <CardTitle>Enter Access Key</CardTitle>
                 <CardDescription>
-                  This assessment requires an access key to begin
+                  {hasExistingAttempt 
+                    ? "Continue your assessment by entering the access key"
+                    : "This assessment requires an access key to begin"
+                  }
                 </CardDescription>
               </div>
             </div>
@@ -806,7 +926,7 @@ export default function AssessmentTakingPage() {
               disabled={!accessKeyInput.trim() || submitting}
               className="w-full"
             >
-              {submitting ? 'Verifying...' : 'Start Assessment'}
+              {submitting ? 'Verifying...' : (hasExistingAttempt ? 'Continue Assessment' : 'Start Assessment')}
             </Button>
           </CardContent>
         </Card>
@@ -915,9 +1035,25 @@ export default function AssessmentTakingPage() {
               transition={{ duration: 0.3 }}
               className="space-y-6"
             >
-              {currentQuestion.title && (
-                <h2 className="text-xl font-semibold mb-4">{currentQuestion.title}</h2>
-              )}
+              {/* Question Type Badge */}
+              <div className="flex items-center">
+                <Badge variant="outline" className="text-sm font-medium">
+                  {(() => {
+                    switch (currentQuestion.type) {
+                      case QuestionType.MULTIPLE_CHOICE:
+                        return 'Multiple Choice'
+                      case QuestionType.MULTI_SELECT:
+                        return 'Multi Select'
+                      case QuestionType.TRUE_FALSE:
+                        return 'True or False'
+                      case QuestionType.FILL_IN_BLANK:
+                        return 'Fill in the Blank'
+                      default:
+                        return currentQuestion.type
+                    }
+                  })()}
+                </Badge>
+              </div>
 
               <div className="prose max-w-none">
                 <RichTextDisplay content={currentQuestion.content} />
@@ -1023,8 +1159,7 @@ export default function AssessmentTakingPage() {
       </main>
 
       {/* Dialogs and Warnings */}
-      <AnimatePresence>
-        {showTabSwitchWarning && (
+      {showTabSwitchWarning && (
           <Dialog open={showTabSwitchWarning} onOpenChange={setShowTabSwitchWarning}>
             <DialogContent>
               <DialogHeader>
@@ -1053,33 +1188,29 @@ export default function AssessmentTakingPage() {
           </Dialog>
         )}
 
-        {showAutoSubmitWarning && (
-          <Dialog open={showAutoSubmitWarning} onOpenChange={setShowAutoSubmitWarning}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-2 text-red-600">
-                  <XCircle className="h-5 w-5" />
-                  Auto-Submitting
-                </DialogTitle>
-              </DialogHeader>
-              <div className="py-4">
-                <p className="text-sm">
-                  You have reached the maximum number of violations or the time has expired.
-                </p>
-                <p className="text-sm mt-2 text-muted-foreground">
-                  Your assessment will be automatically submitted with your current answers.
-                </p>
-                <div className="mt-4 flex items-center justify-center">
-                  <HexagonLoader size={40} />
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
-        )}
-
+        {/* Fullscreen Exit Modal */}
         {showFullscreenExitModal && (
-          <Dialog open={showFullscreenExitModal} onOpenChange={setShowFullscreenExitModal}>
-            <DialogContent>
+          <Dialog 
+            open={showFullscreenExitModal} 
+            onOpenChange={(open) => {
+              // Only allow closing through the button, not by outside click or escape
+              if (!open) return
+              setShowFullscreenExitModal(open)
+            }}
+            onPointerDownOutside={(e) => {
+              // Prevent closing when clicking outside
+              e.preventDefault()
+            }}
+            onEscapeKeyDown={(e) => {
+              // Prevent closing with Escape key
+              e.preventDefault()
+            }}
+          >
+            <DialogContent 
+              showCloseButton={false}
+              onPointerDownOutside={(e) => e.preventDefault()}
+              onEscapeKeyDown={(e) => e.preventDefault()}
+            >
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2 text-orange-600">
                   <Maximize className="h-5 w-5" />
@@ -1154,7 +1285,6 @@ export default function AssessmentTakingPage() {
             </AlertDialogContent>
           </AlertDialog>
         )}
-      </AnimatePresence>
     </div>
   )
 }

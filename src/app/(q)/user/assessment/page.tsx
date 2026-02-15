@@ -105,9 +105,13 @@ export default function UserAssessmentsPage() {
     }
   }
 
-  const handleStartAssessment = async (assessmentId: string) => {
-    // Navigate to the assessment take page directly
-    // The take page will handle access key verification if needed
+  const handleStartAssessment = async (assessmentId: string, status: string) => {
+    // For completed assessments, navigate to result page
+    if (status === "completed") {
+      router.push(`/user/assessment/${assessmentId}/result`)
+      return
+    }
+    // For other statuses, navigate to the assessment take page
     router.push(`/user/assessment/${assessmentId}/take`)
   }
 
@@ -311,21 +315,40 @@ export default function UserAssessmentsPage() {
 
               <CardFooter className="flex-shrink-0 pt-3 px-4">
                 <Button
-                  onClick={() => handleStartAssessment(assessment.id)}
-                  disabled={!assessment.canAttempt}
+                  onClick={() => handleStartAssessment(assessment.id, assessment.attemptStatus)}
+                  disabled={
+                    assessment.attemptStatus === "expired" || 
+                    assessment.isAutoSubmitted ||
+                    !assessment.canAttempt
+                  }
                   className="w-full h-9 text-sm"
-                  variant={assessment.hasInProgress ? "default" : "default"}
+                  variant={
+                    assessment.attemptStatus === "in_progress" 
+                      ? "default" 
+                      : assessment.attemptStatus === "completed" 
+                        ? "outline"
+                        : assessment.isAutoSubmitted 
+                          ? "secondary" 
+                          : "default"
+                  }
                 >
-                  {assessment.hasInProgress ? (
+                  {assessment.attemptStatus === "in_progress" ? (
                     <>
                       <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
                       Continue
                     </>
                   ) : assessment.attemptStatus === "completed" ? (
-                    <>
-                      <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
-                      Retake
-                    </>
+                    assessment.isAutoSubmitted ? (
+                      <>
+                        <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
+                        Submitted
+                      </>
+                    ) : (
+                      <>
+                        <FileText className="w-3.5 h-3.5 mr-1.5" />
+                        View Result
+                      </>
+                    )
                   ) : assessment.attemptStatus === "expired" ? (
                     <>
                       <AlertCircle className="w-3.5 h-3.5 mr-1.5" />
