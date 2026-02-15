@@ -106,23 +106,20 @@ export default function UserAssessmentsPage() {
   }
 
   const handleStartAssessment = async (assessmentId: string, status: string) => {
-    // For completed assessments, navigate to result page
-    if (status === "completed") {
-      router.push(`/user/assessment/${assessmentId}/result`)
-      return
+    // Only allow navigation for in_progress status
+    if (status === "in_progress") {
+      router.push(`/user/assessment/${assessmentId}/take`)
     }
-    // For other statuses, navigate to the assessment take page
-    router.push(`/user/assessment/${assessmentId}/take`)
   }
 
   const getStatusBadge = (status: string, isAutoSubmitted: boolean = false) => {
     if (isAutoSubmitted) {
-      return <Badge variant="destructive" className="bg-orange-100 text-orange-800 border-orange-300 text-xs py-1 px-2"><AlertCircle className="w-3 h-3 mr-1" />Auto Submitted</Badge>
+      return <Badge variant="destructive" className="bg-orange-100 text-orange-800 border-orange-300 text-xs py-1 px-2"><AlertCircle className="w-3 h-3 mr-1" />Submitted</Badge>
     }
 
     switch (status) {
       case "completed":
-        return <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs py-1 px-2"><CheckCircle2 className="w-3 h-3 mr-1" />Completed</Badge>
+        return <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs py-1 px-2"><CheckCircle2 className="w-3 h-3 mr-1" />Submitted</Badge>
       case "in_progress":
         return <Badge variant="default" className="bg-blue-100 text-blue-800 text-xs py-1 px-2"><Play className="w-3 h-3 mr-1" />In Progress</Badge>
       case "expired":
@@ -280,7 +277,7 @@ export default function UserAssessmentsPage() {
                   <Alert className="border-orange-200 bg-orange-50 py-2 px-3">
                     <AlertCircle className="h-3.5 w-3.5 text-orange-600" />
                     <AlertDescription className="text-orange-800 text-xs leading-tight">
-                      <span className="font-semibold">Auto-submitted</span> due to violations or timeout
+                      <span className="font-semibold">Submitted</span> due to violations or timeout
                     </AlertDescription>
                   </Alert>
                 )}
@@ -317,18 +314,19 @@ export default function UserAssessmentsPage() {
                 <Button
                   onClick={() => handleStartAssessment(assessment.id, assessment.attemptStatus)}
                   disabled={
-                    assessment.attemptStatus === "expired" || 
+                    assessment.attemptStatus === "expired" ||
+                    assessment.attemptStatus === "completed" ||
                     assessment.isAutoSubmitted ||
                     !assessment.canAttempt
                   }
                   className="w-full h-9 text-sm"
                   variant={
-                    assessment.attemptStatus === "in_progress" 
-                      ? "default" 
-                      : assessment.attemptStatus === "completed" 
-                        ? "outline"
-                        : assessment.isAutoSubmitted 
-                          ? "secondary" 
+                    assessment.attemptStatus === "in_progress"
+                      ? "default"
+                      : assessment.attemptStatus === "expired"
+                        ? "secondary"
+                        : assessment.startTime && new Date(assessment.startTime) > new Date()
+                          ? "outline"
                           : "default"
                   }
                 >
@@ -337,18 +335,11 @@ export default function UserAssessmentsPage() {
                       <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
                       Continue
                     </>
-                  ) : assessment.attemptStatus === "completed" ? (
-                    assessment.isAutoSubmitted ? (
-                      <>
-                        <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
-                        Submitted
-                      </>
-                    ) : (
-                      <>
-                        <FileText className="w-3.5 h-3.5 mr-1.5" />
-                        View Result
-                      </>
-                    )
+                  ) : assessment.attemptStatus === "completed" || assessment.isAutoSubmitted ? (
+                    <>
+                      <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
+                      Submitted
+                    </>
                   ) : assessment.attemptStatus === "expired" ? (
                     <>
                       <AlertCircle className="w-3.5 h-3.5 mr-1.5" />

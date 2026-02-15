@@ -1059,7 +1059,7 @@ export default function UsersPage() {
                 <Label htmlFor="add-password">Password</Label>
                 <Input
                   id="add-password"
-                  type="text"
+                  type="password"
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   required

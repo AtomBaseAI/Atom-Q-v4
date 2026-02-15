@@ -570,7 +570,7 @@ export default function UserSettingsPage() {
               <Label htmlFor="currentPassword">Current Password</Label>
               <Input
                 id="currentPassword"
-                type="text"
+                type="password"
                 value={passwordData.currentPassword}
                 onChange={(e) => setPasswordData(prev => ({ ...prev, currentPassword: e.target.value }))}
                 placeholder="Enter your current password"
@@ -582,7 +582,7 @@ export default function UserSettingsPage() {
               <Label htmlFor="newPassword">New Password</Label>
               <Input
                 id="newPassword"
-                type="text"
+                type="password"
                 value={passwordData.newPassword}
                 onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
                 placeholder="Enter your new password"
@@ -598,7 +598,7 @@ export default function UserSettingsPage() {
               <Label htmlFor="confirmPassword">Confirm New Password</Label>
               <Input
                 id="confirmPassword"
-                type="text"
+                type="password"
                 value={passwordData.confirmPassword}
                 onChange={(e) => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
                 placeholder="Confirm your new password"

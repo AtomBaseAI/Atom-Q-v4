@@ -1190,23 +1190,15 @@ export default function AssessmentTakingPage() {
 
         {/* Fullscreen Exit Modal */}
         {showFullscreenExitModal && (
-          <Dialog 
-            open={showFullscreenExitModal} 
+          <Dialog
+            open={showFullscreenExitModal}
             onOpenChange={(open) => {
               // Only allow closing through the button, not by outside click or escape
               if (!open) return
               setShowFullscreenExitModal(open)
             }}
-            onPointerDownOutside={(e) => {
-              // Prevent closing when clicking outside
-              e.preventDefault()
-            }}
-            onEscapeKeyDown={(e) => {
-              // Prevent closing with Escape key
-              e.preventDefault()
-            }}
           >
-            <DialogContent 
+            <DialogContent
               showCloseButton={false}
               onPointerDownOutside={(e) => e.preventDefault()}
               onEscapeKeyDown={(e) => e.preventDefault()}
