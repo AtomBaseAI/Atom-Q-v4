@@ -285,8 +285,12 @@ export default function ActivityQuestionsPage() {
     return matchesSearch && matchesDifficulty && matchesGroup
   })
 
-  // Popup-specific filtered questions
+  // Popup-specific filtered questions - Only MULTIPLE CHOICE questions for activities
   const popupFilteredQuestions = availableQuestions.filter(question => {
+    // Only show MULTIPLE_CHOICE questions in activity enrollment
+    if (question.type !== QuestionType.MULTIPLE_CHOICE) {
+      return false
+    }
     const matchesSearch = question.title.toLowerCase().includes(popupSearchTerm.toLowerCase()) ||
       question.content.toLowerCase().includes(popupSearchTerm.toLowerCase())
     const matchesDifficulty = popupDifficultyFilter === "all" || question.difficulty === popupDifficultyFilter
@@ -296,7 +300,9 @@ export default function ActivityQuestionsPage() {
 
   // Helper functions for selection
   const selectAllQuestions = () => {
-    const allQuestionIds = availableQuestions.map(q => q.id)
+    // Only select MULTIPLE_CHOICE questions for activities
+    const multipleChoiceQuestions = availableQuestions.filter(q => q.type === QuestionType.MULTIPLE_CHOICE)
+    const allQuestionIds = multipleChoiceQuestions.map(q => q.id)
     setSelectedQuestionsToAdd(allQuestionIds)
   }
 
@@ -485,7 +491,7 @@ export default function ActivityQuestionsPage() {
           <DialogHeader>
             <DialogTitle>Add Questions</DialogTitle>
             <DialogDescription>
-              Select questions from the available pool to enroll to this activity
+              Select MULTIPLE CHOICE questions from the available pool to enroll to this activity
             </DialogDescription>
           </DialogHeader>
           <div className="grid flex-1 auto-rows-min gap-6 px-4">
@@ -574,7 +580,7 @@ export default function ActivityQuestionsPage() {
                 onClick={selectAllQuestions}
                 className="w-full sm:w-auto"
               >
-                Select All ({availableQuestions.length})
+                Select All Multiple Choice
               </Button>
               <Button
                 variant="outline"
@@ -596,9 +602,11 @@ export default function ActivityQuestionsPage() {
 
             {/* Questions List */}
             <div className="border rounded-lg max-h-[300px] overflow-y-auto">
-              {availableQuestions.length === 0 ? (
+              {popupFilteredQuestions.length === 0 ? (
                 <div className="p-8 text-center text-muted-foreground">
-                  No available questions. Please create questions in Question Groups first.
+                  {availableQuestions.length === 0
+                    ? "No available questions. Please create questions in Question Groups first."
+                    : "No MULTIPLE CHOICE questions available. Activities can only enroll MULTIPLE CHOICE questions."}
                 </div>
               ) : (
                 <div className="divide-y">
