@@ -1,59 +1,60 @@
 @echo off
 REM Quiz User - Windows Batch Script
-REM This script starts a quiz user terminal
+REM Start a quiz user terminal
+REM Usage: user.bat <activity-key> <nickname> [user-id]
 
-REM Check if required arguments are provided
-if "%1"=="" (
-    echo ========================================================================
-    echo Error: Activity key is required!
-    echo ========================================================================
+if "%~1"=="" (
+    echo ======================================================================
+    echo Quiz User Terminal
+    echo ======================================================================
+    echo.
+    echo ERROR: Activity key is required!
     echo.
     echo Usage: user.bat ^<activity-key^> ^<nickname^> [user-id]
     echo.
-    echo Example:
+    echo Examples:
     echo   user.bat quiz-a1b2c3d4 Alice
-    echo   user.bat quiz-a1b2c3d4 Bob user-bob-123
+    echo   user.bat quiz-a1b2c3d4 Bob user-123
     echo.
-    echo Note: Start the admin first to get the activity key
-    echo ========================================================================
+    echo Note: Run the admin first to get the activity key
     echo.
     pause
     exit /b 1
 )
 
-if "%2"=="" (
-    echo ========================================================================
-    echo Error: Nickname is required!
-    echo ========================================================================
-    echo.
+if "%~2"=="" (
+    echo ERROR: Nickname is required!
     echo Usage: user.bat ^<activity-key^> ^<nickname^> [user-id]
-    echo.
-    echo Example:
-    echo   user.bat quiz-a1b2c3d4 Alice
-    echo   user.bat quiz-a1b2c3d4 Bob user-bob-123
-    echo.
-    echo ========================================================================
-    echo.
     pause
     exit /b 1
 )
 
-echo ========================================================================
-echo Starting Quiz User...
-echo ========================================================================
+echo ======================================================================
+echo Quiz User Terminal
+echo ======================================================================
+echo.
+echo Activity Key: %~1
+echo Nickname: %~2
+echo User ID: %~3 (auto-generated if not provided)
 echo.
 
-REM Check if optional user-id was provided
-if "%3"=="" (
-    npx tsx simulate/server-user.ts %1 %2
-) else (
-    npx tsx simulate/server-user.ts %1 %2 %3
+REM Check if Node.js is installed
+where node >nul 2>nul
+if %ERRORLEVEL% NEQ 0 (
+    echo ERROR: Node.js is not installed or not in PATH
+    echo Please install Node.js from https://nodejs.org/
+    pause
+    exit /b 1
 )
 
-if errorlevel 1 (
-    echo.
-    echo Error: Failed to start user. Make sure you have installed dependencies.
-    echo Run: npm install
-    echo.
-    pause
+REM Check if bun is installed (preferred)
+where bun >nul 2>nul
+if %ERRORLEVEL% EQU 0 (
+    echo Using Bun package manager...
+    bun run user %~1 %~2 %~3
+) else (
+    echo Using npm...
+    npm run user %~1 %~2 %~3
 )
+
+pause

@@ -6,13 +6,17 @@
 import { WebSocket } from 'ws';
 import * as readline from 'readline';
 
+// Local server URL
+// const WS_URL = 'http://127.0.0.1:1999/party';
+
+// Remote server URL (commented out)
 const WS_URL = 'https://atomq-quiz-partykit-server.atombaseai.partykit.dev'.replace(
   'https://',
   'wss://'
 );
 
 // Color codes for terminal output
-const colors = {
+const colors: Record<string, string> = {
   reset: '\x1b[0m',
   bright: '\x1b[1m',
   green: '\x1b[32m',
@@ -35,8 +39,9 @@ function clearLine() {
 }
 
 interface Question {
-  id: string;
-  text: string;
+  id?: string;
+  questionId?: string;
+  question: string;
   options: string[];
   duration: number;
   questionIndex: number;
@@ -96,7 +101,7 @@ class QuizUser {
   }
 
   async connect(): Promise<void> {
-    const wsUrl = `${WS_URL}/party/${this.activityKey}`;
+    const wsUrl = `${WS_URL}/${this.activityKey}`;
     log(`Connecting to ${wsUrl}...`, 'cyan');
 
     return new Promise((resolve, reject) => {
@@ -128,7 +133,6 @@ class QuizUser {
   handleMessage(message: any) {
     switch (message.type) {
       case 'SYNC_TIME':
-        // Ignore frequent sync messages
         break;
 
       case 'USER_UPDATE':
@@ -137,7 +141,6 @@ class QuizUser {
         break;
 
       case 'ADMIN_CONFIRMED':
-        // Not applicable for regular users
         break;
 
       case 'GET_READY':
@@ -172,6 +175,8 @@ class QuizUser {
         log(`\n✓ Answer confirmed!`, 'green');
         log(`   Score: ${message.payload.score} points`, 'green');
         log(`   Time taken: ${message.payload.timeSpent.toFixed(2)} seconds`, 'cyan');
+        this.totalScore += message.payload.score;
+        this.questionCount++;
         break;
 
       case 'SHOW_ANSWER':
@@ -195,10 +200,12 @@ class QuizUser {
           }
         }
         log('='.repeat(70) + '\n', 'magenta');
+        log('\n⏳ Waiting for admin to show leaderboard...', 'yellow');
         break;
 
       case 'LEADERBOARD_UPDATE':
         this.showLeaderboard(message.payload.leaderboard);
+        log('\n⏳ Waiting for admin to proceed to next question...', 'yellow');
         break;
 
       case 'QUIZ_END':
@@ -214,10 +221,6 @@ class QuizUser {
         process.exit(0);
         break;
 
-      case 'WAITING_SCREEN':
-        log('\n⏸️  Quiz finished. Waiting for next session...\n', 'yellow');
-        break;
-
       default:
         log(`\n📩 Received: ${message.type}`, 'magenta');
     }
@@ -231,7 +234,7 @@ class QuizUser {
         nickname: this.nickname,
         avatar: this.avatar,
         activityKey: this.activityKey,
-        role: 'PLAYER',
+        role: 'USER', // Changed from 'PLAYER' to 'USER'
       },
     };
     this.ws?.send(JSON.stringify(message));
@@ -249,7 +252,7 @@ class QuizUser {
     console.log('\n' + '='.repeat(70));
     log(`❓ Question ${this.currentQuestion.questionIndex}/${this.currentQuestion.totalQuestions}`, 'bright');
     log('='.repeat(70));
-    log(this.currentQuestion.text, 'bright');
+    log(this.currentQuestion.question, 'bright');
     log('\nOptions:', 'cyan');
     this.currentQuestion.options.forEach((opt, idx) => {
       log(`  ${idx + 1}. ${opt}`);
@@ -273,16 +276,14 @@ class QuizUser {
     log('🏆 LEADERBOARD', 'bright');
     log('='.repeat(70));
 
-    if (leaderboard.length === 0) {
-      log('  No scores yet', 'yellow');
+    // Show only user's score
+    const userEntry = leaderboard.find((entry: any) => entry.userId === this.userId);
+    if (userEntry) {
+      const rank = leaderboard.findIndex((entry: any) => entry.userId === this.userId) + 1;
+      const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '  ';
+      log(`  ${medal} Rank ${rank}: ${userEntry.nickname} (YOU) - ${userEntry.score || 0} pts`, 'green');
     } else {
-      leaderboard.forEach((entry: any, idx: number) => {
-        const isMe = entry.userId === this.userId;
-        const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : '  ';
-        const prefix = isMe ? '→ ' : '   ';
-        const color = isMe ? 'green' : 'cyan';
-        log(`${prefix}${medal} ${idx + 1}. ${entry.nickname} - ${entry.totalScore} pts ${isMe ? '(YOU)' : ''}`, color);
-      });
+      log('  Your score not found on leaderboard', 'yellow');
     }
 
     console.log('='.repeat(70) + '\n');
@@ -339,13 +340,13 @@ class QuizUser {
 
     this.canAnswer = false;
     this.hasAnswered = true;
-    this.questionCount++;
 
+    const questionId = this.currentQuestion.questionId || this.currentQuestion.id;
     const message = {
       type: 'SUBMIT_ANSWER',
       payload: {
         userId: this.userId,
-        questionId: this.currentQuestion.id,
+        questionId: questionId,
         answer: answer,
         timeSpent: timeSpent,
         activityKey: this.activityKey,

@@ -7,13 +7,17 @@ import { WebSocket } from 'ws';
 import * as readline from 'readline';
 import { randomBytes } from 'crypto';
 
+// Local server URL
+// const WS_URL = 'http://127.0.0.1:1999/party';
+
+// Remote server URL (commented out)
 const WS_URL = 'https://atomq-quiz-partykit-server.atombaseai.partykit.dev'.replace(
   'https://',
   'wss://'
 );
 
 // Color codes for terminal output
-const colors = {
+const colors: Record<string, string> = {
   reset: '\x1b[0m',
   bright: '\x1b[1m',
   green: '\x1b[32m',
@@ -33,10 +37,6 @@ function log(message: string, color = 'reset') {
 
 function clearLine() {
   process.stdout.write('\x1b[2K');
-}
-
-function moveCursorUp(lines: number) {
-  process.stdout.write(`\x1b[${lines}F`);
 }
 
 // 10 MCQ Questions
@@ -115,20 +115,19 @@ interface User {
 
 class QuizAdmin {
   private activityKey: string;
-  private questionInterval: number;
   private ws: WebSocket | null = null;
   private users: Map<string, User> = new Map();
   private currentQuestionIndex: number = 0;
   private currentQuestionStats: any = null;
   private quizStarted: boolean = false;
   private quizEnded: boolean = false;
+  private waitingForLeaderboard: boolean = false;
+  private leaderboardShown: boolean = false;
   private rl: readline.Interface;
-  private questionTimers: NodeJS.Timeout[] = [];
 
-  constructor(questionInterval: number = 15) {
+  constructor() {
     // Generate a random activity key
     this.activityKey = 'quiz-' + randomBytes(4).toString('hex').toLowerCase();
-    this.questionInterval = questionInterval;
     this.rl = readline.createInterface({
       input: process.stdin,
       output: process.stdout,
@@ -138,7 +137,7 @@ class QuizAdmin {
   async start() {
     this.showBanner();
     log(`Activity Key: ${this.activityKey}`, 'bgBlue');
-    log(`Question Interval: ${this.questionInterval} seconds\n`, 'cyan');
+    log(`Total Questions: ${QUESTIONS.length}\n`, 'cyan');
 
     // Connect to server
     await this.connect();
@@ -148,7 +147,7 @@ class QuizAdmin {
 
     // Wait a bit then show menu
     setTimeout(() => {
-      this.showMenu();
+      this.showLobbyMenu();
       this.handleInput();
     }, 1000);
   }
@@ -159,24 +158,64 @@ class QuizAdmin {
     log('='.repeat(70) + '\n');
   }
 
-  showMenu() {
+  showLobbyMenu() {
     console.log('\n' + '-'.repeat(70));
-    log('📋 ADMIN MENU', 'bright');
+    log('📋 LOBBY MENU', 'bright');
     log('='.repeat(70));
-    log('1. Start Quiz', 'green');
-    log('2. Show Connected Users', 'cyan');
-    log('3. Show Leaderboard', 'yellow');
-    log('4. Show Current Question Stats', 'blue');
-    log('5. Show Questions List', 'magenta');
-    log('6. Set Question Interval', 'cyan');
-    log('7. Show Activity Info', 'yellow');
-    log('8. End Quiz', 'red');
+
+    // Show connected users
+    const userCount = this.users.size - 1; // Exclude admin
+    log(`👥 Connected Users: ${userCount}\n`, 'cyan');
+    this.users.forEach((user, id) => {
+      if (user.role !== 'ADMIN') {
+        log(`  • ${user.nickname} (${user.avatar})`, 'green');
+      }
+    });
+    console.log('\n' + '-'.repeat(70));
+    log('1. Show Questions', 'magenta');
+    log('2. Start Quiz', 'green');
+    log('0. Exit', 'red');
+    log('='.repeat(70) + '\n');
+  }
+
+  showQuizMenu() {
+    console.log('\n' + '-'.repeat(70));
+    log('📋 QUIZ MENU', 'bright');
+    log('='.repeat(70));
+
+    if (this.waitingForLeaderboard) {
+      log('Status: Question Complete - Waiting for action', 'yellow');
+    } else if (this.leaderboardShown) {
+      log('Status: Leaderboard Shown', 'yellow');
+    } else {
+      log('Status: Quiz in Progress', 'green');
+    }
+
+    console.log('\n' + '-'.repeat(70));
+
+    if (this.waitingForLeaderboard) {
+      log('1. Show Leaderboard', 'yellow');
+    } else if (this.leaderboardShown) {
+      if (this.currentQuestionIndex < QUESTIONS.length - 1) {
+        log('1. Next Question', 'green');
+      } else {
+        log('1. End Quiz', 'red');
+      }
+    } else {
+      log('1. Show Leaderboard', 'yellow');
+      if (this.currentQuestionIndex < QUESTIONS.length - 1) {
+        log('2. Next Question', 'green');
+      } else {
+        log('2. End Quiz', 'red');
+      }
+    }
+
     log('0. Exit', 'red');
     log('='.repeat(70) + '\n');
   }
 
   async connect(): Promise<void> {
-    const wsUrl = `${WS_URL}/party/${this.activityKey}`;
+    const wsUrl = `${WS_URL}/${this.activityKey}`;
     log(`Connecting to ${wsUrl}...`, 'cyan');
 
     return new Promise((resolve, reject) => {
@@ -206,12 +245,13 @@ class QuizAdmin {
   handleMessage(message: any) {
     switch (message.type) {
       case 'SYNC_TIME':
-        // Ignore frequent sync messages
         break;
 
       case 'USER_UPDATE':
         this.updateUsers(message.payload.users || []);
-        this.showLiveUsers();
+        if (!this.quizStarted) {
+          this.showLobbyMenu();
+        }
         break;
 
       case 'ADMIN_CONFIRMED':
@@ -220,6 +260,7 @@ class QuizAdmin {
 
       case 'GET_READY':
         log(`\n🎯 Get Ready! Question ${message.payload.questionIndex}/${message.payload.totalQuestions}`, 'yellow');
+        log(`   Starting in ${message.payload.duration} seconds...`, 'cyan');
         break;
 
       case 'QUESTION_LOADER':
@@ -237,6 +278,7 @@ class QuizAdmin {
           log(`  ${idx + 1}. ${opt}`);
         });
         log(`\n⏱️  Time: ${message.payload.duration} seconds`, 'yellow');
+        log('='.repeat(70));
         break;
 
       case 'QUESTION_STATS_UPDATE':
@@ -245,19 +287,26 @@ class QuizAdmin {
         break;
 
       case 'SHOW_ANSWER':
-        const qIndex = this.currentQuestionIndex;
-        const question = QUESTIONS[qIndex];
-        log(`\n${'='.repeat(70)}`, 'green');
-        log(`💡 Answer Revealed`, 'bright');
-        log('='.repeat(70), 'green');
-        log(`Question: ${question.text}`);
-        log(`Correct Answer: ${question.options[question.correctAnswer]} (Option ${question.correctAnswer + 1})`, 'green');
-        log(`Total Responses: ${message.payload.questionStats?.totalResponses || 0}`);
-        log('='.repeat(70), 'green');
+        const questionId = message.payload.questionId;
+        const question = QUESTIONS.find(q => q.id === questionId);
+        if (question) {
+          log(`\n${'='.repeat(70)}`, 'green');
+          log(`💡 Answer Revealed`, 'bright');
+          log('='.repeat(70), 'green');
+          log(`Question: ${question.text}`);
+          log(`Correct Answer: ${question.options[question.correctAnswer]} (Option ${question.correctAnswer + 1})`, 'green');
+          log(`Total Responses: ${message.payload.questionStats?.totalResponses || 0}`);
+          log('='.repeat(70), 'green');
+        }
+        this.waitingForLeaderboard = true;
+        this.leaderboardShown = false;
         break;
 
       case 'LEADERBOARD_UPDATE':
         this.showLeaderboard(message.payload.leaderboard);
+        this.leaderboardShown = true;
+        this.waitingForLeaderboard = false;
+        this.showQuizMenu();
         break;
 
       case 'QUIZ_END':
@@ -266,11 +315,9 @@ class QuizAdmin {
         log('🏁 QUIZ COMPLETED!', 'bright');
         log('='.repeat(70) + '\n', 'bgGreen');
         this.showLeaderboard(message.payload.finalLeaderboard);
-        this.showMenu();
-        break;
-
-      case 'WAITING_SCREEN':
-        log('\n⏸️  Waiting for next quiz...', 'yellow');
+        log('\n✓ Quiz finished successfully!', 'green');
+        this.rl.close();
+        setTimeout(() => process.exit(0), 3000);
         break;
 
       default:
@@ -299,48 +346,16 @@ class QuizAdmin {
     });
   }
 
-  showLiveUsers() {
-    const userCount = this.users.size;
-    const usersList = Array.from(this.users.values())
-      .filter(u => u.role !== 'ADMIN')
-      .map(u => `  • ${u.nickname} (${u.avatar})`)
-      .join('\n');
-
-    clearLine();
-    process.stdout.write(`\x1b[1A\x1b[2K`);
-    process.stdout.write(
-      `\r${colors.bgBlue} Live Users: ${userCount} ${colors.reset} | ` +
-      `${colors.green}Status: ${this.quizStarted ? (this.quizEnded ? 'Ended' : 'Active') : 'Waiting'}${colors.reset}`
-    );
-  }
-
   showQuestionStats() {
     if (!this.currentQuestionStats) return;
 
     const stats = this.currentQuestionStats;
+    clearLine();
     process.stdout.write('\r\x1b[2K');
     process.stdout.write(
       `\r${colors.cyan}Responses: ${stats.totalResponses}/${stats.totalUsers} users | ` +
       `Options: [${stats.optionCounts.join(' | ')}]${colors.reset}`
     );
-  }
-
-  showConnectedUsers() {
-    console.log('\n' + '='.repeat(70));
-    log(`👥 Connected Users (${this.users.size})`, 'bright');
-    log('='.repeat(70));
-
-    if (this.users.size === 0) {
-      log('  No users connected yet', 'yellow');
-    } else {
-      this.users.forEach((user, id) => {
-        const roleColor = user.role === 'ADMIN' ? 'green' : 'cyan';
-        log(`  • ${user.nickname} (${user.avatar}) - ${user.role}`, roleColor);
-        log(`    ID: ${id} | Status: ${user.status} | Score: ${user.totalScore}`, 'cyan');
-      });
-    }
-    console.log('='.repeat(70) + '\n');
-    this.showMenu();
   }
 
   showLeaderboard(leaderboard: any[] = []) {
@@ -349,28 +364,15 @@ class QuizAdmin {
     log('='.repeat(70));
 
     if (leaderboard.length === 0) {
-      // Build from users map
-      const users = Array.from(this.users.values())
-        .filter(u => u.role !== 'ADMIN')
-        .sort((a, b) => b.totalScore - a.totalScore);
-
-      if (users.length === 0) {
-        log('  No players yet', 'yellow');
-      } else {
-        users.forEach((user, idx) => {
-          const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : '  ';
-          log(`  ${medal} ${idx + 1}. ${user.nickname} (${user.avatar}) - ${user.totalScore} pts`, 'cyan');
-        });
-      }
+      log('  No scores yet', 'yellow');
     } else {
       leaderboard.forEach((entry: any, idx: number) => {
         const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : '  ';
-        log(`  ${medal} ${idx + 1}. ${entry.nickname} - ${entry.totalScore} pts`, 'cyan');
+        log(`  ${medal} ${idx + 1}. ${entry.nickname} - ${entry.score || 0} pts`, 'cyan');
       });
     }
 
     console.log('='.repeat(70) + '\n');
-    this.showMenu();
   }
 
   showQuestionsList() {
@@ -388,29 +390,28 @@ class QuizAdmin {
     });
 
     console.log('\n' + '='.repeat(70) + '\n');
-    this.showMenu();
   }
 
   startQuiz() {
     if (this.quizStarted) {
       log('\n⚠️  Quiz already started!', 'yellow');
-      this.showMenu();
+      this.showLobbyMenu();
       return;
     }
 
-    if (this.users.size < 2) {
+    const playerCount = this.users.size - 1; // Exclude admin
+
+    if (playerCount < 1) {
       log('\n⚠️  Wait for at least 1 player to join!', 'yellow');
-      this.showMenu();
-      return;
+      log('   Starting quiz anyway for testing purposes...\n', 'cyan');
     }
 
     this.quizStarted = true;
     log('\n🚀 Starting quiz...', 'green');
 
-    // Update question duration based on interval
     const questionsWithDuration = QUESTIONS.map(q => ({
       ...q,
-      duration: this.questionInterval,
+      duration: 15,
     }));
 
     const message = {
@@ -424,39 +425,26 @@ class QuizAdmin {
     this.ws?.send(JSON.stringify(message));
   }
 
-  endQuiz() {
-    log('\n🏁 Ending quiz...', 'yellow');
-    this.quizEnded = true;
-    // The server will handle QUIZ_END message
-    this.showMenu();
+  showLeaderboardRequest() {
+    const message = {
+      type: 'SHOW_LEADERBOARD',
+      payload: {
+        activityKey: this.activityKey,
+      },
+    };
+    this.ws?.send(JSON.stringify(message));
+    log('\n📊 Requesting leaderboard...', 'cyan');
   }
 
-  showActivityInfo() {
-    console.log('\n' + '='.repeat(70));
-    log('ℹ️  ACTIVITY INFORMATION', 'bright');
-    log('='.repeat(70));
-    log(`Activity Key: ${this.activityKey}`, 'cyan');
-    log(`Question Interval: ${this.questionInterval} seconds`, 'cyan');
-    log(`Total Questions: ${QUESTIONS.length}`, 'cyan');
-    log(`Connected Users: ${this.users.size}`, 'cyan');
-    log(`Quiz Status: ${this.quizStarted ? (this.quizEnded ? 'Ended' : 'Active') : 'Not Started'}`, this.quizStarted ? 'green' : 'yellow');
-    log(`Current Question: ${this.currentQuestionIndex + 1}/${QUESTIONS.length}`, 'cyan');
-    console.log('='.repeat(70) + '\n');
-    this.showMenu();
-  }
-
-  async setQuestionInterval() {
-    const answer = await this.askQuestion('\nEnter question interval in seconds (default 15): ');
-    const interval = parseInt(answer) || 15;
-
-    if (interval < 5 || interval > 60) {
-      log('⚠️  Interval must be between 5 and 60 seconds', 'yellow');
-    } else {
-      this.questionInterval = interval;
-      log(`✓ Question interval set to ${interval} seconds`, 'green');
-    }
-
-    this.showMenu();
+  nextQuestion() {
+    const message = {
+      type: 'NEXT_QUESTION',
+      payload: {
+        activityKey: this.activityKey,
+      },
+    };
+    this.ws?.send(JSON.stringify(message));
+    log('\n➡️  Moving to next question...', 'cyan');
   }
 
   askQuestion(question: string): Promise<string> {
@@ -470,62 +458,72 @@ class QuizAdmin {
   async handleInput() {
     const answer = await this.askQuestion('Enter your choice: ');
 
-    switch (answer.trim()) {
-      case '1':
-        this.startQuiz();
-        break;
-      case '2':
-        this.showConnectedUsers();
-        break;
-      case '3':
-        this.showLeaderboard();
-        break;
-      case '4':
-        if (this.currentQuestionStats) {
-          console.log('\n' + '='.repeat(70));
-          log('📊 CURRENT QUESTION STATS', 'bright');
-          log('='.repeat(70));
-          log(`Question: ${this.currentQuestionIndex + 1}`, 'cyan');
-          log(`Total Responses: ${this.currentQuestionStats.totalResponses}`, 'cyan');
-          log(`Total Users: ${this.currentQuestionStats.totalUsers}`, 'cyan');
-          log(`Response Rate: ${((this.currentQuestionStats.totalResponses / this.currentQuestionStats.totalUsers) * 100).toFixed(1)}%`, 'yellow');
-          log(`\nOption Distribution:`, 'cyan');
-          this.currentQuestionStats.optionCounts.forEach((count: number, idx: number) => {
-            const percentage = this.currentQuestionStats.totalResponses > 0
-              ? ((count / this.currentQuestionStats.totalResponses) * 100).toFixed(1)
-              : '0.0';
-            log(`  Option ${idx + 1}: ${count} votes (${percentage}%)`, 'magenta');
-          });
-          console.log('='.repeat(70) + '\n');
-        } else {
-          log('\n⚠️  No active question stats available', 'yellow');
-        }
-        this.showMenu();
-        break;
-      case '5':
-        this.showQuestionsList();
-        break;
-      case '6':
-        await this.setQuestionInterval();
-        break;
-      case '7':
-        this.showActivityInfo();
-        break;
-      case '8':
-        this.endQuiz();
-        break;
-      case '0':
-        log('\n👋 Goodbye!', 'yellow');
-        this.ws?.close();
-        this.rl.close();
-        process.exit(0);
-        break;
-      default:
-        log('\n⚠️  Invalid choice. Please try again.', 'yellow');
-        this.showMenu();
+    if (this.quizStarted) {
+      // Quiz menu
+      switch (answer.trim()) {
+        case '1':
+          if (this.waitingForLeaderboard || (!this.leaderboardShown && !this.waitingForLeaderboard)) {
+            this.showLeaderboardRequest();
+          } else {
+            if (this.currentQuestionIndex < QUESTIONS.length - 1) {
+              this.nextQuestion();
+            } else {
+              log('\n🏁 Ending quiz...', 'yellow');
+              this.nextQuestion(); // This will trigger QUIZ_END
+            }
+          }
+          break;
+        case '2':
+          if (!this.waitingForLeaderboard) {
+            if (this.currentQuestionIndex < QUESTIONS.length - 1) {
+              this.nextQuestion();
+            } else {
+              log('\n🏁 Ending quiz...', 'yellow');
+              this.nextQuestion(); // This will trigger QUIZ_END
+            }
+          } else {
+            log('\n⚠️  Please show leaderboard first', 'yellow');
+            this.showQuizMenu();
+          }
+          break;
+        case '0':
+          log('\n👋 Goodbye!', 'yellow');
+          this.ws?.close();
+          this.rl.close();
+          process.exit(0);
+          break;
+        default:
+          log('\n⚠️  Invalid choice. Please try again.', 'yellow');
+          this.showQuizMenu();
+      }
+    } else {
+      // Lobby menu
+      switch (answer.trim()) {
+        case '1':
+          this.showQuestionsList();
+          this.showLobbyMenu();
+          break;
+        case '2':
+          this.startQuiz();
+          break;
+        case '0':
+          log('\n👋 Goodbye!', 'yellow');
+          this.ws?.close();
+          this.rl.close();
+          process.exit(0);
+          break;
+        default:
+          log('\n⚠️  Invalid choice. Please try again.', 'yellow');
+          this.showLobbyMenu();
+      }
     }
 
     if (!this.quizEnded) {
+      if (this.quizStarted) {
+        this.showQuizMenu();
+      } else {
+        this.showLobbyMenu();
+      }
       this.handleInput();
     }
   }
@@ -533,10 +531,7 @@ class QuizAdmin {
 
 // Main execution
 async function main() {
-  const args = process.argv.slice(2);
-  const interval = args[0] ? parseInt(args[0]) : 15;
-
-  const admin = new QuizAdmin(interval);
+  const admin = new QuizAdmin();
   await admin.start();
 }
 

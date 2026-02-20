@@ -33,7 +33,7 @@ import {
   SunDim,
   Maximize,
   Minimize,
-  Activity,
+  Gamepad2,
 } from "lucide-react";
 import { useSidebar } from "@/components/ui/sidebar";
 import { flushSync } from "react-dom";
@@ -68,7 +68,7 @@ const adminNavItems = [
   {
     title: "Activities",
     href: "/admin/activity",
-    icon: Activity,
+    icon: Gamepad2,
   },
   {
     title: "Questions",
