@@ -53,6 +53,7 @@ import {
   Key,
   Copy,
   CheckCircle2 as CheckCircle,
+  Play,
 } from "lucide-react"
 import { toasts } from "@/lib/toasts"
 import { DataTable } from "@/components/ui/data-table"
@@ -297,6 +298,25 @@ export default function ActivitiesPage() {
       cell: ({ row }) => {
         const date = new Date(row.getValue("createdAt"))
         return formatDateDDMMYYYY(date.toISOString())
+      },
+    },
+    {
+      id: "start",
+      enableHiding: false,
+      header: "Start",
+      cell: ({ row }) => {
+        const activity = row.original
+        return (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-primary hover:text-primary hover:bg-primary/10"
+            onClick={() => router.push(`/activity-prepare/${activity.id}`)}
+            title="Start Activity"
+          >
+            <Play className="h-4 w-4 fill-current" />
+          </Button>
+        )
       },
     },
     {
