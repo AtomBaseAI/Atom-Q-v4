@@ -54,6 +54,8 @@ import {
   Copy,
   CheckCircle2 as CheckCircle,
   Play,
+  BadgeCheck,
+  Circle,
 } from "lucide-react"
 import { toasts } from "@/lib/toasts"
 import { DataTable } from "@/components/ui/data-table"
@@ -301,18 +303,45 @@ export default function ActivitiesPage() {
       },
     },
     {
+      id: "status",
+      header: "Status",
+      cell: ({ row }) => {
+        const activity = row.original
+        const questionCount = activity._count?.activityQuestions || 0
+
+        if (questionCount === 0) {
+          return (
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Circle className="h-3 w-3" />
+              <span className="text-sm">Setup Required</span>
+            </div>
+          )
+        }
+
+        return (
+          <div className="flex items-center gap-2 text-green-600">
+            <BadgeCheck className="h-4 w-4" />
+            <span className="text-sm font-medium">Ready</span>
+          </div>
+        )
+      },
+    },
+    {
       id: "start",
       enableHiding: false,
       header: "Start",
       cell: ({ row }) => {
         const activity = row.original
+        const questionCount = activity._count?.activityQuestions || 0
+
         return (
           <Button
             variant="ghost"
             size="icon"
             className="h-8 w-8 text-primary hover:text-primary hover:bg-primary/10"
             onClick={() => router.push(`/activity-prepare/${activity.id}`)}
-            title="Start Activity"
+            title={questionCount === 0 ? "Add questions first" : "Start Activity"}
+            disabled={questionCount === 0}
           >
             <Play className="h-4 w-4 fill-current" />
           </Button>
