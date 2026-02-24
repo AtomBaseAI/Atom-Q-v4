@@ -7,14 +7,18 @@ import { WebSocket } from 'ws';
 import * as readline from 'readline';
 import { randomBytes } from 'crypto';
 
-// Local server URL
-// const WS_URL = 'http://127.0.0.1:1999/party';
+const DEFAULT_PARTYKIT_URL = 'https://atomq-quiz-partykit-server.atombaseai.partykit.dev';
+const PARTYKIT_URL = process.env.PARTYKIT_URL || DEFAULT_PARTYKIT_URL;
 
-// Remote server URL (commented out)
-const WS_URL = 'https://atomq-quiz-partykit-server.atombaseai.partykit.dev'.replace(
-  'https://',
-  'wss://'
-);
+function buildWsBase(url: string): string {
+  const withProtocol = url.startsWith('http://') || url.startsWith('https://')
+    ? url
+    : `https://${url}`;
+  const ws = withProtocol.replace(/^http/, 'ws').replace(/\/+$/, '');
+  return ws.endsWith('/party') ? ws : `${ws}/party`;
+}
+
+const WS_URL = buildWsBase(PARTYKIT_URL);
 
 // Color codes for terminal output
 const colors: Record<string, string> = {
