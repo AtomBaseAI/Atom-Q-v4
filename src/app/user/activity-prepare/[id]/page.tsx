@@ -12,6 +12,7 @@ import { UserRole } from "@prisma/client"
 import { toasts } from "@/lib/toasts"
 import { PartyKitClient, User, Question, getUserIconUrl, getRandomUserIcon, storeUserIcon, retrieveUserIcon } from "@/lib/partykit-client"
 import { Lobby } from "@/components/activity/lobby"
+import { UserQuiz } from "@/components/activity/user-quiz"
 import { FullscreenModal } from "@/components/activity/fullscreen-modal"
 
 interface Activity {
@@ -30,7 +31,7 @@ interface Activity {
   }
 }
 
-type View = 'join' | 'lobby'
+type View = 'join' | 'lobby' | 'quiz'
 
 export default function UserActivityPreparePage() {
   const params = useParams()
@@ -148,6 +149,10 @@ export default function UserActivityPreparePage() {
           setView('lobby')
           setIsJoiningLobby(false)
           toasts.success('Joined lobby successfully!')
+          // Request current state to get existing users
+          setTimeout(() => {
+            client.requestState()
+          }, 500)
         },
         onError: (error) => {
           console.error('[User] PartyKit error:', error)
@@ -164,13 +169,13 @@ export default function UserActivityPreparePage() {
         },
         onGetReady: (payload) => {
           console.log('[User] Get ready for question', payload.questionIndex)
-          // You can show a "Get Ready" screen here
+          setQuizStarted(true)
+          setView('quiz')
         },
         onQuestionStart: (question: Question) => {
           console.log('[User] Question started:', question.questionIndex)
           setQuizStarted(true)
-          // Navigate to quiz view when first question starts
-          // router.push(`/user/activity-take/${params.id}`)
+          setView('quiz')
         },
         onQuestionStatsUpdate: (stats) => {
           console.log('[User] Question stats update:', stats)
@@ -341,6 +346,33 @@ export default function UserActivityPreparePage() {
 
   if (!activity) {
     return null
+  }
+
+  // Quiz view
+  if (view === 'quiz') {
+    return (
+      <>
+        {showFullscreenModal && (
+          <FullscreenModal onEnableFullscreen={enterFullscreen} />
+        )}
+        <UserQuiz
+          client={partyKitClientRef.current}
+          activityKey={activity.accessKey!}
+          currentUser={{
+            id: session?.user?.id || '',
+            nickname: username,
+            avatar: userIcon?.toString() || '1',
+            role: 'USER',
+            status: '',
+            joinedAt: Date.now()
+          }}
+          isFullscreen={isFullscreen}
+          onToggleFullscreen={handleToggleFullscreen}
+          onBack={handleBackFromLobby}
+          activityTitle={activity.title}
+        />
+      </>
+    )
   }
 
   // Lobby view

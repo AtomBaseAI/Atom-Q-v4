@@ -335,6 +335,13 @@ export class PartyKitClient {
     })
   }
 
+  showAnswer(questionId: string) {
+    return this.send('SHOW_ANSWER', {
+      activityKey: this.room,
+      questionId,
+    })
+  }
+
   showLeaderboard() {
     return this.send('SHOW_LEADERBOARD', {
       activityKey: this.room,
@@ -353,6 +360,14 @@ export class PartyKitClient {
       this.ws.close()
       this.ws = null
     }
+  }
+
+  // Request current state (users, etc.) after reconnecting
+  requestState() {
+    console.log('[PartyKit] Requesting current state...')
+    return this.send('REQUEST_STATE', {
+      activityKey: this.room,
+    })
   }
 
   isConnected(): boolean {

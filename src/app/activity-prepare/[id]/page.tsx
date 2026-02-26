@@ -9,6 +9,7 @@ import { Loader2, Play, ArrowLeft, ChevronRight, FileQuestion, Building2, Gradua
 import { UserRole } from "@prisma/client"
 import { PartyKitClient, User, Question, getUserIconUrl } from "@/lib/partykit-client"
 import { Lobby } from "@/components/activity/lobby"
+import { AdminQuiz } from "@/components/activity/admin-quiz"
 import { FullscreenModal } from "@/components/activity/fullscreen-modal"
 import { toasts } from "@/lib/toasts"
 
@@ -41,7 +42,7 @@ interface ActivityQuestion {
   }
 }
 
-type View = 'prepare' | 'lobby'
+type View = 'prepare' | 'lobby' | 'quiz'
 
 export default function ActivityPreparePage() {
   const params = useParams()
@@ -148,6 +149,10 @@ export default function ActivityPreparePage() {
             '1', // Use admin icon (you can customize this)
             'ADMIN'
           )
+          // Request current state to get existing users
+          setTimeout(() => {
+            client.requestState()
+          }, 500)
         },
         onError: (error) => {
           console.error('[Admin] PartyKit error:', error)
@@ -178,8 +183,12 @@ export default function ActivityPreparePage() {
         onQuestionStart: (question: Question) => {
           console.log('[Admin] Question started:', question.questionIndex)
           setQuizStarted(true)
-          // Navigate to quiz view when first question starts
-          // router.push(`/admin/activity/${params.id}/live`)
+          setView('quiz')
+        },
+        onGetReady: (payload: any) => {
+          console.log('[Admin] Get ready for question', payload.questionIndex)
+          setQuizStarted(true)
+          setView('quiz')
         },
         onQuizEnd: (payload) => {
           console.log('[Admin] Quiz ended')
@@ -367,6 +376,35 @@ export default function ActivityPreparePage() {
 
   if (!activity) {
     return null
+  }
+
+  // Quiz view
+  if (view === 'quiz') {
+    return (
+      <>
+        {showFullscreenModal && (
+          <FullscreenModal onEnableFullscreen={enterFullscreen} />
+        )}
+        <AdminQuiz
+          client={partyKitClientRef.current}
+          questions={questions.map((aq, index) => ({
+            id: aq.question.id,
+            question: aq.question.content,
+            options: JSON.parse(aq.question.options),
+            duration: activity?.answerTime || 15,
+            questionIndex: index + 1,
+            totalQuestions: questions.length,
+            correctAnswer: parseInt(aq.question.correctAnswer),
+          }))}
+          activityKey={activity.accessKey!}
+          users={users}
+          isFullscreen={isFullscreen}
+          onToggleFullscreen={handleToggleFullscreen}
+          onBack={handleBackFromLobby}
+          activityTitle={activity.title}
+        />
+      </>
+    )
   }
 
   // Lobby view

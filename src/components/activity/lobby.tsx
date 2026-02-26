@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react"
 import { Button } from "@/components/ui/button"
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"
 import { Users, Crown, Play, ArrowLeft, Maximize2, Minimize2, Key, Sun, Moon, Loader2 } from "lucide-react"
 import { User, getUserIconUrl, retrieveUserIcon, getRandomUserIcon, storeUserIcon, USER_ICON_STORAGE_KEY } from "@/lib/partykit-client"
 import { useTheme } from "next-themes"
@@ -334,12 +334,14 @@ export function Lobby({
           </Button>
         </SheetTrigger>
         <SheetContent side="right" className="w-80">
-          <div className="mt-8">
-            <h2 className="text-xl font-bold mb-2">Joined Players</h2>
-            <p className="text-sm text-muted-foreground mb-6">
+          <SheetHeader>
+            <SheetTitle>Joined Players</SheetTitle>
+            <SheetDescription>
               {playerCount} {playerCount === 1 ? 'player' : 'players'} joined
-            </p>
+            </SheetDescription>
+          </SheetHeader>
 
+          <div className="mt-6">
             <div className="space-y-3 overflow-y-auto max-h-[calc(100vh-200px)] pr-2">
               {sortedUsers
                 .filter(u => u.role !== 'ADMIN')
