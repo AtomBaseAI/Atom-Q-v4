@@ -243,8 +243,19 @@ export function UserQuiz({
           </div>
         </div>
 
-        {/* Right: User info & Theme */}
-        <div className="flex items-center gap-4">
+        {/* Right: Timer, User info & Theme */}
+        <div className="flex items-center gap-2">
+          {phase === 'question' && currentQuestion && (
+            <div className="flex items-center gap-2 px-4 py-2 bg-primary/10 rounded-lg">
+              <div className="h-2 w-24 bg-muted rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-primary transition-all duration-100"
+                  style={{ width: `${(answerTime / currentQuestion.duration) * 100}%` }}
+                />
+              </div>
+              <span className="text-sm font-bold text-primary">{Math.ceil(answerTime)}s</span>
+            </div>
+          )}
           {/* User avatar */}
           <div className="flex items-center gap-2">
             <img
@@ -376,25 +387,10 @@ export function UserQuiz({
               <div className="space-y-6">
                 {/* Question at top */}
                 <div className="text-center pb-6 border-b">
-                  <p className="text-sm text-muted-foreground mb-2">
+                  <h2 className="text-2xl font-bold">{currentQuestion.question}</h2>
+                  <p className="text-sm text-muted-foreground mt-2">
                     Question {currentQuestion.questionIndex}/{currentQuestion.totalQuestions}
                   </p>
-                  <h2 className="text-2xl font-bold">{currentQuestion.question}</h2>
-
-                  {/* Timer */}
-                  {answerTime > 0 && (
-                    <div className="mt-4">
-                      <div className="flex items-center justify-center gap-2">
-                        <div className="h-2 w-48 bg-muted rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-primary transition-all duration-100"
-                            style={{ width: `${(answerTime / currentQuestion.duration) * 100}%` }}
-                          />
-                        </div>
-                        <span className="text-sm font-bold text-primary">{Math.ceil(answerTime)}s</span>
-                      </div>
-                    </div>
-                  )}
                 </div>
 
                 {/* Options */}
@@ -452,10 +448,10 @@ export function UserQuiz({
               <div className="space-y-6">
                 {/* Question at top */}
                 <div className="text-center pb-6 border-b">
-                  <p className="text-sm text-muted-foreground mb-2">
+                  <h2 className="text-2xl font-bold">{currentQuestion.question}</h2>
+                  <p className="text-sm text-muted-foreground mt-2">
                     Question {currentQuestion.questionIndex}/{currentQuestion.totalQuestions}
                   </p>
-                  <h2 className="text-2xl font-bold">{currentQuestion.question}</h2>
                 </div>
 
                 {/* Options with result feedback */}

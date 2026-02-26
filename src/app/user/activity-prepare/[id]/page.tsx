@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Loader2, ArrowLeft, User as UserIcon, ChevronRight, FileQuestion, Building2, GraduationCap, Layers, Users, Maximize2, Minimize2, Crown, Play } from "lucide-react"
+import { Loader2, ArrowLeft, User as UserIcon, ChevronRight, FileQuestion, Building2, GraduationCap, Layers, Users, Maximize2, Minimize2, Crown, Play, AlertTriangle } from "lucide-react"
 import { UserRole } from "@prisma/client"
 import { toasts } from "@/lib/toasts"
 import { PartyKitClient, User, Question, getUserIconUrl, getRandomUserIcon, storeUserIcon, retrieveUserIcon } from "@/lib/partykit-client"
@@ -51,7 +51,12 @@ export default function UserActivityPreparePage() {
   const [users, setUsers] = useState<User[]>([])
   const [isConnected, setIsConnected] = useState(false)
   const [quizStarted, setQuizStarted] = useState(false)
+  const [adminAvailable, setAdminAvailable] = useState(true)
+  const [adminDisconnectTime, setAdminDisconnectTime] = useState<number | null>(null)
+  const [showAdminWarning, setShowAdminWarning] = useState(false)
   const partyKitClientRef = useRef<PartyKitClient | null>(null)
+  const adminDisconnectTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const warningTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     if (status === "loading") return
@@ -196,6 +201,52 @@ export default function UserActivityPreparePage() {
           toasts.success('Quiz completed!')
           // You could show a results screen here
         },
+        onRoomClosed: () => {
+          console.log('[User] Room closed by admin')
+          toasts.error('Room closed by the host')
+          // Redirect to activity page after a short delay
+          setTimeout(() => {
+            router.push('/user/activity')
+          }, 2000)
+        },
+        onAdminDisconnected: () => {
+          console.log('[User] Admin disconnected')
+          setAdminAvailable(false)
+          setAdminDisconnectTime(Date.now())
+          setShowAdminWarning(true)
+
+          // Show warning after 30 seconds
+          warningTimerRef.current = setTimeout(() => {
+            if (!adminAvailable) {
+              toasts.warning('Host is disconnected. Waiting for them to reconnect...')
+            }
+          }, 30000)
+
+          // Start 5-minute timer to redirect
+          adminDisconnectTimerRef.current = setTimeout(() => {
+            console.log('[User] Admin did not reconnect within 5 minutes')
+            toasts.error('Host is not available. Redirecting to activities...')
+            router.push('/user/activity')
+          }, 5 * 60 * 1000) // 5 minutes
+        },
+        onAdminReconnected: () => {
+          console.log('[User] Admin reconnected')
+          setAdminAvailable(true)
+          setShowAdminWarning(false)
+          setAdminDisconnectTime(null)
+
+          // Clear timers
+          if (adminDisconnectTimerRef.current) {
+            clearTimeout(adminDisconnectTimerRef.current)
+            adminDisconnectTimerRef.current = null
+          }
+          if (warningTimerRef.current) {
+            clearTimeout(warningTimerRef.current)
+            warningTimerRef.current = null
+          }
+
+          toasts.success('Host is back online!')
+        },
       })
     } catch (error) {
       console.error("Error joining lobby:", error)
@@ -294,6 +345,16 @@ export default function UserActivityPreparePage() {
   }
 
   const handleBackFromLobby = () => {
+    // Clear admin disconnect timers
+    if (adminDisconnectTimerRef.current) {
+      clearTimeout(adminDisconnectTimerRef.current)
+      adminDisconnectTimerRef.current = null
+    }
+    if (warningTimerRef.current) {
+      clearTimeout(warningTimerRef.current)
+      warningTimerRef.current = null
+    }
+
     // Exit fullscreen if enabled
     if (checkFullscreen()) {
       handleToggleFullscreen()
@@ -304,6 +365,9 @@ export default function UserActivityPreparePage() {
     }
     setView('join')
     setIsConnected(false)
+    setShowAdminWarning(false)
+    setAdminAvailable(true)
+    setAdminDisconnectTime(null)
   }
 
   const handleRegenerateIcon = () => {
@@ -317,6 +381,13 @@ export default function UserActivityPreparePage() {
     return () => {
       if (partyKitClientRef.current) {
         partyKitClientRef.current.disconnect()
+      }
+      // Clear admin disconnect timers
+      if (adminDisconnectTimerRef.current) {
+        clearTimeout(adminDisconnectTimerRef.current)
+      }
+      if (warningTimerRef.current) {
+        clearTimeout(warningTimerRef.current)
       }
     }
   }, [])
@@ -352,6 +423,20 @@ export default function UserActivityPreparePage() {
   if (view === 'quiz') {
     return (
       <>
+        {/* Admin Disconnect Warning */}
+        {showAdminWarning && (
+          <div className="fixed top-0 left-0 right-0 z-50 bg-yellow-500 text-white px-4 py-3 flex items-center justify-center gap-3 animate-bounce">
+            <AlertTriangle className="h-5 w-5" />
+            <span className="font-medium">
+              Host is disconnected. Waiting for them to reconnect...
+              {adminDisconnectTime && (
+                <span className="ml-2 text-yellow-100">
+                  (Time elapsed: {Math.floor((Date.now() - adminDisconnectTime) / 1000)}s / 300s)
+                </span>
+              )}
+            </span>
+          </div>
+        )}
         {showFullscreenModal && (
           <FullscreenModal onEnableFullscreen={enterFullscreen} />
         )}
@@ -379,6 +464,20 @@ export default function UserActivityPreparePage() {
   if (view === 'lobby') {
     return (
       <>
+        {/* Admin Disconnect Warning */}
+        {showAdminWarning && (
+          <div className="fixed top-0 left-0 right-0 z-50 bg-yellow-500 text-white px-4 py-3 flex items-center justify-center gap-3 animate-bounce">
+            <AlertTriangle className="h-5 w-5" />
+            <span className="font-medium">
+              Host is disconnected. Waiting for them to reconnect...
+              {adminDisconnectTime && (
+                <span className="ml-2 text-yellow-100">
+                  (Time elapsed: {Math.floor((Date.now() - adminDisconnectTime) / 1000)}s / 300s)
+                </span>
+              )}
+            </span>
+          </div>
+        )}
         {showFullscreenModal && (
           <FullscreenModal onEnableFullscreen={enterFullscreen} />
         )}

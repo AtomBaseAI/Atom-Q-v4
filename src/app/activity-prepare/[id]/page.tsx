@@ -330,13 +330,17 @@ export default function ActivityPreparePage() {
   }
 
   const handleBackFromLobby = () => {
+    // Close the room to notify all users
+    if (partyKitClientRef.current) {
+      partyKitClientRef.current.closeRoom()
+      // Wait a moment for the message to be sent, then disconnect
+      setTimeout(() => {
+        partyKitClientRef.current?.disconnect()
+      }, 500)
+    }
     // Exit fullscreen if enabled
     if (checkFullscreen()) {
       handleToggleFullscreen()
-    }
-    // Disconnect from PartyKit
-    if (partyKitClientRef.current) {
-      partyKitClientRef.current.disconnect()
     }
     setView('prepare')
     setIsConnected(false)
@@ -476,14 +480,6 @@ export default function ActivityPreparePage() {
                 <div className="mt-4">
                   <p className="text-sm text-muted-foreground mb-1">Activity Code</p>
                   <p className="text-2xl font-bold font-mono tracking-wider">{activity.accessKey}</p>
-                </div>
-              )}
-
-              {/* Connection Status (for debugging) */}
-              {process.env.NODE_ENV === 'development' && view === 'lobby' && (
-                <div className="mt-4 p-2 bg-muted rounded text-xs">
-                  <p className="font-mono">PartyKit URL: wss://atomq-quiz-partykit-server.atombaseai.partykit.dev/party/{activity.accessKey}</p>
-                  <p className="font-mono mt-1">Connected: {isConnected ? '✅ Yes' : '❌ No'}</p>
                 </div>
               )}
             </div>

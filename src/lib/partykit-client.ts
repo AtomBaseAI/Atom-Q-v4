@@ -55,6 +55,10 @@ export type PartyKitEventType =
   | 'START_QUIZ'
   | 'QUIZ_END'
   | 'JOIN_LOBBY'
+  | 'CLOSE_ROOM'
+  | 'ADMIN_DISCONNECTED'
+  | 'ADMIN_RECONNECTED'
+  | 'REQUEST_STATE'
 
 export interface PartyKitEventHandlers {
   onOpen?: () => void
@@ -71,6 +75,9 @@ export interface PartyKitEventHandlers {
   onLeaderboardUpdate?: (payload: { leaderboard: LeaderboardEntry[] }) => void
   onQuizEnd?: (payload: { finalLeaderboard: LeaderboardEntry[] }) => void
   onSyncTime?: () => void
+  onRoomClosed?: () => void
+  onAdminDisconnected?: () => void
+  onAdminReconnected?: () => void
 }
 
 export class PartyKitClient {
@@ -265,6 +272,18 @@ export class PartyKitClient {
         this.handlers.onQuizEnd?.(payload)
         break
 
+      case 'CLOSE_ROOM':
+        this.handlers.onRoomClosed?.()
+        break
+
+      case 'ADMIN_DISCONNECTED':
+        this.handlers.onAdminDisconnected?.()
+        break
+
+      case 'ADMIN_RECONNECTED':
+        this.handlers.onAdminReconnected?.()
+        break
+
       default:
         console.log('[PartyKit] Unhandled message type:', type)
     }
@@ -350,6 +369,12 @@ export class PartyKitClient {
 
   nextQuestion() {
     return this.send('NEXT_QUESTION', {
+      activityKey: this.room,
+    })
+  }
+
+  closeRoom() {
+    return this.send('CLOSE_ROOM', {
       activityKey: this.room,
     })
   }

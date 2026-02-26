@@ -43,6 +43,8 @@ export function AdminQuiz({
 
   const getReadyTimerRef = useRef<NodeJS.Timeout | null>(null)
   const loaderTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const answerTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const questionStartTimeRef = useRef<number>(0)
 
   useEffect(() => {
     if (!client) return
@@ -115,12 +117,29 @@ export function AdminQuiz({
             // Clear any running timers
             if (getReadyTimerRef.current) clearInterval(getReadyTimerRef.current)
             if (loaderTimerRef.current) clearInterval(loaderTimerRef.current)
+            if (answerTimerRef.current) clearInterval(answerTimerRef.current)
 
             setPhase('question')
             setCurrentQuestion(payload)
             setQuestionStats(null)
             setQuestionIndex(payload.questionIndex - 1)
             setAnswerTime(payload.duration)
+            questionStartTimeRef.current = Date.now()
+
+            // Start answer timer
+            answerTimerRef.current = setInterval(() => {
+              const elapsed = (Date.now() - questionStartTimeRef.current) / 1000
+              const remaining = Math.max(0, payload.duration - elapsed)
+              setAnswerTime(remaining)
+
+              if (remaining <= 0) {
+                clearInterval(answerTimerRef.current!)
+                // Auto show answer when timer ends
+                if (client && currentQuestion) {
+                  client.showAnswer(currentQuestion.id)
+                }
+              }
+            }, 100)
             break
 
           case 'QUESTION_STATS_UPDATE':
@@ -130,6 +149,9 @@ export function AdminQuiz({
 
           case 'SHOW_ANSWER':
             console.log('[AdminQuiz] SHOW_ANSWER received')
+            // Clear answer timer
+            if (answerTimerRef.current) clearInterval(answerTimerRef.current)
+
             setPhase('show_answer')
             if (payload.questionStats) {
               setQuestionStats(payload.questionStats)
@@ -163,6 +185,7 @@ export function AdminQuiz({
       ws.removeEventListener('message', handleMessage)
       if (getReadyTimerRef.current) clearInterval(getReadyTimerRef.current)
       if (loaderTimerRef.current) clearInterval(loaderTimerRef.current)
+      if (answerTimerRef.current) clearInterval(answerTimerRef.current)
     }
   }, [client])
 
@@ -218,8 +241,19 @@ export function AdminQuiz({
           </div>
         </div>
 
-        {/* Right: Theme & Fullscreen */}
+        {/* Right: Timer, Theme & Fullscreen */}
         <div className="flex items-center gap-2">
+          {phase === 'question' && currentQuestion && (
+            <div className="flex items-center gap-2 px-4 py-2 bg-primary/10 rounded-lg">
+              <div className="h-2 w-24 bg-muted rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-primary transition-all duration-100"
+                  style={{ width: `${(answerTime / currentQuestion.duration) * 100}%` }}
+                />
+              </div>
+              <span className="text-sm font-bold text-primary">{Math.ceil(answerTime)}s</span>
+            </div>
+          )}
           <Button
             variant="ghost"
             size="icon"
@@ -382,10 +416,10 @@ export function AdminQuiz({
               <div className="space-y-6">
                 {/* Question at top */}
                 <div className="text-center pb-6 border-b">
-                  <p className="text-sm text-muted-foreground mb-2">
+                  <h2 className="text-2xl font-bold">{currentQuestion.question}</h2>
+                  <p className="text-sm text-muted-foreground mt-2">
                     Question {currentQuestion.questionIndex}/{currentQuestion.totalQuestions}
                   </p>
-                  <h2 className="text-2xl font-bold">{currentQuestion.question}</h2>
                 </div>
 
                 {/* Options with bar charts */}
@@ -436,14 +470,6 @@ export function AdminQuiz({
                 )}
               </div>
             </CardContent>
-
-            {/* Bottom Left: Show Answer button */}
-            <div className="absolute bottom-4 left-4">
-              <Button onClick={handleShowAnswer} size="lg" className="gap-2">
-                <Eye className="h-4 w-4" />
-                Show Answer
-              </Button>
-            </div>
           </Card>
         )}
 
@@ -453,10 +479,10 @@ export function AdminQuiz({
               <div className="space-y-6">
                 {/* Question at top */}
                 <div className="text-center pb-6 border-b">
-                  <p className="text-sm text-muted-foreground mb-2">
+                  <h2 className="text-2xl font-bold">{currentQuestion.question}</h2>
+                  <p className="text-sm text-muted-foreground mt-2">
                     Question {currentQuestion.questionIndex}/{currentQuestion.totalQuestions}
                   </p>
-                  <h2 className="text-2xl font-bold">{currentQuestion.question}</h2>
                 </div>
 
                 {/* Options with correct answer highlighted */}
