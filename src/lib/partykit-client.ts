@@ -84,14 +84,14 @@ export class PartyKitClient {
   private connectionTimeout: number = 10000
 
   constructor(room: string) {
-    this.url = 'wss://atomq-quiz-partykit-server.atombaseai.partykit.dev'
+    this.url = 'wss://atomq-quiz-partykit-server.atombaseai.partykit.dev/party'
     this.room = room
   }
 
   // Test if the PartyKit server is accessible
   static async testServer(): Promise<{ accessible: boolean; message: string }> {
     try {
-      const response = await fetch('https://atomq-quiz-partykit-server.atombaseai.partykit.dev', {
+      const response = await fetch('https://atomq-quiz-partykit-server.atombaseai.partykit.dev/party', {
         method: 'HEAD',
         mode: 'no-cors'
       })

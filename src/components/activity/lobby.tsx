@@ -133,7 +133,6 @@ export function Lobby({
                   onClick={onStartQuiz}
                   className="w-full"
                   size="lg"
-                  disabled={playerCount === 0}
                 >
                   <Play className="mr-2 h-5 w-5 fill-current" />
                   Start Quiz

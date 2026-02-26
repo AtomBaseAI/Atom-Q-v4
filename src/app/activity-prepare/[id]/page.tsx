@@ -194,6 +194,11 @@ export default function ActivityPreparePage() {
       return
     }
 
+    if (questions.length === 0) {
+      toasts.error('No questions available to start the quiz')
+      return
+    }
+
     // Convert questions to PartyKit format
     const partyKitQuestions: Question[] = questions.map((aq, index) => {
       const options = JSON.parse(aq.question.options)
@@ -319,7 +324,7 @@ export default function ActivityPreparePage() {
             {/* Connection Status (for debugging) */}
             {process.env.NODE_ENV === 'development' && (
               <div className="mt-4 p-2 bg-muted rounded text-xs">
-                <p className="font-mono">PartyKit URL: wss://atomq-quiz-partykit-server.atombaseai.partykit.dev/{activity.accessKey}</p>
+                <p className="font-mono">PartyKit URL: wss://atomq-quiz-partykit-server.atombaseai.partykit.dev/party/{activity.accessKey}</p>
                 <p className="font-mono mt-1">Connected: {isConnected ? '✅ Yes' : '❌ No'}</p>
               </div>
             )}
