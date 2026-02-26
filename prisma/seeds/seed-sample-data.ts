@@ -107,11 +107,11 @@ async function main() {
 
   // Create 20 Test Users for Campus 2 (distributed across 3 departments, 3 batches, 4 sections)
   console.log('\n👥 Creating 20 Test Users for Campus 2...')
-  const userPassword2 = await bcrypt.hash('testuser123', 10)
   const users2: any[] = []
 
   for (let i = 1; i <= 20; i++) {
     const email = `assessmentuser${i}@test.org`
+    const password = await bcrypt.hash(email, 10) // Use email as password
 
     // Calculate department (approx 6-7 users per department)
     const deptIndex = Math.floor((i - 1) / 7) % 3
@@ -139,7 +139,7 @@ async function main() {
           uoid,
           email,
           name: `Assessment Test User ${i}`,
-          password: userPassword2,
+          password: password,
           role: UserRole.USER,
           campusId: campus2.id,
           departmentId,
@@ -181,7 +181,7 @@ async function main() {
         uoid: 'ADMIN01',
         email: 'testadmin@seed.org',
         name: 'Test Admin for Seed',
-        password: await bcrypt.hash('admin123', 10),
+        password: await bcrypt.hash('testadmin@seed.org', 10), // Use email as password
         role: UserRole.ADMIN,
         isActive: true,
       },
@@ -672,10 +672,10 @@ async function main() {
   console.log('\n🔑 User Credentials:')
   console.log('   Assessment Admin (Creator):')
   console.log('   Email: testadmin@seed.org')
-  console.log('   Password: admin123')
+  console.log('   Password: testadmin@seed.org')
   console.log('\n   Assessment Users:')
   console.log('   Email: assessmentuser{1-20}@test.org')
-  console.log('   Password: testuser123')
+  console.log('   Password: [use the same email as password]')
   console.log('\n   Assessment Access Key:')
   console.log(`   Timed Assessment Test: ${assessment.accessKey || 'N/A'}`)
   console.log('\n' + '='.repeat(60))
