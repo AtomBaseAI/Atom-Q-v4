@@ -1,10 +1,12 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { Card, CardContent } from "@/components/ui/card"
+import { useEffect, useState, useRef } from "react"
 import { Button } from "@/components/ui/button"
-import { Users, Crown, Loader2, Maximize2, Minimize2, Play } from "lucide-react"
-import { User, getUserIconUrl } from "@/lib/partykit-client"
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { Users, Crown, Play, ArrowLeft, Maximize2, Minimize2, Key, Sun, Moon, Loader2 } from "lucide-react"
+import { User, getUserIconUrl, retrieveUserIcon, getRandomUserIcon, storeUserIcon, USER_ICON_STORAGE_KEY } from "@/lib/partykit-client"
+import { useTheme } from "next-themes"
+import { usePathname } from "next/navigation"
 
 interface LobbyProps {
   activityKey: string
@@ -13,6 +15,14 @@ interface LobbyProps {
   isFullscreen: boolean
   onToggleFullscreen: () => void
   onStartQuiz?: () => void
+  onBack?: () => void
+  activityId?: string
+  questionCount?: number
+}
+
+interface AnimatedUser extends User {
+  animationDelay: number
+  angle: number
 }
 
 export function Lobby({
@@ -21,140 +31,406 @@ export function Lobby({
   currentUserRole,
   isFullscreen,
   onToggleFullscreen,
-  onStartQuiz
+  onStartQuiz,
+  onBack,
+  activityId,
+  questionCount = 0
 }: LobbyProps) {
+  const { theme, setTheme } = useTheme()
+  const pathname = usePathname()
+  const [animatedUsers, setAnimatedUsers] = useState<AnimatedUser[]>([])
+  const [prevUserCount, setPrevUserCount] = useState(0)
+  const containerRef = useRef<HTMLDivElement>(null)
   const playerCount = users.filter(u => u.role === 'USER').length
   const adminUser = users.find(u => u.role === 'ADMIN')
 
-  // Sort users by join time, admin first
+  // Get current user from session/localStorage for user view
+  const [currentUserIcon, setCurrentUserIcon] = useState<number>(1)
+
+  useEffect(() => {
+    if (currentUserRole === 'USER' && activityId) {
+      const savedIcon = retrieveUserIcon(activityId)
+      if (savedIcon) {
+        setCurrentUserIcon(savedIcon)
+      } else {
+        const newIcon = getRandomUserIcon()
+        setCurrentUserIcon(newIcon)
+        storeUserIcon(activityId, newIcon)
+      }
+    }
+  }, [currentUserRole, activityId])
+
+  // Get current user from users list
+  const getCurrentUser = () => {
+    // For simplicity, we'll show the first user in the list
+    // In a real app, you'd match by session user ID
+    const user = users.find(u => u.role === 'USER')
+    return user || { id: '', nickname: 'Player', avatar: currentUserIcon.toString(), role: 'USER' as const, status: '', joinedAt: Date.now() }
+  }
+
+  const currentUser = currentUserRole === 'USER' ? getCurrentUser() : null
+
+  // Calculate positions for centrifugal layout (admin only)
+  const calculatePositions = (userList: User[]): AnimatedUser[] => {
+    const nonAdminUsers = userList.filter(u => u.role !== 'ADMIN')
+    const total = nonAdminUsers.length
+
+    return nonAdminUsers.map((user, index) => {
+      const angle = (index / total) * 360
+      return {
+        ...user,
+        angle,
+        animationDelay: index * 0.2,
+      }
+    })
+  }
+
+  // Update animated users when users list changes (admin only)
+  useEffect(() => {
+    if (currentUserRole === 'ADMIN') {
+      const currentCount = users.length
+      if (currentCount !== prevUserCount) {
+        setAnimatedUsers(calculatePositions(users))
+        setPrevUserCount(currentCount)
+      }
+    }
+  }, [users, prevUserCount, currentUserRole])
+
+  // Sort users by join time (admin only)
   const sortedUsers = [...users].sort((a, b) => {
     if (a.role === 'ADMIN') return -1
     if (b.role === 'ADMIN') return 1
     return a.joinedAt - b.joinedAt
   })
 
-  return (
-    <div className={`
-      min-h-screen flex items-center justify-center p-4
-      ${isFullscreen ? 'fixed inset-0 z-50 bg-background' : ''}
-    `}>
-      <Card className={`
-        w-full border-2 relative
-        ${isFullscreen ? 'max-w-4xl h-[90vh] overflow-hidden' : 'max-w-2xl'}
-      `}>
-        {/* Header with fullscreen toggle */}
-        <div className="absolute top-4 right-4 z-10">
+  // USER VIEW - Simple centered layout
+  if (currentUserRole === 'USER') {
+    return (
+      <div className={`min-h-screen flex items-center justify-center p-4 relative overflow-hidden ${isFullscreen ? 'fixed inset-0 z-50 bg-background' : ''}`}>
+        {/* Background decoration - subtle gradient */}
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-primary/5 pointer-events-none" />
+
+        {/* Top Left: Activity Code with Key Icon */}
+        <div className="absolute top-4 left-4 z-10">
+          <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-card/80 backdrop-blur-sm border border-border/50 shadow-sm">
+            <Key className="h-4 w-4 text-primary" />
+            <span className="font-mono font-bold text-lg">{activityKey}</span>
+          </div>
+        </div>
+
+        {/* Top Right: Fullscreen & Theme Toggle */}
+        <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
           <Button
             variant="ghost"
             size="icon"
             onClick={onToggleFullscreen}
-            className="h-8 w-8"
+            className="h-10 w-10"
           >
             {isFullscreen ? (
-              <Minimize2 className="h-4 w-4" />
+              <Minimize2 className="h-5 w-5" />
             ) : (
-              <Maximize2 className="h-4 w-4" />
+              <Maximize2 className="h-5 w-5" />
             )}
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            className="h-10 w-10"
+          >
+            <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+            <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
           </Button>
         </div>
 
-        {/* Content */}
-        <CardContent className={`
-          p-8 h-full
-          ${isFullscreen ? 'flex flex-col' : ''}
-        `}>
-          <div className={`
-            flex flex-col items-center justify-center text-center space-y-6
-            ${isFullscreen ? 'flex-1 overflow-y-auto' : ''}
-          `}>
-            {/* Activity Key */}
-            <div className="space-y-2">
-              <p className="text-sm text-muted-foreground uppercase tracking-wider">Activity Code</p>
-              <p className="text-3xl font-bold font-mono tracking-wider">{activityKey}</p>
+        {/* Center - Big User Icon and Name */}
+        <div className="relative z-10 text-center">
+          {/* Big User Icon */}
+          <div className="relative inline-block mb-6">
+            <div className="w-48 h-48 rounded-full bg-gradient-to-br from-orange-400/20 to-orange-600/20 dark:from-orange-400/30 dark:to-orange-600/30 backdrop-blur-md border-4 border-orange-400/40 dark:border-orange-400/50 shadow-[0_0_40px_rgba(251,146,60,0.5)] dark:shadow-[0_0_50px_rgba(251,146,60,0.7)] flex items-center justify-center overflow-hidden">
+              <img
+                src={getUserIconUrl(parseInt(currentUser.avatar))}
+                alt={currentUser.nickname}
+                className="w-40 h-40 rounded-full object-cover"
+              />
             </div>
-
-            {/* Player Count */}
-            <div className="flex items-center gap-2">
-              <Users className="h-5 w-5 text-primary" />
-              <span className="text-lg font-semibold">
-                {playerCount} {playerCount === 1 ? 'Player' : 'Players'} Joined
-              </span>
-            </div>
-
-            {/* Users Grid */}
-            <div className={`
-              grid gap-4 w-full
-              ${isFullscreen ? 'grid-cols-4 md:grid-cols-6 lg:grid-cols-8' : 'grid-cols-4'}
-            `}>
-              {sortedUsers.map((user) => (
-                <div
-                  key={user.id}
-                  className="flex flex-col items-center space-y-2 p-3 bg-muted/50 rounded-lg"
-                >
-                  <div className="relative">
-                    <img
-                      src={getUserIconUrl(parseInt(user.avatar))}
-                      alt={user.nickname}
-                      className={`
-                        w-12 h-12 md:w-16 md:h-16 object-cover rounded-full
-                        ${user.role === 'ADMIN' ? 'ring-2 ring-primary' : ''}
-                      `}
-                      onError={(e) => {
-                        // Fallback emoji if image fails to load
-                        const target = e.target as HTMLImageElement
-                        target.style.display = 'none'
-                        const fallback = target.nextElementSibling as HTMLDivElement
-                        if (fallback) fallback.style.display = 'flex'
-                      }}
-                    />
-                    <div className="hidden absolute inset-0 items-center justify-center bg-muted rounded-full text-2xl">
-                      {user.role === 'ADMIN' ? '👑' : '👤'}
-                    </div>
-                    {user.role === 'ADMIN' && (
-                      <div className="absolute -top-1 -right-1 bg-primary rounded-full p-1">
-                        <Crown className="h-3 w-3 text-primary-foreground" />
-                      </div>
-                    )}
-                  </div>
-                  <p className="text-xs md:text-sm font-medium truncate max-w-full">
-                    {user.nickname}
-                  </p>
-                  {user.role === 'ADMIN' && (
-                    <span className="text-xs text-muted-foreground">Host</span>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            {/* Admin Actions */}
-            {currentUserRole === 'ADMIN' && onStartQuiz && (
-              <div className="pt-4 border-t w-full max-w-md">
-                <Button
-                  onClick={onStartQuiz}
-                  className="w-full"
-                  size="lg"
-                >
-                  <Play className="mr-2 h-5 w-5 fill-current" />
-                  Start Quiz
-                </Button>
-                {playerCount === 0 && (
-                  <p className="text-sm text-muted-foreground mt-2">
-                    Waiting for players to join...
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* User Waiting Message */}
-            {currentUserRole === 'USER' && (
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <p className="text-sm">Waiting for host to start the quiz...</p>
-              </div>
-            )}
           </div>
-        </CardContent>
-      </Card>
+
+          {/* User Name */}
+          <h1 className="text-4xl font-bold mb-4">{currentUser.nickname}</h1>
+
+          {/* Waiting Message */}
+          <div className="flex items-center justify-center gap-2 text-muted-foreground">
+            <Loader2 className="h-5 w-5 animate-spin" />
+            <p className="text-lg">Waiting for host to start the quiz...</p>
+          </div>
+        </div>
+
+        {/* Bottom Left: Back Button */}
+        {onBack && (
+          <div className="absolute bottom-4 left-4 z-10">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onBack}
+              className="h-12 w-12"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // ADMIN VIEW - Full featured with centrifugal layout
+  return (
+    <div className={`min-h-screen flex items-center justify-center p-4 relative overflow-hidden ${isFullscreen ? 'fixed inset-0 z-50 bg-background' : ''}`}>
+      {/* Background decoration - subtle gradient */}
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-primary/5 pointer-events-none" />
+
+      {/* Progress Bar at Bottom */}
+      {questionCount > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 h-[5px] bg-orange-500 z-50" />
+      )}
+
+      {/* Top Left: Activity Code with Key Icon */}
+      <div className="absolute top-4 left-4 flex items-center gap-3 z-10">
+        <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-card/80 backdrop-blur-sm border border-border/50 shadow-sm">
+          <Key className="h-4 w-4 text-primary" />
+          <span className="font-mono font-bold text-lg">{activityKey}</span>
+        </div>
+        {/* Admin Icon */}
+        {adminUser && (
+          <div className="relative group">
+            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-orange-400/20 to-orange-600/20 dark:from-orange-400/30 dark:to-orange-600/30 backdrop-blur-md border border-orange-400/30 dark:border-orange-400/40 shadow-[0_0_15px_rgba(251,146,60,0.4)] dark:shadow-[0_0_20px_rgba(251,146,60,0.6)] flex items-center justify-center overflow-hidden">
+              <img
+                src={getUserIconUrl(parseInt(adminUser.avatar))}
+                alt={adminUser.nickname}
+                className="w-10 h-10 rounded-full object-cover"
+              />
+            </div>
+            {/* Tooltip */}
+            <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 px-2 py-1 bg-foreground text-background text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+              {adminUser.nickname}
+            </div>
+            {/* Crown for admin */}
+            <div className="absolute -top-1 -right-1 bg-primary rounded-full p-1">
+              <Crown className="h-3 w-3 text-primary-foreground" />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Top Right: Fullscreen & Theme Toggle */}
+      <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onToggleFullscreen}
+          className="h-10 w-10"
+        >
+          {isFullscreen ? (
+            <Minimize2 className="h-5 w-5" />
+          ) : (
+            <Maximize2 className="h-5 w-5" />
+          )}
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+          className="h-10 w-10"
+        >
+          <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+          <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+        </Button>
+      </div>
+
+      {/* Center - Centrifugal User Bubbles */}
+      <div ref={containerRef} className="relative flex items-center justify-center" style={{ width: '600px', height: '600px' }}>
+        {/* Center status indicator */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="text-center space-y-2">
+            <div className="w-24 h-24 mx-auto rounded-full bg-gradient-to-br from-primary/20 to-primary/40 dark:from-primary/30 dark:to-primary/50 backdrop-blur-sm border border-primary/30 flex items-center justify-center shadow-[0_0_30px_rgba(59,130,246,0.3)]">
+              <div className="text-center">
+                <p className="text-4xl font-bold text-primary">{playerCount}</p>
+                <p className="text-xs text-muted-foreground uppercase tracking-wider">Players</p>
+              </div>
+            </div>
+            <p className="text-sm text-muted-foreground">Waiting for players...</p>
+          </div>
+        </div>
+
+        {/* User Bubbles in Centrifugal Pattern */}
+        {animatedUsers.map((user, index) => {
+          const radius = 180 // Distance from center
+          const angleInRadians = (user.angle - 90) * (Math.PI / 180) // -90 to start from top
+          const x = radius * Math.cos(angleInRadians)
+          const y = radius * Math.sin(angleInRadians)
+
+          return (
+            <div
+              key={user.id}
+              className="absolute animate-bubble-float"
+              style={{
+                left: `calc(50% + ${x}px - 32px)`,
+                top: `calc(50% + ${y}px - 32px)`,
+                animationDelay: `${user.animationDelay}s`,
+                animationDuration: '4s',
+              }}
+            >
+              <div className="relative group">
+                {/* Glossy bubble with orange shadow */}
+                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-orange-400/30 to-orange-600/30 dark:from-orange-400/40 dark:to-orange-600/40 backdrop-blur-md border border-orange-400/40 dark:border-orange-400/50 shadow-[0_4px_20px_rgba(251,146,60,0.5)] dark:shadow-[0_4px_25px_rgba(251,146,60,0.7)] flex items-center justify-center overflow-hidden transition-all duration-300 hover:scale-110 animate-pulse-glow">
+                  <img
+                    src={getUserIconUrl(parseInt(user.avatar))}
+                    alt={user.nickname}
+                    className="w-12 h-12 rounded-full object-cover"
+                  />
+                </div>
+                {/* Tooltip on hover */}
+                <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-foreground text-background text-xs font-medium rounded-full whitespace-nowrap opacity-0 group-hover:opacity-100 transition-all duration-200 transform translate-y-2 group-hover:translate-y-0 pointer-events-none shadow-lg">
+                  {user.nickname}
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Bottom Left: Back & Start Quiz */}
+      <div className="absolute bottom-4 left-4 flex items-center gap-2 z-10">
+        {onBack && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onBack}
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+        )}
+        {currentUserRole === 'ADMIN' && onStartQuiz && (
+          <Button
+            onClick={onStartQuiz}
+            size="default"
+          >
+            <Play className="mr-2 h-4 w-4 fill-current" />
+            Start Quiz
+          </Button>
+        )}
+      </div>
+
+      {/* Bottom Right: Users Sheet Trigger */}
+      <Sheet>
+        <SheetTrigger asChild>
+          <Button variant="ghost" size="icon" className="absolute bottom-4 right-4 h-12 w-12 z-10">
+            <Users className="h-5 w-5" />
+            {playerCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center">
+                {playerCount}
+              </span>
+            )}
+          </Button>
+        </SheetTrigger>
+        <SheetContent side="right" className="w-80">
+          <div className="mt-8">
+            <h2 className="text-xl font-bold mb-2">Joined Players</h2>
+            <p className="text-sm text-muted-foreground mb-6">
+              {playerCount} {playerCount === 1 ? 'player' : 'players'} joined
+            </p>
+
+            <div className="space-y-3 overflow-y-auto max-h-[calc(100vh-200px)] pr-2">
+              {sortedUsers
+                .filter(u => u.role !== 'ADMIN')
+                .map((user) => (
+                  <div
+                    key={user.id}
+                    className="flex items-center gap-3 p-3 rounded-lg hover:bg-accent transition-colors"
+                  >
+                    <div className="relative group">
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-400/20 to-orange-600/20 dark:from-orange-400/30 dark:to-orange-600/30 backdrop-blur-md border border-orange-400/30 dark:border-orange-400/40 shadow-[0_0_10px_rgba(251,146,60,0.3)] dark:shadow-[0_0_15px_rgba(251,146,60,0.5)] flex items-center justify-center overflow-hidden">
+                        <img
+                          src={getUserIconUrl(parseInt(user.avatar))}
+                          alt={user.nickname}
+                          className="w-8 h-8 rounded-full object-cover"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">{user.nickname}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Joined {new Date(user.joinedAt).toLocaleTimeString()}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              {playerCount === 0 && (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Users className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                  <p>No players joined yet</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Custom CSS for animations */}
+      <style jsx global>{`
+        @keyframes bubble-float {
+          0%, 100% {
+            transform: translateY(0px);
+          }
+          50% {
+            transform: translateY(-10px);
+          }
+        }
+
+        @keyframes pulse-glow {
+          0%, 100% {
+            box-shadow: 0 4px 20px rgba(251, 146, 60, 0.5), 0 0 30px rgba(251, 146, 60, 0.3);
+          }
+          50% {
+            box-shadow: 0 4px 25px rgba(251, 146, 60, 0.7), 0 0 40px rgba(251, 146, 60, 0.5);
+          }
+        }
+
+        .dark .animate-pulse-glow {
+          animation: pulse-glow-dark 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse-glow-dark {
+          0%, 100% {
+            box-shadow: 0 4px 25px rgba(251, 146, 60, 0.7), 0 0 40px rgba(251, 146, 60, 0.5);
+          }
+          50% {
+            box-shadow: 0 4px 30px rgba(251, 146, 60, 0.9), 0 0 50px rgba(251, 146, 60, 0.7);
+          }
+        }
+
+        .animate-bubble-float {
+          animation: bubble-float 4s ease-in-out infinite;
+        }
+
+        /* Custom scrollbar for sheet */
+        .overflow-y-auto::-webkit-scrollbar {
+          width: 6px;
+        }
+
+        .overflow-y-auto::-webkit-scrollbar-track {
+          background: transparent;
+        }
+
+        .overflow-y-auto::-webkit-scrollbar-thumb {
+          background: hsl(var(--border));
+          border-radius: 3px;
+        }
+
+        .overflow-y-auto::-webkit-scrollbar-thumb:hover {
+          background: hsl(var(--primary));
+        }
+      `}</style>
     </div>
   )
 }

@@ -12,6 +12,7 @@ import { UserRole } from "@prisma/client"
 import { toasts } from "@/lib/toasts"
 import { PartyKitClient, User, Question, getUserIconUrl, getRandomUserIcon, storeUserIcon, retrieveUserIcon } from "@/lib/partykit-client"
 import { Lobby } from "@/components/activity/lobby"
+import { FullscreenModal } from "@/components/activity/fullscreen-modal"
 
 interface Activity {
   id: string
@@ -43,6 +44,7 @@ export default function UserActivityPreparePage() {
   const [view, setView] = useState<View>('join')
   const [userIcon, setUserIcon] = useState<number | null>(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [showFullscreenModal, setShowFullscreenModal] = useState(false)
 
   // PartyKit state
   const [users, setUsers] = useState<User[]>([])
@@ -119,6 +121,14 @@ export default function UserActivityPreparePage() {
 
     setIsJoiningLobby(true)
 
+    // Enable fullscreen before joining lobby
+    const fullscreenEnabled = await enterFullscreen()
+    if (!fullscreenEnabled) {
+      toasts.error('Please enable fullscreen to continue')
+      setIsJoiningLobby(false)
+      return
+    }
+
     try {
       // Initialize PartyKit client
       const client = new PartyKitClient(activity.accessKey)
@@ -189,8 +199,106 @@ export default function UserActivityPreparePage() {
     }
   }
 
+  // Check if browser supports fullscreen
+  const isFullscreenSupported = () => {
+    return !!(
+      document.fullscreenEnabled ||
+      (document as any).webkitFullscreenEnabled ||
+      (document as any).mozFullScreenEnabled ||
+      (document as any).msFullscreenEnabled
+    )
+  }
+
+  // Check current fullscreen state
+  const checkFullscreen = () => {
+    return !!(
+      document.fullscreenElement ||
+      (document as any).webkitFullscreenElement ||
+      (document as any).mozFullScreenElement ||
+      (document as any).msFullscreenElement
+    )
+  }
+
+  // Enter fullscreen
+  const enterFullscreen = async () => {
+    if (!isFullscreenSupported()) {
+      toasts.error('Fullscreen is not supported in this browser')
+      return false
+    }
+
+    try {
+      const element = document.documentElement
+      if (element.requestFullscreen) {
+        await element.requestFullscreen()
+      } else if ((element as any).webkitRequestFullscreen) {
+        await (element as any).webkitRequestFullscreen()
+      } else if ((element as any).mozRequestFullScreen) {
+        await (element as any).mozRequestFullScreen()
+      } else if ((element as any).msRequestFullscreen) {
+        await (element as any).msRequestFullscreen()
+      }
+      return true
+    } catch (error) {
+      console.error('Failed to enter fullscreen:', error)
+      toasts.error('Failed to enable fullscreen')
+      return false
+    }
+  }
+
+  // Handle fullscreen changes
+  const handleFullscreenChange = () => {
+    const isCurrentlyFullscreen = checkFullscreen()
+    setIsFullscreen(isCurrentlyFullscreen)
+
+    // Show modal if we're in activity view and fullscreen is disabled
+    if (view === 'lobby' && !isCurrentlyFullscreen) {
+      setShowFullscreenModal(true)
+    } else {
+      setShowFullscreenModal(false)
+    }
+  }
+
+  // Setup fullscreen change listener
+  useEffect(() => {
+    document.addEventListener('fullscreenchange', handleFullscreenChange)
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange)
+    document.addEventListener('mozfullscreenchange', handleFullscreenChange)
+    document.addEventListener('MSFullscreenChange', handleFullscreenChange)
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange)
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange)
+      document.removeEventListener('mozfullscreenchange', handleFullscreenChange)
+      document.removeEventListener('MSFullscreenChange', handleFullscreenChange)
+    }
+  }, [view])
+
   const handleToggleFullscreen = () => {
-    setIsFullscreen(!isFullscreen)
+    if (checkFullscreen()) {
+      // Exit fullscreen
+      if (document.exitFullscreen) {
+        document.exitFullscreen()
+      } else if ((document as any).webkitExitFullscreen) {
+        (document as any).webkitExitFullscreen()
+      } else if ((document as any).mozCancelFullScreen) {
+        (document as any).mozCancelFullScreen()
+      } else if ((document as any).msExitFullscreen) {
+        (document as any).msExitFullscreen()
+      }
+    }
+  }
+
+  const handleBackFromLobby = () => {
+    // Exit fullscreen if enabled
+    if (checkFullscreen()) {
+      handleToggleFullscreen()
+    }
+    // Disconnect from PartyKit
+    if (partyKitClientRef.current) {
+      partyKitClientRef.current.disconnect()
+    }
+    setView('join')
+    setIsConnected(false)
   }
 
   const handleRegenerateIcon = () => {
@@ -238,13 +346,20 @@ export default function UserActivityPreparePage() {
   // Lobby view
   if (view === 'lobby') {
     return (
-      <Lobby
-        activityKey={activity.accessKey!}
-        users={users}
-        currentUserRole="USER"
-        isFullscreen={isFullscreen}
-        onToggleFullscreen={handleToggleFullscreen}
-      />
+      <>
+        {showFullscreenModal && (
+          <FullscreenModal onEnableFullscreen={enterFullscreen} />
+        )}
+        <Lobby
+          activityKey={activity.accessKey!}
+          activityId={params.id as string}
+          users={users}
+          currentUserRole="USER"
+          isFullscreen={isFullscreen}
+          onToggleFullscreen={handleToggleFullscreen}
+          onBack={handleBackFromLobby}
+        />
+      </>
     )
   }
 

@@ -9,6 +9,7 @@ import { Loader2, Play, ArrowLeft, ChevronRight, FileQuestion, Building2, Gradua
 import { UserRole } from "@prisma/client"
 import { PartyKitClient, User, Question, getUserIconUrl } from "@/lib/partykit-client"
 import { Lobby } from "@/components/activity/lobby"
+import { FullscreenModal } from "@/components/activity/fullscreen-modal"
 import { toasts } from "@/lib/toasts"
 
 interface Activity {
@@ -52,6 +53,7 @@ export default function ActivityPreparePage() {
   const [error, setError] = useState<string | null>(null)
   const [view, setView] = useState<View>('prepare')
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [showFullscreenModal, setShowFullscreenModal] = useState(false)
 
   // PartyKit state
   const [users, setUsers] = useState<User[]>([])
@@ -118,6 +120,13 @@ export default function ActivityPreparePage() {
 
     if (questions.length === 0) {
       toasts.error("Please add questions to the activity first")
+      return
+    }
+
+    // Enable fullscreen before joining lobby
+    const fullscreenEnabled = await enterFullscreen()
+    if (!fullscreenEnabled) {
+      toasts.error('Please enable fullscreen to continue')
       return
     }
 
@@ -222,8 +231,106 @@ export default function ActivityPreparePage() {
     }
   }
 
+  // Check if browser supports fullscreen
+  const isFullscreenSupported = () => {
+    return !!(
+      document.fullscreenEnabled ||
+      (document as any).webkitFullscreenEnabled ||
+      (document as any).mozFullScreenEnabled ||
+      (document as any).msFullscreenEnabled
+    )
+  }
+
+  // Check current fullscreen state
+  const checkFullscreen = () => {
+    return !!(
+      document.fullscreenElement ||
+      (document as any).webkitFullscreenElement ||
+      (document as any).mozFullScreenElement ||
+      (document as any).msFullscreenElement
+    )
+  }
+
+  // Enter fullscreen
+  const enterFullscreen = async () => {
+    if (!isFullscreenSupported()) {
+      toasts.error('Fullscreen is not supported in this browser')
+      return false
+    }
+
+    try {
+      const element = document.documentElement
+      if (element.requestFullscreen) {
+        await element.requestFullscreen()
+      } else if ((element as any).webkitRequestFullscreen) {
+        await (element as any).webkitRequestFullscreen()
+      } else if ((element as any).mozRequestFullScreen) {
+        await (element as any).mozRequestFullScreen()
+      } else if ((element as any).msRequestFullscreen) {
+        await (element as any).msRequestFullscreen()
+      }
+      return true
+    } catch (error) {
+      console.error('Failed to enter fullscreen:', error)
+      toasts.error('Failed to enable fullscreen')
+      return false
+    }
+  }
+
+  // Handle fullscreen changes
+  const handleFullscreenChange = () => {
+    const isCurrentlyFullscreen = checkFullscreen()
+    setIsFullscreen(isCurrentlyFullscreen)
+
+    // Show modal if we're in activity view and fullscreen is disabled
+    if (view === 'lobby' && !isCurrentlyFullscreen) {
+      setShowFullscreenModal(true)
+    } else {
+      setShowFullscreenModal(false)
+    }
+  }
+
+  // Setup fullscreen change listener
+  useEffect(() => {
+    document.addEventListener('fullscreenchange', handleFullscreenChange)
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange)
+    document.addEventListener('mozfullscreenchange', handleFullscreenChange)
+    document.addEventListener('MSFullscreenChange', handleFullscreenChange)
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange)
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange)
+      document.removeEventListener('mozfullscreenchange', handleFullscreenChange)
+      document.removeEventListener('MSFullscreenChange', handleFullscreenChange)
+    }
+  }, [view])
+
   const handleToggleFullscreen = () => {
-    setIsFullscreen(!isFullscreen)
+    if (checkFullscreen()) {
+      // Exit fullscreen
+      if (document.exitFullscreen) {
+        document.exitFullscreen()
+      } else if ((document as any).webkitExitFullscreen) {
+        (document as any).webkitExitFullscreen()
+      } else if ((document as any).mozCancelFullScreen) {
+        (document as any).mozCancelFullScreen()
+      } else if ((document as any).msExitFullscreen) {
+        (document as any).msExitFullscreen()
+      }
+    }
+  }
+
+  const handleBackFromLobby = () => {
+    // Exit fullscreen if enabled
+    if (checkFullscreen()) {
+      handleToggleFullscreen()
+    }
+    // Disconnect from PartyKit
+    if (partyKitClientRef.current) {
+      partyKitClientRef.current.disconnect()
+    }
+    setView('prepare')
+    setIsConnected(false)
   }
 
   // Cleanup PartyKit connection on unmount
@@ -265,92 +372,118 @@ export default function ActivityPreparePage() {
   // Lobby view
   if (view === 'lobby') {
     return (
-      <Lobby
-        activityKey={activity.accessKey!}
-        users={users}
-        currentUserRole="ADMIN"
-        isFullscreen={isFullscreen}
-        onToggleFullscreen={handleToggleFullscreen}
-        onStartQuiz={handleStartQuiz}
-      />
+      <>
+        {showFullscreenModal && (
+          <FullscreenModal onEnableFullscreen={enterFullscreen} />
+        )}
+        <Lobby
+          activityKey={activity.accessKey!}
+          users={users}
+          currentUserRole="ADMIN"
+          isFullscreen={isFullscreen}
+          onToggleFullscreen={handleToggleFullscreen}
+          onStartQuiz={handleStartQuiz}
+          onBack={handleBackFromLobby}
+          questionCount={activity._count?.activityQuestions || 0}
+        />
+      </>
     )
   }
 
   // Prepare view
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <Card className="w-full max-w-2xl border-2 relative">
-        {/* Top Left: Campus, Department, Section */}
-        <div className="absolute top-4 left-4 flex flex-col gap-1 text-xs text-muted-foreground">
-          <div className="flex items-center gap-1">
-            <Building2 className="h-3 w-3" />
-            <span>{activity.campus?.name || "General"}</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <GraduationCap className="h-3 w-3" />
-            <span>{activity.department?.name || "-"}</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <Layers className="h-3 w-3" />
-            <span>{activity.section}</span>
-          </div>
-        </div>
+    <div className="min-h-screen flex flex-col">
+      {/* Progress Bar at Bottom */}
+      {activity._count?.activityQuestions && activity._count.activityQuestions > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 h-[5px] bg-orange-500 z-50" />
+      )}
 
-        {/* Top Right: Question Count */}
-        <div className="absolute top-4 right-4 flex items-center gap-1 text-xs text-muted-foreground">
-          <FileQuestion className="h-3 w-3" />
-          <span>{activity._count?.activityQuestions || 0}</span>
-        </div>
-
-        {/* Middle Section */}
-        <CardContent className="pt-16 pb-20 px-12">
-          <div className="flex flex-col items-center justify-center text-center space-y-4">
-            {/* Play Icon */}
-            <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-              <Play className="h-8 w-8 text-primary fill-current" />
+      <div className="flex-1 flex items-center justify-center p-4">
+        <Card className="w-full max-w-2xl border-2 relative">
+          {/* Top Left: Campus, Department, Section */}
+          <div className="absolute top-4 left-4 flex flex-col gap-1 text-xs text-muted-foreground">
+            <div className="flex items-center gap-1">
+              <Building2 className="h-3 w-3" />
+              <span>{activity.campus?.name || "General"}</span>
             </div>
-
-            {/* Title */}
-            <h1 className="text-3xl font-bold">{activity.title}</h1>
-
-            {/* Access Key */}
-            {activity.accessKey && (
-              <div className="mt-4">
-                <p className="text-sm text-muted-foreground mb-1">Activity Code</p>
-                <p className="text-2xl font-bold font-mono tracking-wider">{activity.accessKey}</p>
-              </div>
-            )}
-
-            {/* Connection Status (for debugging) */}
-            {process.env.NODE_ENV === 'development' && (
-              <div className="mt-4 p-2 bg-muted rounded text-xs">
-                <p className="font-mono">PartyKit URL: wss://atomq-quiz-partykit-server.atombaseai.partykit.dev/party/{activity.accessKey}</p>
-                <p className="font-mono mt-1">Connected: {isConnected ? '✅ Yes' : '❌ No'}</p>
-              </div>
-            )}
+            <div className="flex items-center gap-1">
+              <GraduationCap className="h-3 w-3" />
+              <span>{activity.department?.name || "-"}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <Layers className="h-3 w-3" />
+              <span>{activity.section}</span>
+            </div>
           </div>
-        </CardContent>
 
-        {/* Bottom Left: Buttons */}
-        <div className="absolute bottom-4 left-4 flex items-center gap-2">
-          <Button
-            onClick={() => router.push("/admin/activity")}
-            variant="outline"
-            className="rounded-none"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <Button
-            onClick={handleJoinLobby}
-            variant="outline"
-            className="rounded-none"
-          >
-            <Users className="h-4 w-4 mr-2" />
-            <span>Lobby</span>
-            <ChevronRight className="h-4 w-4 ml-1" />
-          </Button>
-        </div>
-      </Card>
+          {/* Top Right: Question Count */}
+          <div className="absolute top-4 right-4 flex items-center gap-1 text-xs text-muted-foreground">
+            <FileQuestion className="h-3 w-3" />
+            <span>{activity._count?.activityQuestions || 0}</span>
+          </div>
+
+          {/* Middle Section */}
+          <CardContent className="pt-16 pb-20 px-12">
+            <div className="flex flex-col items-center justify-center text-center space-y-4">
+              {/* Play Icon */}
+              <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                <Play className="h-8 w-8 text-primary fill-current" />
+              </div>
+
+              {/* Title */}
+              <h1 className="text-3xl font-bold">{activity.title}</h1>
+
+              {/* Access Key */}
+              {activity.accessKey && (
+                <div className="mt-4">
+                  <p className="text-sm text-muted-foreground mb-1">Activity Code</p>
+                  <p className="text-2xl font-bold font-mono tracking-wider">{activity.accessKey}</p>
+                </div>
+              )}
+
+              {/* Connection Status (for debugging) */}
+              {process.env.NODE_ENV === 'development' && view === 'lobby' && (
+                <div className="mt-4 p-2 bg-muted rounded text-xs">
+                  <p className="font-mono">PartyKit URL: wss://atomq-quiz-partykit-server.atombaseai.partykit.dev/party/{activity.accessKey}</p>
+                  <p className="font-mono mt-1">Connected: {isConnected ? '✅ Yes' : '❌ No'}</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+
+          {/* Bottom Left: Buttons */}
+          <div className="absolute bottom-4 left-4 flex items-center gap-2">
+            <Button
+              onClick={() => router.push("/admin/activity")}
+              variant="outline"
+              size="sm"
+              className="rounded-none"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <Button
+              onClick={handleJoinLobby}
+              variant="outline"
+              size="sm"
+              className="rounded-none"
+            >
+              <Users className="h-4 w-4 mr-2" />
+              <span>Lobby</span>
+              <ChevronRight className="h-4 w-4 ml-1" />
+            </Button>
+          </div>
+
+          {/* Bottom Right: Room Status Indicator */}
+          <div className="absolute bottom-4 right-4">
+            <div
+              className={`w-3 h-3 rounded-full ${
+                isConnected ? 'bg-green-500' : 'bg-red-500'
+              }`}
+              title={isConnected ? 'Connected' : 'Not Connected'}
+            />
+          </div>
+        </Card>
+      </div>
     </div>
   )
 }
