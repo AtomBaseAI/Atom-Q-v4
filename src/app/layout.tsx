@@ -1,5 +1,5 @@
 import { Metadata } from "next"
-
+import { SpeedInsights } from "@vercel/speed-insights/next"
 export const metadata: Metadata = {
   title: "Atom Q",
   description: "Knowledge testing portal powered by Atom Labs",
@@ -24,7 +24,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body>{children}</body>
+      <body>
+        {children}
+        <SpeedInsights />
+      </body>
     </html>
   )
 }
