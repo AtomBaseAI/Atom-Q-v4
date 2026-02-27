@@ -277,7 +277,7 @@ export default function ActivityPreparePage() {
     // Convert questions to PartyKit format
     const partyKitQuestions: Question[] = questions.map((aq, index) => {
       const options = JSON.parse(aq.question.options)
-      return {
+      const formattedQuestion = {
         id: aq.question.id,
         question: aq.question.content,
         options: Array.isArray(options) ? options : [],
@@ -286,7 +286,11 @@ export default function ActivityPreparePage() {
         totalQuestions: questions.length,
         correctAnswer: parseInt(aq.question.correctAnswer),
       }
+      console.log(`[Admin] Formatting question ${index + 1}:`, formattedQuestion)
+      return formattedQuestion
     })
+
+    console.log('[Admin] Sending questions to PartyKit:', JSON.stringify(partyKitQuestions, null, 2))
 
     const success = partyKitClientRef.current.startQuiz(partyKitQuestions)
 

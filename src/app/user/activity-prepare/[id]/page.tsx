@@ -31,6 +31,19 @@ interface Activity {
   }
 }
 
+interface ActivityQuestion {
+  id: string
+  order: number
+  points: number
+  question: {
+    id: string
+    content: string
+    type: string
+    options: string
+    correctAnswer: string
+  }
+}
+
 type View = 'join' | 'lobby' | 'quiz'
 
 export default function UserActivityPreparePage() {
@@ -38,6 +51,7 @@ export default function UserActivityPreparePage() {
   const router = useRouter()
   const { data: session, status } = useSession()
   const [activity, setActivity] = useState<Activity | null>(null)
+  const [questions, setQuestions] = useState<ActivityQuestion[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [username, setUsername] = useState("")
@@ -73,6 +87,7 @@ export default function UserActivityPreparePage() {
     }
 
     fetchActivity()
+    fetchQuestions()
   }, [session, status, router, params.id])
 
   const fetchActivity = async () => {
@@ -109,6 +124,18 @@ export default function UserActivityPreparePage() {
       setError("Network error occurred")
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchQuestions = async () => {
+    try {
+      const response = await fetch(`/api/user/activity/${params.id}/questions`)
+      if (response.ok) {
+        const data = await response.json()
+        setQuestions(data)
+      }
+    } catch (error) {
+      console.error("Error fetching questions:", error)
     }
   }
 
@@ -442,6 +469,15 @@ export default function UserActivityPreparePage() {
         )}
         <UserQuiz
           client={partyKitClientRef.current}
+          questions={questions.map((aq, index) => ({
+            id: aq.question.id,
+            question: aq.question.content,
+            options: JSON.parse(aq.question.options),
+            duration: activity?.answerTime || 15,
+            questionIndex: index + 1,
+            totalQuestions: questions.length,
+            correctAnswer: parseInt(aq.question.correctAnswer),
+          }))}
           activityKey={activity.accessKey!}
           currentUser={{
             id: session?.user?.id || '',

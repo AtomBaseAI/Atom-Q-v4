@@ -11,6 +11,7 @@ type QuizPhase = 'lobby' | 'get_ready' | 'question_loader' | 'question' | 'show_
 
 interface UserQuizProps {
   client: PartyKitClient | null
+  questions: Question[]
   activityKey: string
   currentUser: any
   isFullscreen: boolean
@@ -21,6 +22,7 @@ interface UserQuizProps {
 
 export function UserQuiz({
   client,
+  questions,
   activityKey,
   currentUser,
   isFullscreen,
@@ -118,6 +120,8 @@ export function UserQuiz({
 
           case 'QUESTION_START':
             console.log('[UserQuiz] QUESTION_START received')
+            console.log('[UserQuiz] Full payload:', JSON.stringify(payload, null, 2))
+            console.log('[UserQuiz] Payload.question field:', payload.question)
             // Clear any running timers
             if (getReadyTimerRef.current) clearInterval(getReadyTimerRef.current)
             if (loaderTimerRef.current) clearInterval(loaderTimerRef.current)
@@ -203,14 +207,14 @@ export function UserQuiz({
   }, [client, currentQuestion, myAnswer])
 
   const handleSelectAnswer = (index: number) => {
-    if (!currentQuestion || selectedAnswer !== null) return
+    if (!displayQuestion || selectedAnswer !== null) return
 
     setSelectedAnswer(index)
     setMyAnswer(index)
 
     // Submit answer to server
     const timeSpent = (Date.now() - questionStartTimeRef.current) / 1000
-    client?.submitAnswer(currentQuestion.id, index, timeSpent, currentUser.id)
+    client?.submitAnswer(displayQuestion.id, index, timeSpent, currentUser.id)
   }
 
   // Calculate option percentages
@@ -223,6 +227,14 @@ export function UserQuiz({
   const maxCount = questionStats?.optionCounts
     ? Math.max(...questionStats.optionCounts)
     : 1
+
+  // Get current question from props using questionIndex
+  const currentQuestionFromProps = currentQuestion
+    ? questions[currentQuestion.questionIndex - 1] || null
+    : null
+
+  // Use question from props if available, otherwise fall back to WebSocket payload
+  const displayQuestion = currentQuestionFromProps || currentQuestion
 
   return (
     <div className={`min-h-screen flex flex-col bg-gradient-to-br from-background via-background to-primary/5 ${isFullscreen ? 'fixed inset-0 z-50' : ''}`}>
@@ -245,12 +257,12 @@ export function UserQuiz({
 
         {/* Right: Timer, User info & Theme */}
         <div className="flex items-center gap-2">
-          {phase === 'question' && currentQuestion && (
+          {phase === 'question' && displayQuestion && (
             <div className="flex items-center gap-2 px-4 py-2 bg-primary/10 rounded-lg">
               <div className="h-2 w-24 bg-muted rounded-full overflow-hidden">
                 <div
                   className="h-full bg-primary transition-all duration-100"
-                  style={{ width: `${(answerTime / currentQuestion.duration) * 100}%` }}
+                  style={{ width: `${(answerTime / displayQuestion.duration) * 100}%` }}
                 />
               </div>
               <span className="text-sm font-bold text-primary">{Math.ceil(answerTime)}s</span>
@@ -338,12 +350,12 @@ export function UserQuiz({
             <CardContent className="pt-12 pb-12">
               <div className="text-center space-y-8">
                 {/* Question text at top */}
-                {currentQuestion && (
+                {displayQuestion && (
                   <div className="mb-8">
                     <h2 className="text-2xl font-bold mb-2">
-                      Question {currentQuestion.questionIndex}/{currentQuestion.totalQuestions}
+                      Question {displayQuestion.questionIndex}/{displayQuestion.totalQuestions}
                     </h2>
-                    <p className="text-xl text-muted-foreground">{currentQuestion.question}</p>
+                    <p className="text-xl text-muted-foreground">{displayQuestion.question}</p>
                   </div>
                 )}
 
@@ -381,21 +393,21 @@ export function UserQuiz({
           </Card>
         )}
 
-        {phase === 'question' && currentQuestion && (
+        {phase === 'question' && displayQuestion && (
           <Card className="w-full max-w-4xl">
             <CardContent className="pt-8 pb-8">
               <div className="space-y-6">
                 {/* Question at top */}
                 <div className="text-center pb-6 border-b">
-                  <h2 className="text-2xl font-bold">{currentQuestion.question}</h2>
+                  <h2 className="text-2xl font-bold">{displayQuestion.question}</h2>
                   <p className="text-sm text-muted-foreground mt-2">
-                    Question {currentQuestion.questionIndex}/{currentQuestion.totalQuestions}
+                    Question {displayQuestion.questionIndex}/{displayQuestion.totalQuestions}
                   </p>
                 </div>
 
                 {/* Options */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {currentQuestion.options.map((option, index) => {
+                  {displayQuestion.options.map((option, index) => {
                     const isSelected = selectedAnswer === index
 
                     return (
@@ -442,25 +454,25 @@ export function UserQuiz({
           </Card>
         )}
 
-        {phase === 'show_answer' && currentQuestion && questionStats && (
+        {phase === 'show_answer' && displayQuestion && questionStats && (
           <Card className="w-full max-w-4xl">
             <CardContent className="pt-8 pb-8">
               <div className="space-y-6">
                 {/* Question at top */}
                 <div className="text-center pb-6 border-b">
-                  <h2 className="text-2xl font-bold">{currentQuestion.question}</h2>
+                  <h2 className="text-2xl font-bold">{displayQuestion.question}</h2>
                   <p className="text-sm text-muted-foreground mt-2">
-                    Question {currentQuestion.questionIndex}/{currentQuestion.totalQuestions}
+                    Question {displayQuestion.questionIndex}/{displayQuestion.totalQuestions}
                   </p>
                 </div>
 
                 {/* Options with result feedback */}
                 <div className="space-y-4">
-                  {currentQuestion.options.map((option, index) => {
+                  {displayQuestion.options.map((option, index) => {
                     const count = questionStats.optionCounts[index] || 0
                     const percentage = getOptionPercentage(count)
                     const barWidth = maxCount > 0 ? (count / maxCount) * 100 : 0
-                    const isCorrect = index === currentQuestion.correctAnswer
+                    const isCorrect = index === displayQuestion.correctAnswer
                     const isMyAnswer = myAnswer === index
 
                     return (
@@ -527,7 +539,7 @@ export function UserQuiz({
                       {isCorrect ? (
                         <>
                           <Check className="h-5 w-5" />
-                          <span className="font-bold">Correct! +{Math.ceil(currentQuestion.duration || 0)} points</span>
+                          <span className="font-bold">Correct! +{Math.ceil(displayQuestion.duration || 0)} points</span>
                         </>
                       ) : (
                         <>

@@ -114,6 +114,8 @@ export function AdminQuiz({
 
           case 'QUESTION_START':
             console.log('[AdminQuiz] QUESTION_START received')
+            console.log('[AdminQuiz] Full payload:', JSON.stringify(payload, null, 2))
+            console.log('[AdminQuiz] Payload.question field:', payload.question)
             // Clear any running timers
             if (getReadyTimerRef.current) clearInterval(getReadyTimerRef.current)
             if (loaderTimerRef.current) clearInterval(loaderTimerRef.current)
@@ -135,8 +137,9 @@ export function AdminQuiz({
               if (remaining <= 0) {
                 clearInterval(answerTimerRef.current!)
                 // Auto show answer when timer ends
-                if (client && currentQuestion) {
-                  client.showAnswer(currentQuestion.id)
+                const questionForId = questions[payload.questionIndex - 1] || payload
+                if (client && questionForId) {
+                  client.showAnswer(questionForId.id)
                 }
               }
             }, 100)
@@ -211,6 +214,14 @@ export function AdminQuiz({
 
   const playerCount = users.filter(u => u.role !== 'ADMIN').length
 
+  // Get current question from props using questionIndex
+  const currentQuestionFromProps = currentQuestion
+    ? questions[currentQuestion.questionIndex - 1] || null
+    : null
+
+  // Use question from props if available, otherwise fall back to WebSocket payload
+  const displayQuestion = currentQuestionFromProps || currentQuestion
+
   // Calculate option percentages
   const getOptionPercentage = (count: number) => {
     if (!questionStats || questionStats.totalResponses === 0) return 0
@@ -243,12 +254,12 @@ export function AdminQuiz({
 
         {/* Right: Timer, Theme & Fullscreen */}
         <div className="flex items-center gap-2">
-          {phase === 'question' && currentQuestion && (
+          {phase === 'question' && displayQuestion && (
             <div className="flex items-center gap-2 px-4 py-2 bg-primary/10 rounded-lg">
               <div className="h-2 w-24 bg-muted rounded-full overflow-hidden">
                 <div
                   className="h-full bg-primary transition-all duration-100"
-                  style={{ width: `${(answerTime / currentQuestion.duration) * 100}%` }}
+                  style={{ width: `${(answerTime / displayQuestion.duration) * 100}%` }}
                 />
               </div>
               <span className="text-sm font-bold text-primary">{Math.ceil(answerTime)}s</span>
@@ -367,12 +378,12 @@ export function AdminQuiz({
             <CardContent className="pt-12 pb-12">
               <div className="text-center space-y-8">
                 {/* Question text at top */}
-                {currentQuestion && (
+                {displayQuestion && (
                   <div className="mb-8">
                     <h2 className="text-2xl font-bold mb-2">
-                      Question {currentQuestion.questionIndex}/{currentQuestion.totalQuestions}
+                      Question {displayQuestion.questionIndex}/{displayQuestion.totalQuestions}
                     </h2>
-                    <p className="text-xl text-muted-foreground">{currentQuestion.question}</p>
+                    <p className="text-xl text-muted-foreground">{displayQuestion.question}</p>
                   </div>
                 )}
 
@@ -410,21 +421,21 @@ export function AdminQuiz({
           </Card>
         )}
 
-        {phase === 'question' && currentQuestion && (
+        {phase === 'question' && displayQuestion && (
           <Card className="w-full max-w-5xl">
             <CardContent className="pt-8 pb-8">
               <div className="space-y-6">
                 {/* Question at top */}
                 <div className="text-center pb-6 border-b">
-                  <h2 className="text-2xl font-bold">{currentQuestion.question}</h2>
+                  <h2 className="text-2xl font-bold">{displayQuestion.question}</h2>
                   <p className="text-sm text-muted-foreground mt-2">
-                    Question {currentQuestion.questionIndex}/{currentQuestion.totalQuestions}
+                    Question {displayQuestion.questionIndex}/{displayQuestion.totalQuestions}
                   </p>
                 </div>
 
                 {/* Options with bar charts */}
                 <div className="space-y-4">
-                  {currentQuestion.options.map((option, index) => {
+                  {displayQuestion.options.map((option, index) => {
                     const count = questionStats?.optionCounts[index] || 0
                     const percentage = getOptionPercentage(count)
                     const barWidth = maxCount > 0 ? (count / maxCount) * 100 : 0
@@ -473,25 +484,25 @@ export function AdminQuiz({
           </Card>
         )}
 
-        {phase === 'show_answer' && currentQuestion && questionStats && (
+        {phase === 'show_answer' && displayQuestion && questionStats && (
           <Card className="w-full max-w-5xl">
             <CardContent className="pt-8 pb-8">
               <div className="space-y-6">
                 {/* Question at top */}
                 <div className="text-center pb-6 border-b">
-                  <h2 className="text-2xl font-bold">{currentQuestion.question}</h2>
+                  <h2 className="text-2xl font-bold">{displayQuestion.question}</h2>
                   <p className="text-sm text-muted-foreground mt-2">
-                    Question {currentQuestion.questionIndex}/{currentQuestion.totalQuestions}
+                    Question {displayQuestion.questionIndex}/{displayQuestion.totalQuestions}
                   </p>
                 </div>
 
                 {/* Options with correct answer highlighted */}
                 <div className="space-y-4">
-                  {currentQuestion.options.map((option, index) => {
+                  {displayQuestion.options.map((option, index) => {
                     const count = questionStats.optionCounts[index] || 0
                     const percentage = getOptionPercentage(count)
                     const barWidth = maxCount > 0 ? (count / maxCount) * 100 : 0
-                    const isCorrect = index === currentQuestion.correctAnswer
+                    const isCorrect = index === displayQuestion.correctAnswer
 
                     return (
                       <div key={index} className={`relative ${isCorrect ? 'ring-2 ring-green-500 rounded-lg' : ''}`}>
