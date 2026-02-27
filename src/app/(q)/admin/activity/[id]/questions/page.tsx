@@ -671,23 +671,21 @@ export default function ActivityQuestionsPage() {
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle>{selectedQuestion?.title}</DialogTitle>
-            <DialogDescription>
-              <div className="flex gap-2 mt-2">
-                <Badge variant={
-                  selectedQuestion?.type === QuestionType.MULTIPLE_CHOICE ? "default" :
-                  selectedQuestion?.type === QuestionType.MULTI_SELECT ? "secondary" :
-                  selectedQuestion?.type === QuestionType.TRUE_FALSE ? "outline" : "destructive"
-                }>
-                  {selectedQuestion?.type.replace('_', ' ')}
-                </Badge>
-                <Badge variant={
-                  selectedQuestion?.difficulty === DifficultyLevel.EASY ? "default" :
-                  selectedQuestion?.difficulty === DifficultyLevel.MEDIUM ? "secondary" : "destructive"
-                }>
-                  {selectedQuestion?.difficulty}
-                </Badge>
-              </div>
-            </DialogDescription>
+            <div className="flex gap-2 mt-2">
+              <Badge variant={
+                selectedQuestion?.type === QuestionType.MULTIPLE_CHOICE ? "default" :
+                selectedQuestion?.type === QuestionType.MULTI_SELECT ? "secondary" :
+                selectedQuestion?.type === QuestionType.TRUE_FALSE ? "outline" : "destructive"
+              }>
+                {selectedQuestion?.type.replace('_', ' ')}
+              </Badge>
+              <Badge variant={
+                selectedQuestion?.difficulty === DifficultyLevel.EASY ? "default" :
+                selectedQuestion?.difficulty === DifficultyLevel.MEDIUM ? "secondary" : "destructive"
+              }>
+                {selectedQuestion?.difficulty}
+              </Badge>
+            </div>
           </DialogHeader>
           <div className="space-y-4">
             <div>

@@ -6,17 +6,31 @@ import { UserRole } from "@prisma/client";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const session = await getServerSession(authOptions);
     if (!session || session.user.role !== UserRole.ADMIN) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const activity = await db.activity.findUnique({
-      where: { id: params.id },
-      include: {
+      where: { id },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        campusId: true,
+        departmentId: true,
+        section: true,
+        answerTime: true,
+        maxDuration: true,
+        accessKey: true,
+        serverStatus: true,
+        serverPort: true,
+        createdAt: true,
+        updatedAt: true,
         creator: {
           select: {
             id: true,
@@ -60,9 +74,10 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const session = await getServerSession(authOptions);
     if (!session || session.user.role !== UserRole.ADMIN) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -89,7 +104,7 @@ export async function PUT(
     }
 
     const activity = await db.activity.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         title,
         description,
@@ -100,7 +115,20 @@ export async function PUT(
         maxDuration: maxDuration ? parseInt(maxDuration) : null,
         accessKey,
       },
-      include: {
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        campusId: true,
+        departmentId: true,
+        section: true,
+        answerTime: true,
+        maxDuration: true,
+        accessKey: true,
+        serverStatus: true,
+        serverPort: true,
+        createdAt: true,
+        updatedAt: true,
         creator: {
           select: {
             id: true,
@@ -140,16 +168,17 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const session = await getServerSession(authOptions);
     if (!session || session.user.role !== UserRole.ADMIN) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const activity = await db.activity.delete({
-      where: { id: params.id },
+      where: { id },
     });
 
     return NextResponse.json(activity);

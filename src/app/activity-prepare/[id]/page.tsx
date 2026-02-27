@@ -6,7 +6,7 @@ import { useSession } from "next-auth/react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Loader2, Play, ArrowLeft, ChevronRight, FileQuestion, Building2, GraduationCap, Layers, Users } from "lucide-react"
-import { UserRole } from "@prisma/client"
+import { UserRole, ActivityServerStatus } from "@prisma/client"
 import { PartyKitClient, User, Question, getUserIconUrl } from "@/lib/partykit-client"
 import { Lobby } from "@/components/activity/lobby"
 import { AdminQuiz } from "@/components/activity/admin-quiz"
@@ -23,6 +23,8 @@ interface Activity {
   answerTime?: number
   maxDuration?: number
   accessKey?: string
+  serverStatus: ActivityServerStatus
+  serverPort?: number | null
   createdAt: string
   _count: {
     activityQuestions: number
@@ -80,11 +82,54 @@ export default function ActivityPreparePage() {
     fetchQuestions()
   }, [session, status, router, params.id])
 
+  // Poll for server status updates when in CREATING state
+  useEffect(() => {
+    if (!activity || activity.serverStatus !== ActivityServerStatus.CREATING) {
+      return
+    }
+
+    console.log('[Activity-Prepare] Starting to poll for server status...')
+
+    const pollInterval = setInterval(async () => {
+      try {
+        console.log('[Activity-Prepare] Polling server status...')
+        const response = await fetch(`/api/admin/activities/${params.id}/server`)
+        if (response.ok) {
+          const data = await response.json()
+          console.log('[Activity-Prepare] Server status:', data.serverStatus)
+          setActivity(prev => prev ? { ...prev, serverStatus: data.serverStatus } : null)
+
+          // If server is created, clear the interval
+          if (data.serverStatus === ActivityServerStatus.CREATED) {
+            clearInterval(pollInterval)
+            toasts.success('Server created successfully!')
+          } else if (data.serverStatus === ActivityServerStatus.ERROR) {
+            clearInterval(pollInterval)
+            toasts.error('Failed to create server')
+          }
+        }
+      } catch (error) {
+        console.error('Error polling server status:', error)
+      }
+    }, 1000)
+
+    return () => {
+      console.log('[Activity-Prepare] Cleaning up poll interval')
+      clearInterval(pollInterval)
+    }
+  }, [activity, params.id])
+
   const fetchActivity = async () => {
     try {
       const response = await fetch(`/api/admin/activities/${params.id}`)
       if (response.ok) {
         const data = await response.json()
+        console.log('[Activity-Prepare] Fetched activity:', {
+          id: data.id,
+          title: data.title,
+          serverStatus: data.serverStatus,
+          serverPort: data.serverPort
+        })
         setActivity(data)
       } else if (response.status === 404) {
         setError("Activity not found")
@@ -116,6 +161,18 @@ export default function ActivityPreparePage() {
   const handleJoinLobby = async () => {
     if (!activity?.accessKey || !session?.user) {
       toasts.error("Missing activity information")
+      return
+    }
+
+    // Check server status
+    if (activity.serverStatus !== ActivityServerStatus.CREATED) {
+      if (activity.serverStatus === ActivityServerStatus.CREATING) {
+        toasts.error("Server is still being created, please wait...")
+      } else if (activity.serverStatus === ActivityServerStatus.ERROR) {
+        toasts.error("Server creation failed. Please try starting the activity again.")
+      } else {
+        toasts.error("Server is not ready. Please start the activity first.")
+      }
       return
     }
 
@@ -507,14 +564,27 @@ export default function ActivityPreparePage() {
             </Button>
           </div>
 
-          {/* Bottom Right: Room Status Indicator */}
-          <div className="absolute bottom-4 right-4">
-            <div
-              className={`w-3 h-3 rounded-full ${
-                isConnected ? 'bg-green-500' : 'bg-red-500'
-              }`}
-              title={isConnected ? 'Connected' : 'Not Connected'}
-            />
+          {/* Bottom Right: Server Status and Connection Status */}
+          <div className="absolute bottom-4 right-4 flex flex-col items-end gap-2">
+            {/* Server Status */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">
+                {activity.serverStatus === ActivityServerStatus.CREATING && 'Creating...'}
+                {activity.serverStatus === ActivityServerStatus.CREATED && 'Server Ready'}
+                {activity.serverStatus === ActivityServerStatus.INACTIVE && 'Inactive'}
+                {activity.serverStatus === ActivityServerStatus.ERROR && 'Error'}
+              </span>
+              <div
+                className={`w-3 h-3 rounded-full ${
+                  activity.serverStatus === ActivityServerStatus.CREATING
+                    ? 'bg-yellow-500 animate-pulse'
+                    : activity.serverStatus === ActivityServerStatus.CREATED
+                    ? 'bg-green-500'
+                    : 'bg-red-500'
+                }`}
+                title={`Server Status: ${activity.serverStatus}`}
+              />
+            </div>
           </div>
         </Card>
       </div>

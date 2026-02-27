@@ -398,6 +398,13 @@ enum StudentSection {
   F
 }
 
+enum ActivityServerStatus {
+  INACTIVE
+  CREATING
+  CREATED
+  ERROR
+}
+
 model AssessmentTabSwitch {
   id            String   @id @default(cuid())
   attemptId     String
@@ -424,22 +431,24 @@ model QuizTabSwitch {
 }
 
 model Activity {
-  id           String          @id @default(cuid())
+  id           String               @id @default(cuid())
   title        String
   description  String?
   campusId     String?
-  campus       Campus?         @relation(fields: [campusId], references: [id])
+  campus       Campus?              @relation(fields: [campusId], references: [id])
   departmentId String?
-  department   Department?     @relation(fields: [departmentId], references: [id])
-  section      StudentSection  @default(A)
-  answerTime   Int?            // in seconds
-  maxDuration  Int?            // in minutes
-  accessKey    String          @unique
+  department   Department?          @relation(fields: [departmentId], references: [id])
+  section      StudentSection       @default(A)
+  answerTime   Int?                 // in seconds
+  maxDuration  Int?                 // in minutes
+  accessKey    String               @unique
   creatorId    String
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
+  serverStatus ActivityServerStatus @default(INACTIVE)
+  serverPort   Int?
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
   activityQuestions ActivityQuestion[]
-  creator      User            @relation("ActivityCreator", fields: [creatorId], references: [id])
+  creator      User                 @relation("ActivityCreator", fields: [creatorId], references: [id])
 
   @@map("activities")
 }

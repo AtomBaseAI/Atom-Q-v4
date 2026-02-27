@@ -143,6 +143,7 @@ export default function ActivitiesPage() {
   const [deleteConfirmation, setDeleteConfirmation] = useState("")
   const [submitLoading, setSubmitLoading] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState<string | null>(null)
+  const [startingActivityId, setStartingActivityId] = useState<string | null>(null)
 
   // Deletion tracking state
   const [deleteInfo, setDeleteInfo] = useState<{
@@ -339,11 +340,15 @@ export default function ActivitiesPage() {
             variant="ghost"
             size="icon"
             className="h-8 w-8 text-primary hover:text-primary hover:bg-primary/10"
-            onClick={() => router.push(`/activity-prepare/${activity.id}`)}
+            onClick={() => handleStart(activity.id, activity.title)}
             title={questionCount === 0 ? "Add questions first" : "Start Activity"}
-            disabled={questionCount === 0}
+            disabled={questionCount === 0 || startingActivityId !== null}
           >
-            <Play className="h-4 w-4 fill-current" />
+            {startingActivityId === activity.id ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Play className="h-4 w-4 fill-current" />
+            )}
           </Button>
         )
       },
@@ -660,6 +665,35 @@ export default function ActivitiesPage() {
   const handleCampusChange = (campusId: string, isEdit: boolean = false) => {
     const setFormData = isEdit ? setEditFormData : setCreateFormData
     setFormData(prev => ({ ...prev, campusId, departmentId: "" }))
+  }
+
+  const handleStart = async (activityId: string, activityTitle: string) => {
+    setStartingActivityId(activityId)
+    try {
+      console.log('[Admin/Activity] Starting server for activity:', activityId)
+      const response = await fetch(`/api/admin/activities/${activityId}/server`, {
+        method: 'POST',
+      })
+
+      console.log('[Admin/Activity] Server response status:', response.status)
+
+      if (response.ok) {
+        const data = await response.json()
+        console.log('[Admin/Activity] Server creation response:', data)
+        toasts.success(`Server creation started for "${activityTitle}"`)
+        // Navigate to activity-prepare page
+        router.push(`/activity-prepare/${activityId}`)
+      } else {
+        const error = await response.json()
+        console.error('[Admin/Activity] Server creation failed:', error)
+        toasts.error(error.message || error.error || "Failed to start server")
+      }
+    } catch (error) {
+      console.error('[Admin/Activity] Error starting server:', error)
+      toasts.error("Failed to start server")
+    } finally {
+      setStartingActivityId(null)
+    }
   }
 
   if (status === "loading" || loading) {
